@@ -38,6 +38,7 @@ def get_all_books_names(bucket_name, folder_name):
 
 # downlads particular book from aws and save it to system and return the bookpath
 def download_book_from_aws(bookname):
+    print("helli")
   try:
     os.makedirs(folder_name, exist_ok=True)
     # Save the PDF with the bookname.pdf in the books folder
