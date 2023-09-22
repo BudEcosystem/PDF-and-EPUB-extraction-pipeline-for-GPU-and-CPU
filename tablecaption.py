@@ -87,19 +87,18 @@ def process_book_page(image_path):
         print('API request failed with status code:', response.status_code)
     tables = extract_table_results(data)
     caption = find_closest_results_for_table_caption(data)
-    pageTable=[]
     for idx, table_data in enumerate(tables):
         caption = caption[idx] if idx < len(caption) else ""
         # if should_skip_table(table_data):
         #     continue
         table_id = uuid.uuid4().hex
         rows = [row for row in table_data]
-        pageTable.append({
+        pageTable={
             "id": table_id,
             "caption": caption,
             "data": {
                 "rows": rows
                 }
-            })
+            }
 
-    return pageTable
+        return pageTable

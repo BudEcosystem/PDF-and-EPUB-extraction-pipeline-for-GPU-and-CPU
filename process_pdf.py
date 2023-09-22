@@ -74,6 +74,8 @@ def process_book(bookname):
         "pages": page_data
     }
     bookdata.insert_one(bookdata_doc)
+    #delete the book
+    os.remove(book_path)
     
 def process_page(page_num, book_path, book_folder):
     pages_data=[]
@@ -90,8 +92,9 @@ def process_page(page_num, book_path, book_folder):
         "content":page_data,
         "tables":tables_array 
     }
-    pages_data.append(page_obj)
-    return pages_data
+    if os.path.exists(image_path):
+         os.remove(image_path)
+    return page_obj
 
 def process_image(imagepath):
     image = cv2.imread(imagepath)
@@ -146,7 +149,7 @@ def sort_text_blocks_and_extract_data(blocks, imagepath,tables_array):
             output = process_list(block,imagepath, output)
     return output
 
-def process_table(table_block, imagepath, output,tables_array):
+def process_table(table_block, imagepath, output, tables_array):
     x1, y1, x2, y2 = table_block.block.x_1, table_block.block.y_1, table_block.block.x_2, table_block.block.y_2
     # Load the image
     img = cv2.imread(imagepath)
@@ -169,8 +172,12 @@ def process_table(table_block, imagepath, output,tables_array):
 
     cv2.imwrite(cropped_image_path, cropped_image)
     #process table: 
-    tables=process_book_page(cropped_image_path)
-    tables_array.append(tables)
+    table=process_book_page(cropped_image_path)
+    tables_array.append(table)
+    #delete cropped image
+    if os.path.exists(cropped_image_path):
+        os.remove(cropped_image_path)
+
     # Return the path to the cropped image
     tableId =uuid.uuid4().hex
     output+=f"{{{{table:{tableId}}}}}"
@@ -229,6 +236,9 @@ def process_text(text_block,imagepath, output):
     image =Image.open(cropped_image_path)
     text = pytesseract.image_to_string(image)
     output+=text
+    #delete cropped image
+    if os.path.exists(cropped_image_path):
+        os.remove(cropped_image_path)
 
     return output
 
@@ -254,14 +264,13 @@ def process_title(title_block,imagepath, output):
     # Save the cropped image
     cropped_image_path = "title_block.png"
     cv2.imwrite(cropped_image_path, cropped_image)
-    cropped_image_path = "text_block.png"
-    cv2.imwrite(cropped_image_path, cropped_image)
     image =Image.open(cropped_image_path)
     text = pytesseract.image_to_string(image)
     output+=text
+    #delete cropped image
+    if os.path.exists(cropped_image_path):
+        os.remove(cropped_image_path)
 
-    # titleId =uuid.uuid4().hex
-    # output+=f"{{{{title:{titleId}}}}}"
     return output
 
 def process_list(list_block,imagepath, output):
@@ -289,8 +298,10 @@ def process_list(list_block,imagepath, output):
     image =Image.open(cropped_image_path)
     text = pytesseract.image_to_string(image)
     output+=text
-    # listId =uuid.uuid4().hex
-    # output+=f"{{{{list:{listId}}}}}"
+    #delete cropped image
+    if os.path.exists(cropped_image_path):
+        os.remove(cropped_image_path)
+
     return output
 
 
