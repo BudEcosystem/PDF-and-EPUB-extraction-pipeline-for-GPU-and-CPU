@@ -31,8 +31,8 @@ import time
 
 if __name__ == "__main__":
 
-    input_path = '/home/bud-data-extraction/datapipeline/PDFigCapX/code/pdffiles'
-    output_path = '/home/bud-data-extraction/datapipeline/PDFigCapX/code/pdfoutput'
+    input_path = '/home/bud-data-extraction/datapipeline/PdfFigCapX/code/pdffiles'
+    output_path = '/home/bud-data-extraction/datapipeline/PdfFigCapX/code/pdfoutput'
     xpdf_path = output_path +'/xpdf/'  
     log_file = output_path + '/log.text'
     f_log = open(log_file, 'w') 
