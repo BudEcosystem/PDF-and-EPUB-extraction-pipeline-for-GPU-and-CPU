@@ -4,6 +4,7 @@ import json
 import requests
 import math
 import uuid
+import re
 from bs4 import BeautifulSoup
 
 def parse_html_table(html):
@@ -71,7 +72,7 @@ def find_closest_results_for_table_caption(data):
     return closest_values
 # Example data
 
-def process_book_page(image_path):
+def process_book_page(image_path, page_tables, output):
 
     files = {
         'file': (image_path, open(image_path, 'rb'))
@@ -89,16 +90,23 @@ def process_book_page(image_path):
     caption = find_closest_results_for_table_caption(data)
     for idx, table_data in enumerate(tables):
         caption = caption[idx] if idx < len(caption) else ""
-        # if should_skip_table(table_data):
-        #     continue
+        if should_skip_table(table_data):
+            continue
         table_id = uuid.uuid4().hex
         rows = [row for row in table_data]
-        pageTable={
+        if not re.match(r'^Table\s+\d+', caption):
+            caption = ""
+        page_tables.append({
             "id": table_id,
             "caption": caption,
             "data": {
                 "rows": rows
                 }
-            }
+            })
+        output+= f"{{{{table:{table_id}}}}}"
+        return output 
 
-        return pageTable
+def should_skip_table(table):
+    if len(table)<=1:
+        return True
+    return False
