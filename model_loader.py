@@ -38,6 +38,7 @@ class ModelLoader:
         return self._model
     
 # if __name__ == "__main__":
+#
 #     # Test the singleton with different model names
 #     instance1 = ModelLoader("PubLayNet")
 #     instance2 = ModelLoader("TableBank")
