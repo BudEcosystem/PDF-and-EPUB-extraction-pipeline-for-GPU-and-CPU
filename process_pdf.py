@@ -438,7 +438,7 @@ if __name__=="__main__":
     # process all books
     # books = get_all_books_names('bud-datalake', 'book-set-2/')
     # print(len(books))
-    # for idx, book in books:
+    # for book in books:
     #     if book.endswith('.pdf'):
     #         process_book(book)
     #     else:
