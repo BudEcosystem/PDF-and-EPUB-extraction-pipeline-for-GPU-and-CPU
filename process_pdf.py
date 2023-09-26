@@ -64,7 +64,7 @@ def download_book_from_aws(url):
         return local_path,bookname 
     except Exception as e:
         print("An error occurred:", e)
-        error_collection.update_one({"book": bookname}, {"$set": {"error": f"{bookname} is not a pdf"}}, upsert=True)
+        error_collection.update_one({"book": bookname}, {"$set": {"error": str(e)}}, upsert=True)
         return None
  
 def process_book(url):
