@@ -51,7 +51,7 @@ def download_book_from_aws(url):
         bucket_name = parsed_url.path.split('/')[-1]
         file_key_list = list(filter(lambda x: x.startswith('prefix='), parsed_url.query.split('&')))
         file_key = file_key_list[0].split('=')[1]
-        print(file_key)
+        file_key=urllib.parse.unquote_plus(file_key)
         folder_name = file_key_list[0].split('/')[0]
         folder_name = folder_name.replace('prefix=', '') 
         bookname = file_key_list[0].split('/')[-1]
@@ -64,6 +64,7 @@ def download_book_from_aws(url):
         return local_path,bookname 
     except Exception as e:
         print("An error occurred:", e)
+        error_collection.update_one({"book": bookname}, {"$set": {"error": f"{bookname} is not a pdf"}}, upsert=True)
         return None
  
 def process_book(url):
