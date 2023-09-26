@@ -81,9 +81,6 @@ def process_book_page(image_path, page_tables, output):
 
     if response.status_code == 200:
         data = response.json()
-        if data:
-            print("process fisrt page image")
-        # Now you can use the image_data as needed
     else:
         print('API request failed with status code:', response.status_code)
     tables = extract_table_results(data)

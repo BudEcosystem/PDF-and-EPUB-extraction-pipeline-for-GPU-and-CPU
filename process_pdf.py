@@ -7,7 +7,11 @@ import shutil
 import boto3
 import re
 import cv2
+# import urlpars
 import pymongo
+from urllib.parse import urlparse
+import urllib
+import time
 import uuid
 from PyPDF2 import PdfReader
 from multiprocessing import Pool
@@ -29,8 +33,8 @@ s3 = boto3.client('s3',
                    aws_secret_access_key=aws_secret_access_key,
                    region_name=aws_region)
 
-bucket_name = 'bud-datalake'
-folder_name = 'book-set-2'
+# bucket_name = 'bud-datalake'
+# folder_name = 'book-set-2'
 
 # returns list of booknames
 def get_all_books_names(bucket_name, folder_name):
@@ -40,25 +44,32 @@ def get_all_books_names(bucket_name, folder_name):
   return book_names
 
 # downlads particular book from aws and save it to system and return the bookpath
-def download_book_from_aws(bookname):
-  try:
-    os.makedirs(folder_name, exist_ok=True)
-    # Save the PDF with the bookname.pdf in the books folder
-    local_path = os.path.join(folder_name, f'{bookname}')
-    file_key = f'{folder_name}/{bookname}'
-    response = s3.get_object(Bucket=bucket_name, Key=file_key)
-    pdf_data = response['Body'].read()
-    with open(local_path, 'wb') as f:
-      f.write(pdf_data)
-    return local_path   
-  except Exception as e:
+def download_book_from_aws(url):
+    try:
+        start_time = time.time()
+        parsed_url = urlparse(url)
+        bucket_name = parsed_url.path.split('/')[-1]
+        file_key_list = list(filter(lambda x: x.startswith('prefix='), parsed_url.query.split('&')))
+        file_key = file_key_list[0].split('=')[1]
+        print(file_key)
+        folder_name = file_key_list[0].split('/')[0]
+        folder_name = folder_name.replace('prefix=', '') 
+        bookname = file_key_list[0].split('/')[-1]
+        os.makedirs(folder_name, exist_ok=True)
+        local_path = os.path.join(folder_name, os.path.basename(file_key))
+        s3.download_file(bucket_name, file_key, local_path)
+        end_time=time.time()
+        total_time = end_time - start_time
+        print(f"download_book_from_aws took {total_time} seconds")
+        return local_path,bookname 
+    except Exception as e:
         print("An error occurred:", e)
-        error_collection.update_one({"book": book}, {"$set": {"error":str(e)}}, upsert=True)
         return None
-
-def process_book(bookname):
-    book_folder = bookname.replace('.pdf', '')
-    book_path = download_book_from_aws(bookname)  
+ 
+def process_book(url):
+    start_time=time.time()
+    book_path,bookname = download_book_from_aws(url)
+    book_folder = book_path.split('/')[-1].replace('.pdf','')
     if not book_path:
          return 
     os.makedirs(book_folder, exist_ok=True)
@@ -78,6 +89,9 @@ def process_book(bookname):
             "pages": page_data
         }
         bookdata.insert_one(bookdata_doc)
+        end_time=time.time()
+        total_time=end_time-start_time
+        print(f"process_book took {elapsed_time} seconds")
     except Exception as e:
         error_collection.update_one({"book": book}, {"$set": {"error": str(e)}}, upsert=True)
     #find document by name replace figure caption with ""
@@ -107,8 +121,8 @@ def process_book(bookname):
 
 #convert pages into images and return all pages data
 def process_page(page_num, book_path, book_folder, bookname):
+    start_time=time.time()
     pages_data=[]
-    print(page_num, "done")
     pdf_images = fitz.open(book_path)
     page_image = pdf_images[page_num]
     book_image = page_image.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
@@ -123,11 +137,15 @@ def process_page(page_num, book_path, book_folder, bookname):
         "figures":page_figures
     }
     os.remove(image_path)
+    end_time=time.time()
+    total_time=end_time-start_time
+    print(f"process_page took {total_time} seconds")
     return page_obj
 
 #detect layout and return page data
 def process_image(imagepath, page_num, bookname):
     try:
+        start_time=time.time()
         image = cv2.imread(imagepath)
         image = image[..., ::-1]
 
@@ -166,6 +184,9 @@ def process_image(imagepath, page_num, bookname):
             error = {"page_number": page_num, "error":"Could not detect layout for this page. Try a different model."}
             error_collection.update_one({"book": bookname}, {"$push": {"pages": error}}, upsert=True)
             return "", [], []
+        end_time=time.time()
+        total_time=end_time-start_time
+        print(f"process_image took {total_time} seconds")
     except Exception as e:
         print(f"An error occurred while processing {bookname}, page {page_num}: {str(e)}")
         error = {"page_number": page_num, "error":str(e)}
@@ -174,6 +195,7 @@ def process_image(imagepath, page_num, bookname):
 
 #sort the layout blocks and return page data 
 def sort_text_blocks_and_extract_data(blocks, imagepath,page_tables, page_figures):
+    start_time=time.time()
     sorted_blocks = sorted(blocks, key=lambda block: (block.block.y_1 + block.block.y_2) / 2)
     output = ""
     
@@ -198,10 +220,15 @@ def sort_text_blocks_and_extract_data(blocks, imagepath,page_tables, page_figure
             output = process_list(block, imagepath, output)
 
     page_content = re.sub(r'\s+', ' ', output).strip()
+
+    end_time=time.time()
+    total_time=end_time-start_time
+    print(f"sorting block and extracting took {total_time} seconds")
     return page_content
 
 #extract table and table_caption and return table object {id, data, caption}
 def process_table(table_block, imagepath, output, page_tables):
+    start_time=time.time()
     x1, y1, x2, y2 = table_block.block.x_1, table_block.block.y_1, table_block.block.x_2, table_block.block.y_2
     # Load the image
     img = cv2.imread(imagepath)
@@ -230,10 +257,14 @@ def process_table(table_block, imagepath, output, page_tables):
 
     if os.path.exists(table_image_path):
         os.remove(table_image_path)
+    end_time=time.time()
+    total_time=end_time-start_time
+    print(f"process_table took {total_time} seconds")
     return output
 
 #extract figure and figure_caption and return figure object {id, figureUrl, caption}
 def process_figure(figure_block, imagepath, prev_block, next_block, output, page_figures):
+    start_time=time.time()
     caption=""
     # Process the "Figure" block
     x1, y1, x2, y2 = figure_block.block.x_1, figure_block.block.y_1, figure_block.block.x_2, figure_block.block.y_2
@@ -322,10 +353,15 @@ def process_figure(figure_block, imagepath, prev_block, next_block, output, page
     })
     if os.path.exists(figure_image_path):
         os.remove(figure_image_path)
+
+    end_time=time.time()
+    total_time=end_time-start_time
+    print(f"process_figure took {total_time} seconds")
     return output    
 
 #extract and return text from text block
 def process_text(text_block,imagepath, output):
+    start_time=time.time()
     x1, y1, x2, y2 = text_block.block.x_1, text_block.block.y_1, text_block.block.x_2, text_block.block.y_2
     # Load the image
     img = cv2.imread(imagepath)
@@ -355,10 +391,14 @@ def process_text(text_block,imagepath, output):
     if os.path.exists(cropped_image_path):
         os.remove(cropped_image_path)
 
+    end_time=time.time()
+    total_time=end_time-start_time
+    print(f"process_text took {total_time} seconds")
     return output
 
 #extract and return text from title block
 def process_title(title_block,imagepath, output):
+    start_time=time.time()
     x1, y1, x2, y2 = title_block.block.x_1, title_block.block.y_1, title_block.block.x_2, title_block.block.y_2
     # Load the image
     img = cv2.imread(imagepath)
@@ -388,10 +428,14 @@ def process_title(title_block,imagepath, output):
     if os.path.exists(cropped_image_path):
         os.remove(cropped_image_path)
 
+    end_time=time.time()
+    total_time=end_time-start_time
+    print(f"process_title took {total_time} seconds")
     return output
 
 #extract and return text from list block
 def process_list(list_block,imagepath, output):
+    start_time=time.time()
     x1, y1, x2, y2 = list_block.block.x_1, list_block.block.y_1, list_block.block.x_2, list_block.block.y_2
     # Load the image
     img = cv2.imread(imagepath)
@@ -421,17 +465,24 @@ def process_list(list_block,imagepath, output):
     if os.path.exists(cropped_image_path):
         os.remove(cropped_image_path)
 
+    end_time=time.time()
+    total_time=end_time-start_time
+    print(f"process_list took {total_time} seconds")
     return output
 
 #upload figure to aws and return aws url
 def upload_to_aws_s3(figure_image_path, figureId): 
+    start_time=time.time()
     folderName="book-set-2-Images"
     s3_key = f"{folderName}/{figureId}.png"
     # Upload the image to the specified S3 bucket
     s3.upload_file(figure_image_path, bucket_name, s3_key)
     # Get the URL of the uploaded image
     figure_url = f"https://{bucket_name}.s3.amazonaws.com/{s3_key}"
-    print(figure_url)
+
+    end_time=time.time()
+    total_time=end_time-start_time
+    print(f"uppload to aws s3 took {total_time} seconds")
     return figure_url 
     
 if __name__=="__main__":
@@ -447,5 +498,5 @@ if __name__=="__main__":
     #         continue
     
     # process single book
-    process_book("A Beginner's Guide to R - Alain Zuur- Elena N Ieno- Erik Meesters.pdf")
-
+    # process_book("A Beginner's Guide to R - Alain Zuur- Elena N Ieno- Erik Meesters.pdf")
+      process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=bud-ebooks/00a85ef0-160d-432e-baa8-1d2f16277c2f.pdf")
