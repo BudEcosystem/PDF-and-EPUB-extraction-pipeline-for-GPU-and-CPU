@@ -16,6 +16,7 @@ import uuid
 from PyPDF2 import PdfReader
 from multiprocessing import Pool
 from tablecaption import process_book_page
+from model_loader import ModelLoader 
 
 # Configure AWS credentials
 aws_access_key_id = 'AKIA4CKBAUILYLX23AO7'
@@ -27,13 +28,15 @@ db = client.aws_book_set_2
 bookdata = db.bookdata
 error_collection = db.error_collection
 
+
+
 # Create an S3 client
 s3 = boto3.client('s3',
                    aws_access_key_id=aws_access_key_id,
                    aws_secret_access_key=aws_secret_access_key,
                    region_name=aws_region)
 
-# bucket_name = 'bud-datalake'
+bucket_name = 'bud-datalake'
 # folder_name = 'book-set-2'
 
 # returns list of booknames
@@ -92,7 +95,7 @@ def process_book(url):
         bookdata.insert_one(bookdata_doc)
         end_time=time.time()
         total_time=end_time-start_time
-        print(f"process_book took {elapsed_time} seconds")
+        print(f"process_book took {total_time} seconds")
     except Exception as e:
         error_collection.update_one({"book": book}, {"$set": {"error": str(e)}}, upsert=True)
     #find document by name replace figure caption with ""
@@ -150,19 +153,15 @@ def process_image(imagepath, page_num, bookname):
         image = cv2.imread(imagepath)
         image = image[..., ::-1]
 
-        model = lp.Detectron2LayoutModel('lp://PubLayNet/mask_rcnn_X_101_32x8d_FPN_3x/config',
-                                 extra_config=["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],
-                                 label_map={0: "Text", 1: "Title", 2: "List", 3:"Table", 4:"Figure"})
+        instance1 = ModelLoader("PubLayNet")
+        instance2 = ModelLoader("TableBank")
 
-        layout1 = model.detect(image)
-    
-        #detect extract table layout using TableBank model
-        model2 = lp.Detectron2LayoutModel('lp://TableBank/faster_rcnn_R_101_FPN_3x/config',
-                                     extra_config=["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],
-                                     label_map={0:"Table"})
-    
-        layout2=model2.detect(image)
-    
+        loaded_model1 = instance1.model
+        loaded_model2 = instance2.model
+
+        layout1=loaded_model1.detect(image)
+        layout2=loaded_model2.detect(image)
+
         final_layout = []
         for block in layout1:
             if block.type != "Table":
@@ -178,6 +177,7 @@ def process_image(imagepath, page_num, bookname):
             page_figures=[]
             #sort blocks based on their region
             page_content = sort_text_blocks_and_extract_data(final_layout,imagepath,page_tables,page_figures)
+            print(page_content)
             #process blocks for extracting different information(text,table,figure etc.)    
             return page_content,page_tables,page_figures
         else:
@@ -500,4 +500,4 @@ if __name__=="__main__":
     
     # process single book
     # process_book("A Beginner's Guide to R - Alain Zuur- Elena N Ieno- Erik Meesters.pdf")
-      process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=bud-ebooks/00a85ef0-160d-432e-baa8-1d2f16277c2f.pdf")
+      process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=book-set-2/page_28+%284%29.pdf")
