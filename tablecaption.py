@@ -104,7 +104,7 @@ def process_book_page(image_path, page_tables, output):
                 }
             })
         output+= f"{{{{table:{table_id}}}}}"
-        return output 
+    return output  
 
 def should_skip_table(table):
     if len(table)<=1:

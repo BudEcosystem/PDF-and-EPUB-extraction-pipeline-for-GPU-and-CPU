@@ -21,6 +21,7 @@ aws_region = 'ap-south-1'
 client = pymongo.MongoClient("mongodb+srv://prakash:prak1234@cluster0.nbtkiwp.mongodb.net")
 db = client.aws_book_set_2
 bookdata = db.bookdata
+error_collection = db.error_collection
 
 # Create an S3 client
 s3 = boto3.client('s3',
@@ -52,33 +53,33 @@ def download_book_from_aws(bookname):
     return local_path   
   except Exception as e:
         print("An error occurred:", e)
+        error_collection.update_one({"book": book}, {"$set": {"error":str(e)}}, upsert=True)
         return None
 
 def process_book(bookname):
     book_folder = bookname.replace('.pdf', '')
-    book_path = download_book_from_aws(bookname)
-    
+    book_path = download_book_from_aws(bookname)  
     if not book_path:
-        print(f"Error: Could not download {bookname} from AWS.")
-        return  # Exit the function if book_path is not available
-    
+         return 
     os.makedirs(book_folder, exist_ok=True)
     book = PdfReader(book_path)  # Use book_path instead of bookname
     print(bookname)
     num_pages = len(book.pages)
     print(f"{bookname} has total {num_pages} page")
     num_cpu_cores = os.cpu_count()
-    print(num_cpu_cores)
-    with Pool(processes=num_cpu_cores) as pool:
-        page_numbers = range(num_pages)
+    try:
+        with Pool(processes=num_cpu_cores) as pool:
+            page_numbers = range(num_pages)
         #use parrallel proccesing to process pages concurrently
-        page_data = pool.starmap(process_page,[(page_num, book_path,book_folder) for page_num in page_numbers])
+            page_data = pool.starmap(process_page,[(page_num, book_path,book_folder, bookname) for page_num in page_numbers])
     
-    bookdata_doc = {
-        "book": bookname,
-        "pages": page_data
-    }
-    bookdata.insert_one(bookdata_doc)
+        bookdata_doc = {
+            "book": bookname,
+            "pages": page_data
+        }
+        bookdata.insert_one(bookdata_doc)
+    except Exception as e:
+        error_collection.update_one({"book": book}, {"$set": {"error": str(e)}}, upsert=True)
     #find document by name replace figure caption with ""
     document = bookdata.find_one({"book":bookname})
     if document:
@@ -105,7 +106,7 @@ def process_book(bookname):
     shutil.rmtree(book_folder)
 
 #convert pages into images and return all pages data
-def process_page(page_num, book_path, book_folder):
+def process_page(page_num, book_path, book_folder, bookname):
     pages_data=[]
     print(page_num, "done")
     pdf_images = fitz.open(book_path)
@@ -113,7 +114,7 @@ def process_page(page_num, book_path, book_folder):
     book_image = page_image.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
     image_path = os.path.join(book_folder, f'page_{page_num + 1}.jpg')
     book_image.save(image_path)
-    page_content,page_tables,page_figures = process_image(image_path)
+    page_content,page_tables,page_figures = process_image(image_path, page_num, bookname)
     pageId= uuid.uuid4().hex
     page_obj={
         "id":pageId,
@@ -125,42 +126,51 @@ def process_page(page_num, book_path, book_folder):
     return page_obj
 
 #detect layout and return page data
-def process_image(imagepath):
-    image = cv2.imread(imagepath)
-    image = image[..., ::-1]
+def process_image(imagepath, page_num, bookname):
+    try:
+        image = cv2.imread(imagepath)
+        image = image[..., ::-1]
 
-    model = lp.Detectron2LayoutModel('lp://PubLayNet/mask_rcnn_X_101_32x8d_FPN_3x/config',
+        model = lp.Detectron2LayoutModel('lp://PubLayNet/mask_rcnn_X_101_32x8d_FPN_3x/config',
                                  extra_config=["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],
                                  label_map={0: "Text", 1: "Title", 2: "List", 3:"Table", 4:"Figure"})
 
-    layout1 = model.detect(image)
+        layout1 = model.detect(image)
     
-    #detect extract table layout using TableBank model
-    model2 = lp.Detectron2LayoutModel('lp://TableBank/faster_rcnn_R_101_FPN_3x/config',
+        #detect extract table layout using TableBank model
+        model2 = lp.Detectron2LayoutModel('lp://TableBank/faster_rcnn_R_101_FPN_3x/config',
                                      extra_config=["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],
                                      label_map={0:"Table"})
     
-    layout2=model2.detect(image)
+        layout2=model2.detect(image)
     
-    final_layout = []
-    for block in layout1:
-        if block.type != "Table":
-            final_layout.append(block)
+        final_layout = []
+        for block in layout1:
+            if block.type != "Table":
+                final_layout.append(block)
 
-    # Add "Table" blocks from layout2 to the new list
-    for block in layout2:
-        if block.type == "Table":
-            final_layout.append(block)
+        # Add "Table" blocks from layout2 to the new list
+        for block in layout2:
+            if block.type == "Table":
+                final_layout.append(block)
     
-    if final_layout:
-        page_tables=[]
-        page_figures=[]
-        #sort blocks based on their region
-        page_content = sort_text_blocks_and_extract_data(final_layout,imagepath,page_tables,page_figures)
-        #process blocks for extracting different information(text,table,figure etc.)    
-        return page_content,page_tables,page_figures
-    else:
-        print("try that image with different model")
+        if final_layout:
+            page_tables=[]
+            page_figures=[]
+            #sort blocks based on their region
+            page_content = sort_text_blocks_and_extract_data(final_layout,imagepath,page_tables,page_figures)
+            #process blocks for extracting different information(text,table,figure etc.)    
+            return page_content,page_tables,page_figures
+        else:
+            print(f"Could not detect layout for page number {page_num} of book {bookname} Try a different model.")
+            error = {"page_number": page_num, "error":"Could not detect layout for this page. Try a different model."}
+            error_collection.update_one({"book": bookname}, {"$push": {"pages": error}}, upsert=True)
+            return "", [], []
+    except Exception as e:
+        print(f"An error occurred while processing {bookname}, page {page_num}: {str(e)}")
+        error = {"page_number": page_num, "error":str(e)}
+        error_collection.update_one({"book": bookname}, {"$push": {"pages": error}}, upsert=True)
+        return "", [], []
 
 #sort the layout blocks and return page data 
 def sort_text_blocks_and_extract_data(blocks, imagepath,page_tables, page_figures):
@@ -217,6 +227,7 @@ def process_table(table_block, imagepath, output, page_tables):
     
     #process table and caption with bud-ocr
     output=process_book_page(table_image_path,page_tables, output)
+
     if os.path.exists(table_image_path):
         os.remove(table_image_path)
     return output
@@ -427,11 +438,13 @@ if __name__=="__main__":
     # process all books
     # books = get_all_books_names('bud-datalake', 'book-set-2/')
     # print(len(books))
-    # for book in books:
+    # for idx, book in books:
     #     if book.endswith('.pdf'):
     #         process_book(book)
     #     else:
     #         print(f"skipping this {book} as it it is not pdf")
+    #         error_collection.update_one({"book": book}, {"$set": {"error": f"{book} is not a pdf"}}, upsert=True)
+    #         continue
     
     # process single book
     process_book("A Beginner's Guide to R - Alain Zuur- Elena N Ieno- Erik Meesters.pdf")
