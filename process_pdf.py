@@ -4,6 +4,7 @@ from PIL import Image
 import os
 import fitz
 import shutil
+import traceback
 import boto3
 import re
 import cv2
@@ -49,7 +50,7 @@ def get_all_books_names(bucket_name, folder_name):
 
 # downlads particular book from aws and save it to system and return the bookpath
 @timeit
-def download_book_from_aws(url):
+def download_book_from_aws(url,bookId):
     try:
         parsed_url = urlparse(url)
         bucket_name = parsed_url.path.split('/')[-1]
@@ -65,11 +66,14 @@ def download_book_from_aws(url):
         return local_path,bookname 
     except Exception as e:
         print("An error occurred:", e)
-        error_collection.update_one({"book": bookname}, {"$set": {"error": str(e)}}, upsert=True)
+        data = {"bookId":{bookId},"book":{bookname}, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
+        error_collection.insert_one(data)
         return None
+
 @timeit
 def process_book(url):
-    book_path,bookname = download_book_from_aws(url)
+    bookId=uuid.uuid4().hex
+    book_path,bookname = download_book_from_aws(url, bookId)
     book_folder = book_path.split('/')[-1].replace('.pdf','')
     if not book_path:
          return 
@@ -80,20 +84,22 @@ def process_book(url):
     print(f"{bookname} has total {num_pages} page")
     num_cpu_cores = os.cpu_count()
     try:
-        with Pool(processes=num_cpu_cores) as pool:
-            page_numbers = range(num_pages)
-        #use parrallel proccesing to process pages concurrently
-            page_data = pool.starmap(process_page,[(page_num, book_path,book_folder, bookname) for page_num in page_numbers])
-    
+        page_data=[]
+        for page_num in range(num_pages):
+            page_object=process_page(page_num, book_path, book_folder, bookname,bookId)
+            page_data.append(page_object)
+
         bookdata_doc = {
+            "bookId":bookId,
             "book": bookname,
             "pages": page_data
         }
         bookdata.insert_one(bookdata_doc)
     except Exception as e:
-        error_collection.update_one({"book": book}, {"$set": {"error": str(e)}}, upsert=True)
+        data = {"bookId":{bookId},"book":{bookname},"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
+        error_collection.insert_one_one(data)
     #find document by name replace figure caption with ""
-    document = bookdata.find_one({"book":bookname})
+    document = bookdata.find_one({"bookId":bookId})
     if document:
         for page in document['pages']:
             for figure in page['figures']:
@@ -119,14 +125,14 @@ def process_book(url):
 
 #convert pages into images and return all pages data
 @timeit
-def process_page(page_num, book_path, book_folder, bookname):
+def process_page(page_num, book_path, book_folder, bookname, bookId):
     pages_data=[]
     pdf_images = fitz.open(book_path)
     page_image = pdf_images[page_num]
     book_image = page_image.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
     image_path = os.path.join(book_folder, f'page_{page_num + 1}.jpg')
     book_image.save(image_path)
-    page_content,page_tables,page_figures = process_image(image_path, page_num, bookname)
+    page_content,page_tables,page_figures = process_image(image_path, page_num, bookname, bookId)
     pageId= uuid.uuid4().hex
     page_obj={
         "id":pageId,
@@ -139,47 +145,55 @@ def process_page(page_num, book_path, book_folder, bookname):
 
 #detect layout and return page data
 @timeit
-def process_image(imagepath, page_num, bookname):
+def process_image(imagepath, page_num, bookname, bookId):
     try:
         image = cv2.imread(imagepath)
         image = image[..., ::-1]
 
-        instance1 = ModelLoader("PubLayNet")
-        instance2 = ModelLoader("TableBank")
+        publaynet = ModelLoader("PubLayNet")
+        tablebank = ModelLoader("TableBank")
 
-        loaded_model1 = instance1.model
-        loaded_model2 = instance2.model
+        publaynet_model = publaynet.model
+        tablebank_model = tablebank.model
 
-        layout1=loaded_model1.detect(image)
-        layout2=loaded_model2.detect(image)
+        publaynet_layout = publaynet_model.detect(image)
+        tablebank_layout = tablebank_model.detect(image)
 
         final_layout = []
-        for block in layout1:
+        for block in publaynet_layout:
             if block.type != "Table":
                 final_layout.append(block)
 
         # Add "Table" blocks from layout2 to the new list
-        for block in layout2:
+        for block in tablebank_layout:
             if block.type == "Table":
                 final_layout.append(block)
-    
         if final_layout:
             page_tables=[]
             page_figures=[]
             #sort blocks based on their region
             page_content = sort_text_blocks_and_extract_data(final_layout,imagepath,page_tables,page_figures)
-            print(page_content)
-            #process blocks for extracting different information(text,table,figure etc.)    
             return page_content,page_tables,page_figures
         else:
             print(f"Could not detect layout for page number {page_num} of book {bookname} Try a different model.")
-            error = {"page_number": page_num, "error":"Could not detect layout for this page. Try a different model."}
-            error_collection.update_one({"book": bookname}, {"$push": {"pages": error}}, upsert=True)
+            error = {"page_number": page_num, "error":"Could not detect layout for this page. Try a different model.", "line_number":177}
+            document=error_collection.find_one({"bookId":bookId})
+            if document:
+                error_collection.update_one({"_id": existing_document["_id"]}, {"$push": {"pages": error}})
+            else:
+                new_error_doc = {"bookId": bookId, "book": bookname, "error_pages": [error]}
+                error_collection.insert_one(new_error_doc)
             return "", [], []
+
     except Exception as e:
         print(f"An error occurred while processing {bookname}, page {page_num}: {str(e)}")
-        error = {"page_number": page_num, "error":str(e)}
-        error_collection.update_one({"book": bookname}, {"$push": {"pages": error}}, upsert=True)
+        error={"error":str(e),"page_number":page_num, "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
+        document=error_collection.find_one({"bookId":bookId})
+        if document:
+            error_collection.update_one({"_id": existing_document["_id"]}, {"$push": {"pages": error}})
+        else:
+            new_error_doc = {"bookId": bookId, "book": bookname, "error_pages": [error]}
+            error_collection.insert_one(new_error_doc)
         return "", [], []
 
 #sort the layout blocks and return page data 
@@ -462,4 +476,4 @@ if __name__=="__main__":
     
     # process single book
     # process_book("A Beginner's Guide to R - Alain Zuur- Elena N Ieno- Erik Meesters.pdf")
-      process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=book-set-2/page_41.pdf")
+      process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=book-set-2/page_1.pdf")
