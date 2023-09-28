@@ -2,6 +2,8 @@ import layoutparser as lp
 import pytesseract
 from PIL import Image
 import os
+import subprocess
+import img2pdf
 import fitz
 import shutil
 import traceback
@@ -18,6 +20,7 @@ from multiprocessing import Pool
 from tablecaption import process_book_page
 from model_loader import ModelLoader 
 from utils import timeit
+from latext import latex_to_text
 
 # Configure AWS credentials
 aws_access_key_id = 'AKIA4CKBAUILYLX23AO7'
@@ -97,7 +100,7 @@ def process_book(url):
         bookdata.insert_one(bookdata_doc)
     except Exception as e:
         data = {"bookId":{bookId},"book":{bookname},"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
-        error_collection.insert_one_one(data)
+        error_collection.insert_one(data)
     #find document by name replace figure caption with ""
     document = bookdata.find_one({"bookId":bookId})
     if document:
@@ -132,13 +135,14 @@ def process_page(page_num, book_path, book_folder, bookname, bookId):
     book_image = page_image.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
     image_path = os.path.join(book_folder, f'page_{page_num + 1}.jpg')
     book_image.save(image_path)
-    page_content,page_tables,page_figures = process_image(image_path, page_num, bookname, bookId)
+    page_content,page_tables,page_figures, page_equations = process_image(image_path, page_num, bookname, bookId)
     pageId= uuid.uuid4().hex
     page_obj={
         "id":pageId,
         "text":page_content,
         "tables":page_tables,
-        "figures":page_figures
+        "figures":page_figures,
+        "equations":page_equations
     }
     os.remove(image_path)
     return page_obj
@@ -168,22 +172,33 @@ def process_image(imagepath, page_num, bookname, bookId):
         for block in tablebank_layout:
             if block.type == "Table":
                 final_layout.append(block)
-        if final_layout:
-            page_tables=[]
-            page_figures=[]
-            #sort blocks based on their region
-            page_content = sort_text_blocks_and_extract_data(final_layout,imagepath,page_tables,page_figures)
-            return page_content,page_tables,page_figures
-        else:
-            print(f"Could not detect layout for page number {page_num} of book {bookname} Try a different model.")
-            error = {"page_number": page_num, "error":"Could not detect layout for this page. Try a different model.", "line_number":177}
-            document=error_collection.find_one({"bookId":bookId})
-            if document:
-                error_collection.update_one({"_id": existing_document["_id"]}, {"$push": {"pages": error}})
-            else:
-                new_error_doc = {"bookId": bookId, "book": bookname, "error_pages": [error]}
-                error_collection.insert_one(new_error_doc)
-            return "", [], []
+
+
+        page_tables=[]
+        page_figures=[]
+        page_equations=[]
+
+        # Check if final_layout is empty or doesn't contain any "Table" or "Figure" blocks then process the page with nougat
+        if not final_layout or not any(block.type in ["Table", "Figure"] for block in final_layout):
+            try:
+                print("extracting using naugat")
+                page_content=extract_text_equation_with_nougat(imagepath, page_equations, page_num,bookname, bookId)
+                return page_content, page_tables, page_figures, page_equations
+
+            except Exception as e:
+                    print(f"An error occurred while processing {bookname}, page {page_num} with nougat: {str(e)}")
+                    error={"error":str(e),"page_number":page_num, "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
+                    document=error_collection.find_one({"bookId":bookId})
+                    if document:
+                        error_collection.update_one({"_id": existing_document["_id"]}, {"$push": {"pages": error}})
+                    else:
+                        new_error_doc = {"bookId": bookId, "book": bookname, "error_pages": [error]}
+                        error_collection.insert_one(new_error_doc)
+                        return "",[],[],[]
+
+        #extract page content based on their region
+        page_content = sort_text_blocks_and_extract_data(final_layout,imagepath,page_tables,page_figures)
+        return page_content,page_tables,page_figures, page_equations
 
     except Exception as e:
         print(f"An error occurred while processing {bookname}, page {page_num}: {str(e)}")
@@ -194,7 +209,7 @@ def process_image(imagepath, page_num, bookname, bookId):
         else:
             new_error_doc = {"bookId": bookId, "book": bookname, "error_pages": [error]}
             error_collection.insert_one(new_error_doc)
-        return "", [], []
+        return "", [], [],[]
 
 #sort the layout blocks and return page data 
 @timeit
@@ -461,7 +476,58 @@ def upload_to_aws_s3(figure_image_path, figureId):
     figure_url = f"https://{bucket_name}.s3.amazonaws.com/{s3_key}"
 
     return figure_url 
+
+@timeit
+def extract_text_equation_with_nougat(image_path, page_equations, page_num, bookname, bookId):
+    pdf_path="page.pdf"
+    with open(pdf_path, "wb") as pdf_file, open(image_path, "rb") as image_file:
+        pdf_file.write(img2pdf.convert(image_path))
+    latex_text=get_latext_text(pdf_path,page_num, bookname, bookId)
+    pattern = r'(\\\(.*?\\\)|\\\[.*?\\\])'
     
+    def replace_with_uuid(match):
+        equationId = uuid.uuid4().hex
+        match_text = match.group()
+        text_to_speech=latext_to_text_to_speech(match_text)
+        page_equations.append({'id': equationId, 'text': match_text, 'text_to_speech':text_to_speech})
+        return f'{{{{equation:{equationId}}}}}'
+    
+    page_content = re.sub(pattern, replace_with_uuid, latex_text)
+    if os.path.exists(pdf_path):
+        os.remove(pdf_path)
+    return page_content
+   
+@timeit
+def get_latext_text(pdf_path, page_num, bookname, bookId):
+    try:
+        command=[
+            "nougat",
+            pdf_path,
+            "--no-skipping"
+        ]
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        return result.stdout
+
+    except Exception as e:
+        print(f"An error occurred while processing {bookname}, page {page_num} with nougat: {str(e)}")
+        error={"error":str(e),"page_number":page_num, "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
+        document=error_collection.find_one({"bookId":bookId})
+        if document:
+            error_collection.update_one({"_id": existing_document["_id"]}, {"$push": {"pages": error}})
+        else:
+            new_error_doc = {"bookId": bookId, "book": bookname, "error_pages": [error]}
+            error_collection.insert_one(new_error_doc)
+        return ""
+
+@timeit
+def latext_to_text_to_speech(text):
+    # Remove leading backslashes and add dollar signs at the beginning and end of the text
+    text = "${}$".format(text.lstrip('\\'))
+    # Convert the LaTeX text to text to speech
+    text_to_speech = latex_to_text(text)
+    return text_to_speech
+
+
 if __name__=="__main__":
     # process all books
     # books = get_all_books_names('bud-datalake', 'book-set-2/')
@@ -476,4 +542,4 @@ if __name__=="__main__":
     
     # process single book
     # process_book("A Beginner's Guide to R - Alain Zuur- Elena N Ieno- Erik Meesters.pdf")
-      process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=book-set-2/page_1.pdf")
+      process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=book-set-2/page_12.pdf")
