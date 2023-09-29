@@ -62,7 +62,7 @@ def download_book_from_aws(url,bookId):
         file_key=urllib.parse.unquote_plus(file_key)
         folder_name = file_key_list[0].split('/')[0]
         folder_name = folder_name.replace('prefix=', '') 
-        bookname = file_key_list[0].split('/')[-1]
+        bookname = file_key.split('/')[-1]
         os.makedirs(folder_name, exist_ok=True)
         local_path = os.path.join(folder_name, os.path.basename(file_key))
         s3.download_file(bucket_name, file_key, local_path)
@@ -135,7 +135,7 @@ def process_page(page_num, book_path, book_folder, bookname, bookId):
     book_image = page_image.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
     image_path = os.path.join(book_folder, f'page_{page_num + 1}.jpg')
     book_image.save(image_path)
-    page_content,page_tables,page_figures, page_equations = process_image(image_path, page_num, bookname, bookId)
+    page_content,page_tables,page_figures, page_equations, *nougat_extraction= process_image(image_path, page_num, bookname, bookId)
     pageId= uuid.uuid4().hex
     page_obj={
         "id":pageId,
@@ -144,6 +144,9 @@ def process_page(page_num, book_path, book_folder, bookname, bookId):
         "figures":page_figures,
         "equations":page_equations
     }
+    if nougat_extraction:
+        page_obj["nougat_extraction"] = nougat_extraction[0]
+
     os.remove(image_path)
     return page_obj
 
@@ -194,11 +197,13 @@ def process_image(imagepath, page_num, bookname, bookId):
                     else:
                         new_error_doc = {"bookId": bookId, "book": bookname, "error_pages": [error]}
                         error_collection.insert_one(new_error_doc)
-                        return "",[],[],[]
+                    return "",[],[],[]
 
         #extract page content based on their region
         page_content = sort_text_blocks_and_extract_data(final_layout,imagepath,page_tables,page_figures)
-        return page_content,page_tables,page_figures, page_equations
+        #extract equations
+        nougat_extraction = extract_text_equation_with_nougat(imagepath, page_equations, page_num,bookname, bookId)
+        return page_content,page_tables,page_figures, page_equations,nougat_extraction
 
     except Exception as e:
         print(f"An error occurred while processing {bookname}, page {page_num}: {str(e)}")
@@ -493,6 +498,7 @@ def extract_text_equation_with_nougat(image_path, page_equations, page_num, book
         return f'{{{{equation:{equationId}}}}}'
     
     page_content = re.sub(pattern, replace_with_uuid, latex_text)
+    page_content = re.sub(r'\s+', ' ', page_content).strip()
     if os.path.exists(pdf_path):
         os.remove(pdf_path)
     return page_content
@@ -542,4 +548,4 @@ if __name__=="__main__":
     
     # process single book
     # process_book("A Beginner's Guide to R - Alain Zuur- Elena N Ieno- Erik Meesters.pdf")
-      process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=book-set-2/page_12.pdf")
+      process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=book-set-2/page_28+%285%29.pdf")
