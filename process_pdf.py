@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 import layoutparser as lp
 import pytesseract
 from PIL import Image
@@ -21,17 +22,17 @@ from tablecaption import process_book_page
 from model_loader import ModelLoader 
 from utils import timeit
 from latext import latex_to_text
+load_dotenv()
 
 # Configure AWS credentials
-aws_access_key_id = 'AKIA4CKBAUILYLX23AO7'
-aws_secret_access_key = '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'
-aws_region = 'ap-south-1'
+aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
+aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
+aws_region = os.environ['AWS_REGION']
 
-client = pymongo.MongoClient("mongodb+srv://prakash:prak1234@cluster0.nbtkiwp.mongodb.net")
+client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.aws_book_set_2
 bookdata = db.bookdata
 error_collection = db.error_collection
-
 
 
 # Create an S3 client
@@ -40,7 +41,7 @@ s3 = boto3.client('s3',
                    aws_secret_access_key=aws_secret_access_key,
                    region_name=aws_region)
 
-bucket_name = 'bud-datalake'
+bucket_name = os.environ['AWS_BUCKET_NAME']
 # folder_name = 'book-set-2'
 
 # returns list of booknames
