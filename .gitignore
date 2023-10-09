@@ -1,3 +1,4 @@
 /myenv
 /__pycache__
 /.env
+./code/__pycache__

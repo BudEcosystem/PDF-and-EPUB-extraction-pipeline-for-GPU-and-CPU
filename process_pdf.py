@@ -1,8 +1,13 @@
 from dotenv import load_dotenv
 import layoutparser as lp
 import pytesseract
+import sys
+sys.path.append('/home/bud-data-extraction/datapipeline/code')
+from FigCap import extract_figure_and_caption
 from PIL import Image
 import os
+import PyPDF2
+
 import subprocess
 import img2pdf
 import fitz
@@ -33,6 +38,8 @@ client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.aws_book_set_2
 bookdata = db.bookdata
 error_collection = db.error_collection
+figure_caption = db.figure_caption
+
 
 
 # Create an S3 client
@@ -81,6 +88,10 @@ def process_book(url):
     book_folder = book_path.split('/')[-1].replace('.pdf','')
     if not book_path:
          return 
+    #extract figure and figure caption
+    book_figure_and_caption = get_figure_and_captions(book_path)
+    figure_caption_data = figure_caption.insert_one({"bookId":bookId, "pages":book_figure_and_caption})
+    print("done figure and captions okay") 
     os.makedirs(book_folder, exist_ok=True)
     book = PdfReader(book_path)  # Use book_path instead of bookname
     print(bookname)
@@ -90,7 +101,7 @@ def process_book(url):
     try:
         page_data=[]
         for page_num in range(num_pages):
-            page_object=process_page(page_num, book_path, book_folder, bookname,bookId)
+            page_object=process_page(page_num, book_path, book_folder, bookname, bookId )
             page_data.append(page_object)
 
         bookdata_doc = {
@@ -98,6 +109,7 @@ def process_book(url):
             "book": bookname,
             "pages": page_data
         }
+        
         bookdata.insert_one(bookdata_doc)
     except Exception as e:
         data = {"bookId":{bookId},"book":{bookname},"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
@@ -129,14 +141,14 @@ def process_book(url):
 
 #convert pages into images and return all pages data
 @timeit
-def process_page(page_num, book_path, book_folder, bookname, bookId):
+def process_page(page_num, book_path, book_folder, bookname, bookId ):
     pages_data=[]
-    pdf_images = fitz.open(book_path)
-    page_image = pdf_images[page_num]
+    pdf_book = fitz.open(book_path)
+    page_image = pdf_book[page_num]
     book_image = page_image.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
     image_path = os.path.join(book_folder, f'page_{page_num + 1}.jpg')
     book_image.save(image_path)
-    page_content,page_tables,page_figures, page_equations, *nougat_extraction= process_image(image_path, page_num, bookname, bookId)
+    page_content,page_tables,page_figures, page_equations, *nougat_extraction= process_image(image_path, page_num, bookname, bookId, pdf_book)
     pageId= uuid.uuid4().hex
     page_obj={
         "id":pageId,
@@ -147,13 +159,13 @@ def process_page(page_num, book_path, book_folder, bookname, bookId):
     }
     if nougat_extraction:
         page_obj["nougat_extraction"] = nougat_extraction[0]
-
+    print(page_num, "done")
     os.remove(image_path)
     return page_obj
 
 #detect layout and return page data
 @timeit
-def process_image(imagepath, page_num, bookname, bookId):
+def process_image(imagepath, page_num, bookname, bookId, pdf_book):
     try:
         image = cv2.imread(imagepath)
         image = image[..., ::-1]
@@ -176,8 +188,9 @@ def process_image(imagepath, page_num, bookname, bookId):
         for block in tablebank_layout:
             if block.type == "Table":
                 final_layout.append(block)
+        
 
-
+        
         page_tables=[]
         page_figures=[]
         page_equations=[]
@@ -199,6 +212,23 @@ def process_image(imagepath, page_num, bookname, bookId):
                         new_error_doc = {"bookId": bookId, "book": bookname, "error_pages": [error]}
                         error_collection.insert_one(new_error_doc)
                     return "",[],[],[]
+
+        if len(final_layout) == 1 and final_layout[0].type == "Figure":
+            page=pdf_book[page_num]
+            text = page.get_text(sort=True)
+            if text:
+                page_content = text = re.sub(r'\s+', ' ', text)
+                return page_content,page_tables,page_figures, page_equations
+            else:
+                figureId=uuid.uuid4().hex
+                figure_url=upload_to_aws_s3(imagepath, figureId)
+                page_figures.append({
+                    "id":figureId,
+                    "url":figure_url,
+                    "caption":""
+                })
+                page_content = f"{{{{figure:{figureId}}}}}"
+                return page_content,page_tables,page_figures, page_equations
 
         #extract page content based on their region
         page_content = sort_text_blocks_and_extract_data(final_layout,imagepath,page_tables,page_figures)
@@ -301,9 +331,9 @@ def process_figure(figure_block, imagepath, prev_block, next_block, output, page
 
     #crop the expanded bounding box
     figure_bbox = img[int(y1):int(y2), int(x1):int(x2)]
-    figure_image_path = f"figure_6.png"
-    cv2.imwrite(figure_image_path,figure_bbox)
     figureId=uuid.uuid4().hex
+    figure_image_path = f"figure_6{figureId}.png"
+    cv2.imwrite(figure_image_path,figure_bbox) 
     output += f"{{{{figure:{figureId}}}}}"
 
     if prev_block:
@@ -534,6 +564,33 @@ def latext_to_text_to_speech(text):
     text_to_speech = latex_to_text(text)
     return text_to_speech
 
+@timeit
+def get_figure_and_captions(book_path):
+    output_directory = "pdffiles"
+    book_output='output'
+    os.makedirs(output_directory, exist_ok=True)
+    os.makedirs(book_output, exist_ok=True)
+    with open(book_path, 'rb') as pdf_file:
+        pdf_reader =PyPDF2.PdfFileReader(pdf_file)
+        num_pages = pdf_reader.numPages
+        pages_per_split = 15
+        for i in range(0, num_pages, pages_per_split):
+            pdf_writer = PyPDF2.PdfFileWriter()
+            for page_num in range(i, min(i + pages_per_split, num_pages)):
+                 page = pdf_reader.getPage(page_num)
+                 pdf_writer.addPage(page)
+
+            # Save the smaller PDF to the output directory
+            output_filename = os.path.join(output_directory, f'output_{i // pages_per_split + 1}.pdf')
+            with open(output_filename, 'wb') as output_file:
+                pdf_writer.write(output_file)
+    print("PDFs have been successfully split and saved to the 'pdffiles' folder.")
+    
+    book_data=extract_figure_and_caption(output_directory, book_output)
+
+    return book_data
+
+
 
 if __name__=="__main__":
     # process all books
@@ -549,4 +606,4 @@ if __name__=="__main__":
     
     # process single book
     # process_book("A Beginner's Guide to R - Alain Zuur- Elena N Ieno- Erik Meesters.pdf")
-      process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=book-set-2/page_28+%285%29.pdf")
+      process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=book-set-2/output_2.pdf")
