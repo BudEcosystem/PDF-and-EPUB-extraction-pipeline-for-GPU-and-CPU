@@ -41,10 +41,7 @@ def extract_figure_and_caption(input_path, output_path):
     all_data=[]
     pdf_files = [pdf for pdf in os.listdir(input_path) if pdf.endswith('.pdf') and not pdf.startswith('._')]
     pdf_files.sort(key=lambda x: int(x.split("_")[1].split(".")[0]))  
-    print(pdf_files)
-
     for pdf in pdf_files:
-        print(pdf)
         print(pdf)
         data = {}
         images = renderer.render_pdf((input_path + '/' + pdf), 360)
@@ -109,9 +106,7 @@ def extract_figure_and_caption(input_path, output_path):
                     'caption_text':''
                     }
                     book_data.append(data)
-    
-    with open('bookdata.json', 'w') as outfile:
-        json.dump(book_data, outfile, indent=4)
+
     return book_data
 
         

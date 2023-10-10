@@ -7,7 +7,8 @@ from FigCap import extract_figure_and_caption
 from PIL import Image
 import os
 import PyPDF2
-
+from collections import namedtuple
+import ast
 import subprocess
 import img2pdf
 import fitz
@@ -90,8 +91,8 @@ def process_book(url):
          return 
     #extract figure and figure caption
     book_figure_and_caption = get_figure_and_captions(book_path)
-    figure_caption_data = figure_caption.insert_one({"bookId":bookId, "pages":book_figure_and_caption})
-    print("done figure and captions okay") 
+    figure_caption_data = figure_caption.insert_one({"bookId":bookId, "book":bookname, "pages":book_figure_and_caption})
+    print("Book's figure and figure caption saved in the database") 
     os.makedirs(book_folder, exist_ok=True)
     book = PdfReader(book_path)  # Use book_path instead of bookname
     print(bookname)
@@ -101,7 +102,7 @@ def process_book(url):
     try:
         page_data=[]
         for page_num in range(num_pages):
-            page_object=process_page(page_num, book_path, book_folder, bookname, bookId )
+            page_object=process_page(page_num, book_path, book_folder, bookname, bookId)
             page_data.append(page_object)
 
         bookdata_doc = {
@@ -114,8 +115,9 @@ def process_book(url):
     except Exception as e:
         data = {"bookId":{bookId},"book":{bookname},"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
         error_collection.insert_one(data)
-    #find document by name replace figure caption with ""
+    #find document by name replace figure caption witsh ""
     document = bookdata.find_one({"bookId":bookId})
+    
     if document:
         for page in document['pages']:
             for figure in page['figures']:
@@ -141,7 +143,7 @@ def process_book(url):
 
 #convert pages into images and return all pages data
 @timeit
-def process_page(page_num, book_path, book_folder, bookname, bookId ):
+def process_page(page_num, book_path, book_folder, bookname, bookId):
     pages_data=[]
     pdf_book = fitz.open(book_path)
     page_image = pdf_book[page_num]
@@ -178,10 +180,10 @@ def process_image(imagepath, page_num, bookname, bookId, pdf_book):
 
         publaynet_layout = publaynet_model.detect(image)
         tablebank_layout = tablebank_model.detect(image)
-
+      
         final_layout = []
         for block in publaynet_layout:
-            if block.type != "Table":
+            if block.type not in ["Table", "Figure"]:
                 final_layout.append(block)
 
         # Add "Table" blocks from layout2 to the new list
@@ -189,14 +191,64 @@ def process_image(imagepath, page_num, bookname, bookId, pdf_book):
             if block.type == "Table":
                 final_layout.append(block)
         
+        layout_blocks = []
+        for item in final_layout:  
+            output_item = {
+                "x_1": item.block.x_1,
+                "y_1": item.block.y_1,
+                "x_2": item.block.x_2,
+                "y_2": item.block.y_2,
+                'type': item.type
+            }
+            layout_blocks.append(output_item)
 
-        
+        document = figure_caption.find_one({"bookId":bookId})
+
+        if document:
+            figures_block=[]
+            for page in document.get("pages", []):
+                if page.get("page_num") == page_num+1:
+                    figure_bbox_values = page.get("figure_bbox")
+                    caption_text = page.get('caption_text')
+                    caption =''.join(caption_text)
+
+                    old_page_width=439
+                    old_page_height=666
+                    new_page_width= 1831
+                    new_page_height= 2776
+
+                    width_scale=new_page_width/old_page_width
+                    height_scale=new_page_height/old_page_height
+
+                    x1, y1, x2, y2 = figure_bbox_values
+
+                    x1=x1*width_scale
+                    y1=y1*height_scale
+                    x2=x2*width_scale
+                    y2=y2*height_scale
+
+                    x2=x1+x2
+                    y2=y1+y2
+                    figure_block = {
+                         "x_1": x1,
+                         "y_1": y1,
+                         "x_2": x2,
+                         "y_2": y2,
+                         "type": "Figure",
+                         "caption":caption
+                    }
+                    figures_block.append(figure_block)
+            
+            if figures_block:
+                layout_blocks.extend(figures_block)
+
         page_tables=[]
         page_figures=[]
         page_equations=[]
+        
 
         # Check if final_layout is empty or doesn't contain any "Table" or "Figure" blocks then process the page with nougat
-        if not final_layout or not any(block.type in ["Table", "Figure"] for block in final_layout):
+        if not layout_blocks or not any(block['type'] in ["Table", "Figure"] for block in layout_blocks):
             try:
                 print("extracting using naugat")
                 page_content=extract_text_equation_with_nougat(imagepath, page_equations, page_num,bookname, bookId)
@@ -213,31 +265,15 @@ def process_image(imagepath, page_num, bookname, bookId, pdf_book):
                         error_collection.insert_one(new_error_doc)
                     return "",[],[],[]
 
-        if len(final_layout) == 1 and final_layout[0].type == "Figure":
-            page=pdf_book[page_num]
-            text = page.get_text(sort=True)
-            if text:
-                page_content = text = re.sub(r'\s+', ' ', text)
-                return page_content,page_tables,page_figures, page_equations
-            else:
-                figureId=uuid.uuid4().hex
-                figure_url=upload_to_aws_s3(imagepath, figureId)
-                page_figures.append({
-                    "id":figureId,
-                    "url":figure_url,
-                    "caption":""
-                })
-                page_content = f"{{{{figure:{figureId}}}}}"
-                return page_content,page_tables,page_figures, page_equations
-
+        
         #extract page content based on their region
-        page_content = sort_text_blocks_and_extract_data(final_layout,imagepath,page_tables,page_figures)
+        page_content = sort_text_blocks_and_extract_data(layout_blocks,imagepath,page_tables,page_figures)
         #extract equations
         nougat_extraction = extract_text_equation_with_nougat(imagepath, page_equations, page_num,bookname, bookId)
-        return page_content,page_tables,page_figures, page_equations,nougat_extraction
+        return page_content,page_tables,page_figures, page_equations, nougat_extraction
 
     except Exception as e:
-        print(f"An error occurred while processing {bookname}, page {page_num}: {str(e)}")
+        print(f"An error occurred while processing {bookname}, page {page_num}: {str(e)}, line_numbe {traceback.extract_tb(e.__traceback__)[-1].lineno}")
         error={"error":str(e),"page_number":page_num, "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
         document=error_collection.find_one({"bookId":bookId})
         if document:
@@ -250,37 +286,28 @@ def process_image(imagepath, page_num, bookname, bookId, pdf_book):
 #sort the layout blocks and return page data 
 @timeit
 def sort_text_blocks_and_extract_data(blocks, imagepath,page_tables, page_figures):
-    sorted_blocks = sorted(blocks, key=lambda block: (block.block.y_1 + block.block.y_2) / 2)
+    sorted_blocks = sorted(blocks, key=lambda block: (block['y_1'] + block['y_2']) / 2)
     output = ""
-    
-    # Initialize variables to keep track of the previous and next blocks
-    prev_block = None
-    next_block = None
-    
-    for i, block in enumerate(sorted_blocks):
-        if i > 0:
-            prev_block = sorted_blocks[i - 1]
-        if i < len(sorted_blocks) - 1:
-            next_block = sorted_blocks[i + 1]   
-        if block.type == "Table":
+    for block in sorted_blocks: 
+        if block['type'] == "Table":
             output = process_table(block, imagepath, output, page_tables)
-        elif block.type == "Figure":
-            output = process_figure(block, imagepath, prev_block, next_block, output, page_figures)
-        elif block.type == "Text":
+        elif block['type'] == "Figure":
+            output = process_figure(block, imagepath, output, page_figures)
+        elif block['type'] == "Text":
             output = process_text(block, imagepath, output)
-        elif block.type == "Title":
+        elif block['type'] == "Title":
             output = process_title(block, imagepath, output)
-        elif block.type == "List":
+        elif block['type'] == "List":
             output = process_list(block, imagepath, output)
 
     page_content = re.sub(r'\s+', ' ', output).strip()
     return page_content
 
-#extract table and table_caption and return table object {id, data, caption}
+# #extract table and table_caption and return table object {id, data, caption}
 @timeit
 def process_table(table_block, imagepath, output, page_tables):
-    x1, y1, x2, y2 = table_block.block.x_1, table_block.block.y_1, table_block.block.x_2, table_block.block.y_2
-    # Load the image
+    x1, y1, x2, y2 = table_block['x_1'], table_block['y_1'], table_block['x_2'], table_block['y_2']
+    # # Load the image
     img = cv2.imread(imagepath)
     # Increase top boundary by 70 pixels
     y1 -= 70
@@ -303,7 +330,7 @@ def process_table(table_block, imagepath, output, page_tables):
     cv2.imwrite(table_image_path, cropped_image)
     
     #process table and caption with bud-ocr
-    output=process_book_page(table_image_path,page_tables, output)
+    # output=process_book_page(table_image_path,page_tables, output)
 
     if os.path.exists(table_image_path):
         os.remove(table_image_path)
@@ -311,11 +338,9 @@ def process_table(table_block, imagepath, output, page_tables):
 
 #extract figure and figure_caption and return figure object {id, figureUrl, caption}
 @timeit
-def process_figure(figure_block, imagepath, prev_block, next_block, output, page_figures):
-    caption=""
+def process_figure(figure_block, imagepath, output, page_figures):
     # Process the "Figure" block
-    x1, y1, x2, y2 = figure_block.block.x_1, figure_block.block.y_1, figure_block.block.x_2, figure_block.block.y_2
-    # Load the image
+    x1, y1, x2, y2 = figure_block['x_1'], figure_block['y_1'], figure_block['x_2'], figure_block['y_2']
     img = cv2.imread(imagepath)
     # Expand the bounding box by 5 pixels on every side
     x1-=5
@@ -336,68 +361,14 @@ def process_figure(figure_block, imagepath, prev_block, next_block, output, page
     cv2.imwrite(figure_image_path,figure_bbox) 
     output += f"{{{{figure:{figureId}}}}}"
 
-    if prev_block:
-        prev_x1, prev_y1, prev_x2, prev_y2 = prev_block.block.x_1, prev_block.block.y_1, prev_block.block.x_2, prev_block.block.y_2
-        prev_x1 -= 5
-        prev_y1 -= 5
-        prev_x2 += 5
-        prev_y2 += 5
-        # Ensure the coordinates are within the image boundaries
-        prev_x1 = max(0, prev_x1)
-        prev_y1 = max(0, prev_y1)
-        prev_x2 = min(img.shape[1], prev_x2)
-        prev_y2 = min(img.shape[0], prev_y2)
-        # Crop the bounding box for the block before the "Figure" block
-        prev_bbox = img[int(prev_y1):int(prev_y2), int(prev_x1):int(prev_x2)]
-        # Save the cropped bounding box as an image
-        prev_image_path = f"prev_block{figureId}.png"
-        cv2.imwrite(prev_image_path, prev_bbox)
-        #extraction of text from cropped image using pytesseract
-        image =Image.open(prev_image_path)
-        text = pytesseract.image_to_string(image)
-        text = re.sub(r'\s+', ' ', text).strip()
-        pattern = r"(Fig\.|Figure)\s+\d+"
-        match = re.search(pattern, text)
-        if match:
-            caption = text
-        if os.path.exists(prev_image_path):
-            os.remove(prev_image_path)
-
-    if next_block:
-        next_x1, next_y1, next_x2, next_y2 = next_block.block.x_1, next_block.block.y_1, next_block.block.x_2, next_block.block.y_2
-         # Expand the bounding box by 5 pixels on every side
-        next_x1 -= 5
-        next_y1 -= 5
-        next_x2 += 5
-        next_y2 += 5
-        
-        # Ensure the coordinates are within the image boundaries
-        next_x1 = max(0, next_x1)
-        next_y1 = max(0, next_y1)
-        next_x2 = min(img.shape[1], next_x2)
-        next_y2 = min(img.shape[0], next_y2)
-        # Crop the bounding box for the block after the "Figure" block
-        next_bbox = img[int(next_y1):int(next_y2), int(next_x1):int(next_x2)]
-        # Save the cropped bounding box as an image
-        next_image_path = f"next_block_{figureId}.png"
-        cv2.imwrite(next_image_path, next_bbox)
-        #extraction of text from cropped image using pytesseract
-        image =Image.open(next_image_path)
-        text = pytesseract.image_to_string(image)
-        text = re.sub(r'\s+', ' ',text).strip()
-        pattern = r"(Fig\.|Figure)\s+\d+"
-        match = re.search(pattern, text)
-        if match:
-            caption = text
-        if os.path.exists(next_image_path):
-            os.remove(next_image_path)
-
     figure_url=upload_to_aws_s3(figure_image_path, figureId)
     page_figures.append({
         "id":figureId,
         "url":figure_url,
-        "caption":caption
+        "caption": figure_block['caption']
     })
+    print(page_figures)
+
     if os.path.exists(figure_image_path):
         os.remove(figure_image_path)
     return output    
@@ -405,7 +376,7 @@ def process_figure(figure_block, imagepath, prev_block, next_block, output, page
 #extract and return text from text block
 @timeit
 def process_text(text_block,imagepath, output):
-    x1, y1, x2, y2 = text_block.block.x_1, text_block.block.y_1, text_block.block.x_2, text_block.block.y_2
+    x1, y1, x2, y2 = text_block['x_1'], text_block['y_1'], text_block['x_2'], text_block['y_2']
     # Load the image
     img = cv2.imread(imagepath)
     # Add 10 pixels to each side of the rectangle
@@ -438,7 +409,7 @@ def process_text(text_block,imagepath, output):
 #extract and return text from title block
 @timeit
 def process_title(title_block,imagepath, output):
-    x1, y1, x2, y2 = title_block.block.x_1, title_block.block.y_1, title_block.block.x_2, title_block.block.y_2
+    x1, y1, x2, y2 = title_block['x_1'], title_block['y_1'], title_block['x_2'], title_block['y_2']
     # Load the image
     img = cv2.imread(imagepath)
     # Add 10 pixels to each side of the rectangle
@@ -471,7 +442,7 @@ def process_title(title_block,imagepath, output):
 #extract and return text from list block
 @timeit
 def process_list(list_block,imagepath, output):
-    x1, y1, x2, y2 = list_block.block.x_1, list_block.block.y_1, list_block.block.x_2, list_block.block.y_2
+    x1, y1, x2, y2 = list_block['x_1'], list_block['y_1'], list_block['x_2'], list_block['y_2']
     # Load the image
     img = cv2.imread(imagepath)
     # Add 10 pixels to each side of the rectangle
@@ -564,7 +535,7 @@ def latext_to_text_to_speech(text):
     text_to_speech = latex_to_text(text)
     return text_to_speech
 
-@timeit
+# @timeit
 def get_figure_and_captions(book_path):
     output_directory = "pdffiles"
     book_output='output'
@@ -583,12 +554,17 @@ def get_figure_and_captions(book_path):
             # Save the smaller PDF to the output directory
             output_filename = os.path.join(output_directory, f'output_{i // pages_per_split + 1}.pdf')
             with open(output_filename, 'wb') as output_file:
-                pdf_writer.write(output_file)
-    print("PDFs have been successfully split and saved to the 'pdffiles' folder.")
-    
+                pdf_writer.write(output_file)   
+
     book_data=extract_figure_and_caption(output_directory, book_output)
 
+    if os.path.exists(output_directory):
+        shutil.rmtree(output_directory)   
+    if os.path.exists(book_output):
+        shutil.rmtree(book_output)
     return book_data
+
+
 
 
 
@@ -606,4 +582,4 @@ if __name__=="__main__":
     
     # process single book
     # process_book("A Beginner's Guide to R - Alain Zuur- Elena N Ieno- Erik Meesters.pdf")
-      process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=book-set-2/output_2.pdf")
+      process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=book-set-2/output_1.pdf")

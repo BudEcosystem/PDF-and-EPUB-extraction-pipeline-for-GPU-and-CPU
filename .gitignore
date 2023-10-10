@@ -1,4 +1,4 @@
 /myenv
 /__pycache__
 /.env
-./code/__pycache__
+/code/__pycache__
