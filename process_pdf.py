@@ -90,7 +90,7 @@ def process_book(url):
     if not book_path:
          return 
     #extract figure and figure caption
-    book_figure_and_caption = get_figure_and_captions(book_path)
+    book_figure_and_caption = get_figure_and_captions(book_path, bookname)
     figure_caption_data = figure_caption.insert_one({"bookId":bookId, "book":bookname, "pages":book_figure_and_caption})
     print("Book's figure and figure caption saved in the database") 
     os.makedirs(book_folder, exist_ok=True)
@@ -536,7 +536,7 @@ def latext_to_text_to_speech(text):
     return text_to_speech
 
 # @timeit
-def get_figure_and_captions(book_path):
+def get_figure_and_captions(book_path,bookname):
     output_directory = "pdffiles"
     book_output='output'
     os.makedirs(output_directory, exist_ok=True)
@@ -555,8 +555,13 @@ def get_figure_and_captions(book_path):
             output_filename = os.path.join(output_directory, f'output_{i // pages_per_split + 1}.pdf')
             with open(output_filename, 'wb') as output_file:
                 pdf_writer.write(output_file)   
+    try:
+        book_data=extract_figure_and_caption(output_directory, book_output)
 
-    book_data=extract_figure_and_caption(output_directory, book_output)
+    except Exception as e:
+        print(f"Unable to get figure and figure caption for this {bookname}, {str(e)}, line_number {traceback.extract_tb(e.__traceback__)[-1].lineno}")
+        return null
+
 
     if os.path.exists(output_directory):
         shutil.rmtree(output_directory)   
@@ -582,4 +587,4 @@ if __name__=="__main__":
     
     # process single book
     # process_book("A Beginner's Guide to R - Alain Zuur- Elena N Ieno- Erik Meesters.pdf")
-      process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=book-set-2/output_1.pdf")
+      process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=book-set-2/Physics+of+Semiconductor+Devices+-+Massimo+Rudan_55_65.pdf")
