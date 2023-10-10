@@ -29,9 +29,8 @@ import subprocess
 import os
 import time
 
+
 def extract_figure_and_caption(input_path, output_path):
-    input_path= '/home/bud-data-extraction/datapipeline/'+input_path
-    output_path='/home/bud-data-extraction/datapipeline/'+output_path
     xpdf_path = output_path +'/xpdf/'  
     log_file = output_path + '/log.text'
     f_log = open(log_file, 'w') 
@@ -51,7 +50,7 @@ def extract_figure_and_caption(input_path, output_path):
         pdf_flag = 0
         try:
             if not os.path.isdir(xpdf_path+pdf[:-4]):
-                std_out = subprocess.check_output(["/home/bud-data-extraction/xpdf-tools-linux-4.04/bin64/pdftohtml", input_path+'/'+pdf, xpdf_path+pdf[:-4]+'/'])
+                std_out = subprocess.check_output([os.environ['Xpdf_PATH'], input_path+'/'+pdf, xpdf_path+pdf[:-4]+'/'])
         except:
             f_log.write(pdf+'\n')
             pdf_flag = 1
@@ -106,7 +105,6 @@ def extract_figure_and_caption(input_path, output_path):
                     'caption_text':''
                     }
                     book_data.append(data)
-
     return book_data
 
         

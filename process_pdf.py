@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 import layoutparser as lp
 import pytesseract
 import sys
-sys.path.append('/home/bud-data-extraction/datapipeline/code')
+sys.path.append("code")
 from FigCap import extract_figure_and_caption
 from PIL import Image
 import os
@@ -537,8 +537,8 @@ def latext_to_text_to_speech(text):
 
 # @timeit
 def get_figure_and_captions(book_path,bookname):
-    output_directory = "pdffiles"
-    book_output='output'
+    output_directory = os.path.abspath("pdffiles")
+    book_output = os.path.abspath('output')
     os.makedirs(output_directory, exist_ok=True)
     os.makedirs(book_output, exist_ok=True)
     with open(book_path, 'rb') as pdf_file:
