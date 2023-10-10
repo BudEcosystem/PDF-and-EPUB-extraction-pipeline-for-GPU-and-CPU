@@ -330,7 +330,7 @@ def process_table(table_block, imagepath, output, page_tables):
     cv2.imwrite(table_image_path, cropped_image)
     
     #process table and caption with bud-ocr
-    # output=process_book_page(table_image_path,page_tables, output)
+    output=process_book_page(table_image_path,page_tables, output)
 
     if os.path.exists(table_image_path):
         os.remove(table_image_path)
