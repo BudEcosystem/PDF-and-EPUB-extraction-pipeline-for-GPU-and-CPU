@@ -277,7 +277,7 @@ def process_image(imagepath, page_num, bookname, bookId, pdf_book):
         error={"error":str(e),"page_number":page_num, "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
         document=error_collection.find_one({"bookId":bookId})
         if document:
-            error_collection.update_one({"_id": existing_document["_id"]}, {"$push": {"pages": error}})
+            error_collection.update_one({"_id": document["_id"]}, {"$push": {"pages": error}})
         else:
             new_error_doc = {"bookId": bookId, "book": bookname, "error_pages": [error]}
             error_collection.insert_one(new_error_doc)
@@ -542,14 +542,14 @@ def get_figure_and_captions(book_path,bookname):
     os.makedirs(output_directory, exist_ok=True)
     os.makedirs(book_output, exist_ok=True)
     with open(book_path, 'rb') as pdf_file:
-        pdf_reader =PyPDF2.PdfFileReader(pdf_file)
-        num_pages = pdf_reader.numPages
+        pdf_reader =PyPDF2.PdfReader(pdf_file)
+        num_pages = len(pdf_reader.pages)
         pages_per_split = 15
         for i in range(0, num_pages, pages_per_split):
-            pdf_writer = PyPDF2.PdfFileWriter()
+            pdf_writer = PyPDF2.PdfWriter()
             for page_num in range(i, min(i + pages_per_split, num_pages)):
-                 page = pdf_reader.getPage(page_num)
-                 pdf_writer.addPage(page)
+                 page = pdf_reader.pages[page_num]
+                 pdf_writer.add_page(page)
 
             # Save the smaller PDF to the output directory
             output_filename = os.path.join(output_directory, f'output_{i // pages_per_split + 1}.pdf')
@@ -557,7 +557,6 @@ def get_figure_and_captions(book_path,bookname):
                 pdf_writer.write(output_file)   
     try:
         book_data=extract_figure_and_caption(output_directory, book_output)
-
     except Exception as e:
         print(f"Unable to get figure and figure caption for this {bookname}, {str(e)}, line_number {traceback.extract_tb(e.__traceback__)[-1].lineno}")
         return null
