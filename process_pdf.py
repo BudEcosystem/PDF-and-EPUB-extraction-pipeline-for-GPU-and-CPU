@@ -521,7 +521,7 @@ def get_latext_text(pdf_path, page_num, bookname, bookId):
         error={"error":str(e),"page_number":page_num, "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
         document=error_collection.find_one({"bookId":bookId})
         if document:
-            error_collection.update_one({"_id": existing_document["_id"]}, {"$push": {"pages": error}})
+            error_collection.update_one({"_id": document["_id"]}, {"$push": {"pages": error}})
         else:
             new_error_doc = {"bookId": bookId, "book": bookname, "error_pages": [error]}
             error_collection.insert_one(new_error_doc)
