@@ -1,5 +1,6 @@
 import subprocess
-def nougat(pdf_path):
+
+def gettext(pdf_path):
     try:
         command=[
             "nougat",
@@ -7,11 +8,9 @@ def nougat(pdf_path):
             "--no-skipping"
         ]
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        print(result.stderr)
         print(result.stdout)
-        return result.stdout
-
     except Exception as e:
-        print(f"error nougat: {str(e)}")
-
-input_path='page_3.pdf'
-nougat(input_path)
+        print(f"An error occurred whi",e)
+        
+gettext("page_3.pdf")

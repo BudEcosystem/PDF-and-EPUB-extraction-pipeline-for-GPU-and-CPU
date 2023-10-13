@@ -6,7 +6,6 @@ filename, height, width, page_no, figure_est_no, layout_bbox, text_mask
 '''
 from selenium import webdriver
 from multiprocessing import Pool, TimeoutError
-from selenium.webdriver.chrome.service import Service
 
 import time
 import os
@@ -52,7 +51,7 @@ def pdf_info(html_file_path, pdf):
             browser.get(html_file)
             page_layout = browser.find_element("xpath","/html/body/img")
             img_size = (page_layout.size['height'], page_layout.size['width'])
-            print("this is image size",img_size)
+            print("this is image size", img_size)
             text_elements = browser.find_elements("xpath", "/html/body/div")
             text_boxes = []
             for element in text_elements:

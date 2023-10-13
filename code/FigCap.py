@@ -19,11 +19,7 @@ Start from 19/10/2017
 """
 
 import os
-import json
-from pprint import pprint
 import renderer
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 from xpdf_process import figures_captions_list
 import subprocess
 import os
@@ -43,7 +39,7 @@ def extract_figure_and_caption(input_path, output_path):
     for pdf in pdf_files:
         print(pdf)
         data = {}
-        images = renderer.render_pdf((input_path + '/' + pdf), 360)
+        images = renderer.render_pdf((input_path + '/' + pdf), 370)
         data[pdf] = {}
         data[pdf]['figures'] = []
         data[pdf]['pages_annotated'] = []
@@ -54,7 +50,6 @@ def extract_figure_and_caption(input_path, output_path):
         except:
             f_log.write(pdf+'\n')
             pdf_flag = 1
-
         if pdf_flag == 0:
             flag = 0
             wrong_count = 0
@@ -105,6 +100,11 @@ def extract_figure_and_caption(input_path, output_path):
                     'caption_text':''
                     }
                     book_data.append(data)
+    
+    has_pages_annotated = any('pages_annotated' in item for item in book_data)
+    if has_pages_annotated:
+        book_data=[]
+
     return book_data
 
-        
+    
