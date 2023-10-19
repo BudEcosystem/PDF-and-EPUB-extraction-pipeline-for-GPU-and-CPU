@@ -28,6 +28,11 @@ class ModelLoader:
                 'config': 'lp://TableBank/faster_rcnn_R_50_FPN_3x/config',
                 'extra_config': ["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],
                 'label_map': {0: "Table"}
+            },
+            'MathFormulaDetection': {
+                'config': 'lp://MFD/faster_rcnn_R_50_FPN_3x/config',
+                'extra_config': ["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],
+                'label_map': {1: "Equation"}
             }
         }
         
@@ -38,11 +43,12 @@ class ModelLoader:
         return self._model
     
 # if __name__ == "__main__":
-#
+
 #     # Test the singleton with different model names
 #     instance1 = ModelLoader("PubLayNet")
 #     instance2 = ModelLoader("TableBank")
-#     instance3 = ModelLoader("PubLayNet")  # Reuse the existing model1 instance
+#     instance3 = ModelLoader("PubLayNet")
+#     instance4 = ModelLoader("MathFormulaDetection")  # Reuse the existing model1 instance
 
 #     # Instances with the same model name should be the same
 #     print(instance1 is instance3)
@@ -50,3 +56,4 @@ class ModelLoader:
 #     # Access the loaded model
 #     loaded_model1 = instance1.model
 #     loaded_model2 = instance2.model
+#     loaded_model4 = instance4.model

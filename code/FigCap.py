@@ -24,6 +24,7 @@ from xpdf_process import figures_captions_list
 import subprocess
 import os
 import time
+import uuid
 
 
 def extract_figure_and_caption(input_path, output_path):
@@ -101,10 +102,20 @@ def extract_figure_and_caption(input_path, output_path):
                     }
                     book_data.append(data)
     
-    has_pages_annotated = any('pages_annotated' in item for item in book_data)
-    if has_pages_annotated:
-        book_data=[]
+    figure_extracted=True
+    for item in book_data:
+        if not 'page_num' in item:
+            figure_extracted=False
 
+    if not figure_extracted:
+        for item in book_data:
+            for bookName, bookData in item.items():
+                if 'pages_annotated' in bookData:
+                    book_data=[]
+    
+    id=uuid.uuid4().hex
+    f=open(f"book{id}.txt",'w')
+    f.write(str(book_data))
     return book_data
 
     

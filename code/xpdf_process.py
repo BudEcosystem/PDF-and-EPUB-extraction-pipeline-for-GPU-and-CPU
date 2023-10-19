@@ -425,7 +425,6 @@ def caption_regions(cap_box, fig_box, info):
                     #     no_cross_fig = 0
                     #
                     # if no_cross_fig == 0:
-                    #     region = [1, max(columns_point), info['page_width']-2, cap_y - max(columns_point)]
                     #     columns_point = [cap_item[1] + cap_item[3]] * column_no
                     #
                     if no_cross_fig== 1:
@@ -452,7 +451,6 @@ def caption_regions(cap_box, fig_box, info):
 
 
 def label_subfig(info, figures, cap_regions, table_box):
-    # region overlap
     # distance between all objects, thresh in 4 lines
     # objects under table box
     label = range(len(cap_regions))
@@ -782,7 +780,6 @@ def check_region(info, figures, captions):
     return figures, captions
 
 def merge_boxes(figures, cap_regions, table_box, info):
-    # region overlap
     # distance between all objects, thresh in 4 lines
     # objects under table box
     label = [-1]*len(figures)

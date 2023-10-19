@@ -25,6 +25,7 @@ from tablecaption import process_book_page
 from model_loader import ModelLoader 
 from utils import timeit
 from latext import latex_to_text
+from pix2tex.cli import LatexOCR
 load_dotenv()
 
 # Configure AWS credentials
@@ -34,9 +35,10 @@ aws_region = os.environ['AWS_REGION']
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.aws_book_set_2
-bookdata = db.bookdata
+bookdata = db.bookdata2
 error_collection = db.error_collection
 figure_caption = db.figure_caption
+book_layout = db.book_layout
 
 
 
@@ -84,7 +86,6 @@ def download_book_from_aws(bookname, bookId):
     # Save the PDF with the bookname.pdf in the books folder
     local_path = os.path.join(folder_name, f'{bookname}')
     file_key = f'{folder_name}/{bookname}'
-    print(file_key)
     response = s3.get_object(Bucket=bucket_name, Key=file_key)
     pdf_data = response['Body'].read()
     with open(local_path, 'wb') as f:
@@ -113,10 +114,13 @@ def process_book(bookname, bookId):
     print(f"{bookname} has total {num_pages} page")
     try:
         page_data=[]
+        page_layout_data=[]
         for page_num in range(num_pages):
-            page_object=process_page(page_num, book_path, book_folder, bookname, bookId)
+            page_object, page_layout_info=process_page(page_num, book_path, book_folder, bookname, bookId)
             page_data.append(page_object)
-
+            page_layout_data.append(page_layout_info)
+        
+        # print(page_layout_data)
         bookdata_doc = {
             "bookId":bookId,
             "book": bookname,
@@ -124,6 +128,8 @@ def process_book(bookname, bookId):
         }
         
         bookdata.insert_one(bookdata_doc)
+        book_layout.insert_one({"bookId":bookId, "book":bookname, "pages":page_layout_data})
+
     except Exception as e:
         data = {"bookId":{bookId},"book":{bookname},"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
         error_collection.insert_one(data)
@@ -161,7 +167,7 @@ def process_page(page_num, book_path, book_folder, bookname, bookId):
     book_image = page_image.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
     image_path = os.path.join(book_folder, f'page_{page_num + 1}.jpg')
     book_image.save(image_path)
-    page_content,page_tables,page_figures, page_equations, *nougat_extraction= process_image(image_path, page_num, bookname, bookId, pdf_book)
+    page_content,page_tables,page_figures, page_equations,layout_blocks= process_image(image_path, page_num, bookname, bookId, pdf_book)
     pageId= uuid.uuid4().hex
     page_obj={
         "id":pageId,
@@ -170,11 +176,17 @@ def process_page(page_num, book_path, book_folder, bookname, bookId):
         "figures":page_figures,
         "equations":page_equations
     }
-    if nougat_extraction:
-        page_obj["nougat_extraction"] = nougat_extraction[0]
+    page_layout_info={
+        "id":pageId,
+        "layout_info":layout_blocks
+    }
+
+    # if nougat_extraction:
+    #     page_obj["nougat_extraction"] = nougat_extraction[0]
+
     print(page_num, "done")
     os.remove(image_path)
-    return page_obj
+    return page_obj, page_layout_info
 
 #detect layout and return page data
 @timeit
@@ -185,22 +197,29 @@ def process_image(imagepath, page_num, bookname, bookId, pdf_book):
 
         publaynet = ModelLoader("PubLayNet")
         tablebank = ModelLoader("TableBank")
-
+        mathformuladetection = ModelLoader("MathFormulaDetection")
+        
         publaynet_model = publaynet.model
         tablebank_model = tablebank.model
+        mathformuladetection_model = mathformuladetection.model
 
         publaynet_layout = publaynet_model.detect(image)
         tablebank_layout = tablebank_model.detect(image)
-        
+        mathformuladetection_layout = mathformuladetection_model.detect(image)
+
         pdFigCap=False
         final_layout = []
+
         for block in publaynet_layout:
             if block.type != "Table":
                 final_layout.append(block)
 
-        # Add "Table" blocks from layout2 to the new list
         for block in tablebank_layout:
             if block.type == "Table":
+                final_layout.append(block)
+
+        for block in mathformuladetection_layout:
+            if block.type == 'Equation':
                 final_layout.append(block)
         
         layout_blocks = []
@@ -228,7 +247,7 @@ def process_image(imagepath, page_num, bookname, bookId, pdf_book):
 
                     old_page_width=439
                     old_page_height=666
-                    new_page_width= 1831
+                    new_page_width = 1831
                     new_page_height= 2776
 
                     width_scale=new_page_width/old_page_width
@@ -266,7 +285,7 @@ def process_image(imagepath, page_num, bookname, bookId, pdf_book):
             try:
                 print("extracting using naugat")
                 page_content=extract_text_equation_with_nougat(imagepath, page_equations, page_num,bookname, bookId)
-                return page_content, page_tables, page_figures, page_equations
+                return page_content, page_tables, page_figures, page_equations, layout_blocks
 
             except Exception as e:
                     print(f"An error occurred while processing {bookname}, page {page_num} with nougat: {str(e)}")
@@ -277,7 +296,7 @@ def process_image(imagepath, page_num, bookname, bookId, pdf_book):
                     else:
                         new_error_doc = {"bookId": bookId, "book": bookname, "error_pages": [error]}
                         error_collection.insert_one(new_error_doc)
-                    return "",[],[],[]
+                    return "",[],[],[],[]
 
         
         #extract page content based on their region
@@ -303,12 +322,12 @@ def process_image(imagepath, page_num, bookname, bookId, pdf_book):
                 })
             if os.path.exists(figure_image_path):
                 os.remove(figure_image_path)
-            return page_content, page_tables,page_figures,page_equations
+            return page_content, page_tables,page_figures,page_equations,layout_blocks
             
-        page_content = sort_text_blocks_and_extract_data(layout_blocks,imagepath,page_tables,page_figures, pdFigCap)
+        page_content = sort_text_blocks_and_extract_data(layout_blocks,imagepath,page_tables,page_figures,page_equations, pdFigCap)
         #extract equations
-        nougat_extraction = extract_text_equation_with_nougat(imagepath, page_equations, page_num,bookname, bookId)
-        return page_content,page_tables,page_figures, page_equations, nougat_extraction
+        # nougat_extraction = extract_text_equation_with_nougat(imagepath, page_equations, page_num,bookname, bookId)
+        return page_content,page_tables,page_figures, page_equations,layout_blocks
 
     except Exception as e:
         print(f"An error occurred while processing {bookname}, page {page_num}: {str(e)}, line_numbe {traceback.extract_tb(e.__traceback__)[-1].lineno}")
@@ -319,11 +338,11 @@ def process_image(imagepath, page_num, bookname, bookId, pdf_book):
         else:
             new_error_doc = {"bookId": bookId, "book": bookname, "error_pages": [error]}
             error_collection.insert_one(new_error_doc)
-        return "", [], [],[]
+        return "", [],[],[],[]
 
 #sort the layout blocks and return page data 
 @timeit
-def sort_text_blocks_and_extract_data(blocks, imagepath,page_tables, page_figures, pdFigCap):
+def sort_text_blocks_and_extract_data(blocks, imagepath,page_tables, page_figures, page_equations, pdFigCap):
     sorted_blocks = sorted(blocks, key=lambda block: (block['y_1'] + block['y_2']) / 2)
     output = ""
     prev_block = None
@@ -346,6 +365,8 @@ def sort_text_blocks_and_extract_data(blocks, imagepath,page_tables, page_figure
             output = process_title(block, imagepath, output)
         elif block['type'] == "List":
             output = process_list(block, imagepath, output)
+        elif block['type']=='Equation':
+            output=process_equation(block, imagepath, output, page_equations)
 
     page_content = re.sub(r'\s+', ' ', output).strip()
     return page_content
@@ -628,6 +649,9 @@ def extract_text_equation_with_nougat(image_path, page_equations, page_num, book
     with open(pdf_path, "wb") as pdf_file, open(image_path, "rb") as image_file:
         pdf_file.write(img2pdf.convert(image_path))
     latex_text=get_latext_text(pdf_path,page_num, bookname, bookId)
+    latex_text = latex_text.replace("[MISSING_PAGE_EMPTY:1]", "")
+    if latex_text == "":
+        latex_text = ""
     pattern = r'(\\\(.*?\\\)|\\\[.*?\\\])'
     
     def replace_with_uuid(match):
@@ -642,6 +666,43 @@ def extract_text_equation_with_nougat(image_path, page_equations, page_num, book
     if os.path.exists(pdf_path):
         os.remove(pdf_path)
     return page_content
+
+@timeit
+def process_equation(equation_block, imagepath, output, page_equations):
+    x1, y1, x2, y2 = equation_block['x_1'], equation_block['y_1'], equation_block['x_2'], equation_block['y_2']
+    # # Load the image
+    img = cv2.imread(imagepath)
+
+    x1 -= 5
+    y1 -= 5
+    x2 += 5
+    y2 += 5
+    
+    x1 = max(0, x1)
+    y1 = max(0, y1)
+    x2 = min(img.shape[1], x2)
+    y2 = min(img.shape[0], y2)
+    
+    cropped_image = img[int(y1):int(y2), int(x1):int(x2)]
+    equation_image_path ="cropped_equation.png"
+    cv2.imwrite(equation_image_path, cropped_image)
+
+    equationId=uuid.uuid4().hex
+    output += f"{{{{equation:{equationId}}}}}"
+
+    img = Image.open(equation_image_path)
+    model = LatexOCR()
+    latex_text= model(img)
+
+    text_to_speech=latext_to_text_to_speech(latex_text)
+
+    page_equations.append(
+       {'id': equationId, 'text':latex_text, 'text_to_speech':text_to_speech} 
+    )
+
+    if os.path.exists(equation_image_path):
+        os.remove(equation_image_path)
+    return output
    
 @timeit
 def get_latext_text(pdf_path, page_num, bookname, bookId):
@@ -653,7 +714,6 @@ def get_latext_text(pdf_path, page_num, bookname, bookId):
         ]
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         # print(result.stderr)
-        # print("this nougat extraction", result.stdout)
         return result.stdout
     except Exception as e:
         print(f"An error occurred while processing {bookname}, page {page_num} with nougat: {str(e)}")
@@ -673,7 +733,7 @@ def latext_to_text_to_speech(text):
     text_to_speech = latex_to_text(text)
     return text_to_speech
 
-# @timeit
+@timeit
 def get_figure_and_captions(book_path,bookname,bookId):
     output_directory = os.path.abspath("pdffiles")
     book_output = os.path.abspath('output')
@@ -695,19 +755,22 @@ def get_figure_and_captions(book_path,bookname,bookId):
                 pdf_writer.write(output_file)   
     try:
         book_data=extract_figure_and_caption(output_directory, book_output)
+        if os.path.exists(output_directory):
+            shutil.rmtree(output_directory)   
+        if os.path.exists(book_output):
+            shutil.rmtree(book_output)
         if book_data:
             figure_caption.insert_one({"bookId": bookId, "book": bookname, "pages": book_data})
             print("Book's figure and figure caption saved in the database")
         else:
             print(f"no figure detected by pdfigcapx for this book {bookname}")
     except Exception as e:
+        if os.path.exists(output_directory):
+            shutil.rmtree(output_directory)   
+        if os.path.exists(book_output):
+            shutil.rmtree(book_output)
         print(f"Unable to get figure and figure caption for this {bookname}, {str(e)}, line_number {traceback.extract_tb(e.__traceback__)[-1].lineno}")
         return []
-
-    if os.path.exists(output_directory):
-        shutil.rmtree(output_directory)   
-    if os.path.exists(book_output):
-        shutil.rmtree(book_output)
     return book_data
 
 
@@ -715,21 +778,24 @@ if __name__=="__main__":
     # process all books
     books = get_all_books_names(bucket_name, folder_name+'/')
     print(len(books))
-    # for idx, book in enumerate(books):
-        # bookId=uuid.uuid4().hex
-        # if(idx<4):
-        #     print('skipping this book', book)
-        #     continue
-        # if book.endswith('.pdf'):
-        #     process_book(book, bookId)
-        # else:
-        #     print(f"skipping this {book} as it it is not a pdf file")
-        #     data = {"bookId":{bookId},"book":{book}, "error":"Not a pdf file", "line_number":591}
-        #     error_collection.insert_one(data)            
-        #     continue
-    bookId=uuid.uuid4().hex
-    
-    process_book("page_11.pdf", bookId)
-    # process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=book-set-2/page_41.pdf")
+    for idx, book in enumerate(books):
+        bookId=uuid.uuid4().hex
+        if(idx<28):
+            print('skipping this book', book)
+            continue
+        if book.endswith('.pdf'):
+            process_book(book, bookId)
+        else:
+            print(f"skipping this {book} as it it is not a pdf file")
+            data = {"bookId":bookId,"book":book, "error":"Not a pdf file", "line_number":591}
+            error_collection.insert_one(data)            
+            continue
+    # bookss=['A Beginners Guide to Python 3 Programming - John Hunt.pdf','A Concise Guide to Market Research - Marko Sarstedt- Erik Mooi.pdf']
+    # for book in bookss:
+    #     bookId=uuid.uuid4().hex
+    #     process_book(book, bookId)
+    # bookId=uuid.uuid4().hex
+    # process_book("page_5.pdf", bookId)
+    # # process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=book-set-2/page_41.pdf")
 
 
