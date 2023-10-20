@@ -27,6 +27,9 @@ from utils import timeit
 from latext import latex_to_text
 from pix2tex.cli import LatexOCR
 load_dotenv()
+import os
+import signal
+import atexit
 
 # Configure AWS credentials
 aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
@@ -35,10 +38,12 @@ aws_region = os.environ['AWS_REGION']
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.aws_book_set_2
-bookdata = db.bookdata2
+bookdata = db.testdata
 error_collection = db.error_collection
 figure_caption = db.figure_caption
 book_layout = db.book_layout
+book_progress=db.book_progress
+book_number=db.book_number
 
 
 
@@ -51,6 +56,31 @@ s3 = boto3.client('s3',
 bucket_name = os.environ['AWS_BUCKET_NAME']
 folder_name=os.environ['BOOK_FOLDER_NAME']
 # returns list of booknames
+
+def store_book_progress(bookname, page_num, bookId, current_book_number):
+    book_progress.delete_many({})
+    book_progress.insert_one({"bookId":bookId, "book":bookname, "book_number":current_book_number, "page_num":page_num})
+    book_number.delete_many({})
+
+def signal_handler(sig, frame):
+    # Capture the progress when the script is interrupted
+    if current_bookname and current_page_num is not None:
+        store_book_progress(current_bookname, current_page_num, current_bookId,current_book_number)
+    exit(0)
+
+def exit_handler():
+    # Capture the progress when the script exits normally
+    if current_bookname and current_page_num is not None:
+        store_book_progress(current_bookname, current_page_num, current_bookId, current_book_number)
+
+atexit.register(exit_handler)
+signal.signal(signal.SIGINT, signal_handler)
+
+current_bookname = None
+current_page_num = None
+current_bookId = None
+current_book_number=None
+
 @timeit
 def get_all_books_names(bucket_name, folder_name):
   contents = s3.list_objects_v2(Bucket=bucket_name, Prefix=folder_name)
@@ -98,7 +128,17 @@ def download_book_from_aws(bookname, bookId):
     return None
 
 @timeit
-def process_book(bookname, bookId):
+def process_book(bookname, start_page, bookId):
+    newBookId=uuid.uuid4().hex
+
+    if bookId is None:
+        bookId=newBookId
+
+    global current_bookname
+    global current_page_num
+    global current_bookId
+    current_bookId=bookId
+
     # book_path,bookname = download_book_from_aws(url, bookId)
     # book_folder = book_path.split('/')[-1].replace('.pdf','')
     book_folder = bookname.replace('.pdf', '')
@@ -113,22 +153,34 @@ def process_book(bookname, bookId):
     num_pages = len(book.pages)
     print(f"{bookname} has total {num_pages} page")
     try:
-        page_data=[]
-        page_layout_data=[]
-        for page_num in range(num_pages):
+        for page_num in range(start_page,num_pages):
+            current_bookname = bookname
+            current_page_num = page_num
+            print(page_num)
             page_object, page_layout_info=process_page(page_num, book_path, book_folder, bookname, bookId)
-            page_data.append(page_object)
-            page_layout_data.append(page_layout_info)
-        
-        # print(page_layout_data)
-        bookdata_doc = {
-            "bookId":bookId,
-            "book": bookname,
-            "pages": page_data
-        }
-        
-        bookdata.insert_one(bookdata_doc)
-        book_layout.insert_one({"bookId":bookId, "book":bookname, "pages":page_layout_data})
+
+            book_document = bookdata.find_one({"bookId":bookId})
+            book_layout_doc = book_layout.find_one({"bookId":bookId})
+            if book_document:
+                bookdata.update_one({"_id": book_document["_id"]}, {"$push": {"pages": page_object}})
+            else:
+                new_book_document={
+                   "bookId":bookId,
+                   "book": bookname,
+                   "pages": [page_object] 
+                }
+                bookdata.insert_one(new_book_document)
+            if book_layout_doc:
+                book_layout.update_one({"_id":book_layout_doc['_id']}, {"$push":{"pages":page_layout_info}})
+            else:
+                new_book_layout={
+                   "bookId":bookId,
+                   "book": bookname,
+                   "pages": [page_layout_info] 
+                }
+                book_layout.insert_one(new_book_layout)
+        book_progress.delete_many({})
+        book_number.insert_one({'book_number':current_book_number})
 
     except Exception as e:
         data = {"bookId":{bookId},"book":{bookname},"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
@@ -155,6 +207,7 @@ def process_book(bookname, bookId):
                 print("Document update did not modify any document.")
         except Exception as e:
             print("An error occurred:", str(e))
+
     #delete the book
     os.remove(book_path)
     shutil.rmtree(book_folder)
@@ -735,6 +788,9 @@ def latext_to_text_to_speech(text):
 
 @timeit
 def get_figure_and_captions(book_path,bookname,bookId):
+    document = figure_caption.find_one({"bookId":bookId})
+    if document:
+        return
     output_directory = os.path.abspath("pdffiles")
     book_output = os.path.abspath('output')
     os.makedirs(output_directory, exist_ok=True)
@@ -771,31 +827,56 @@ def get_figure_and_captions(book_path,bookname,bookId):
             shutil.rmtree(book_output)
         print(f"Unable to get figure and figure caption for this {bookname}, {str(e)}, line_number {traceback.extract_tb(e.__traceback__)[-1].lineno}")
         return []
-    return book_data
 
 
-if __name__=="__main__":
-    # process all books
-    books = get_all_books_names(bucket_name, folder_name+'/')
-    print(len(books))
-    for idx, book in enumerate(books):
-        bookId=uuid.uuid4().hex
-        if(idx<28):
-            print('skipping this book', book)
-            continue
-        if book.endswith('.pdf'):
-            process_book(book, bookId)
-        else:
-            print(f"skipping this {book} as it it is not a pdf file")
-            data = {"bookId":bookId,"book":book, "error":"Not a pdf file", "line_number":591}
-            error_collection.insert_one(data)            
-            continue
-    # bookss=['A Beginners Guide to Python 3 Programming - John Hunt.pdf','A Concise Guide to Market Research - Marko Sarstedt- Erik Mooi.pdf']
-    # for book in bookss:
-    #     bookId=uuid.uuid4().hex
-    #     process_book(book, bookId)
-    # bookId=uuid.uuid4().hex
-    # process_book("page_5.pdf", bookId)
-    # # process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=book-set-2/page_41.pdf")
+
+# if __name__=="__main__":
+#     # process all books
+#     books = get_all_books_names(bucket_name, folder_name+'/')
+#     print(len(books))
+#     # for idx, book in enumerate(books):
+#     #     bookId=uuid.uuid4().hex
+#     #     if(idx<28):
+#     #         print('skipping this book', book)
+#     #         continue
+#     #     if book.endswith('.pdf'):
+#     #         process_book(book, bookId)
+#     #     else:
+#     #         print(f"skipping this {book} as it it is not a pdf file")
+#     #         data = {"bookId":bookId,"book":book, "error":"Not a pdf file", "line_number":591}
+#     #         error_collection.insert_one(data)            
+#     #         continue
+#     # bookss=['A Beginners Guide to Python 3 Programming - John Hunt.pdf','A Concise Guide to Market Research - Marko Sarstedt- Erik Mooi.pdf']
+#     # for book in bookss:
+#     #     bookId=uuid.uuid4().hex
+#     #     process_book(book, bookId)
+#     bookId=uuid.uuid4().hex
+#     process_book("pgysics_1.pdf", bookId)
+#     # # process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=book-set-2/page_41.pdf")
 
 
+books = get_all_books_names(bucket_name, folder_name+'/')
+bookId=None
+start_page=0
+start_book=0
+prog_doc=list(book_progress.find())
+
+if len(prog_doc)>0:
+    start_page=prog_doc[-1]['page_num']
+    start_book=prog_doc[-1]['book_number']-1
+    bookId=prog_doc[-1]['bookId']
+
+for idx, book in enumerate(books):
+    book_com=list(book_number.find({}))
+    if len(book_com)>0:
+        start_book=book_com[0]['book_number']
+    if(idx<start_book):
+        print('skipping this book', book)
+        continue
+    if book.endswith('.pdf'):
+        current_book_number=idx+1
+        process_book(book, start_page, bookId)
+        book_number.delete_many({})
+    else:
+        print(f"skipping this {book} as it it is not a pdf file")
+        continue
