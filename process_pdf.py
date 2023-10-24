@@ -1,6 +1,6 @@
+import numpy as np
 from dotenv import load_dotenv
 import subprocess
-import layoutparser as lp
 import pytesseract
 import sys
 from PIL import Image
@@ -38,7 +38,7 @@ aws_region = os.environ['AWS_REGION']
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.aws_book_set_2
-bookdata = db.testdata
+bookdata = db.bookdata2
 error_collection = db.error_collection
 figure_caption = db.figure_caption
 book_layout = db.book_layout
@@ -179,7 +179,9 @@ def process_book(bookname, start_page, bookId):
                    "pages": [page_layout_info] 
                 }
                 book_layout.insert_one(new_book_layout)
+                
         book_progress.delete_many({})
+        book_number.delete_many({})
         book_number.insert_one({'book_number':current_book_number})
 
     except Exception as e:
@@ -700,7 +702,7 @@ def upload_to_aws_s3(figure_image_path, figureId):
 def extract_text_equation_with_nougat(image_path, page_equations, page_num, bookname, bookId):
     pdf_path ="page.pdf"
     with open(pdf_path, "wb") as pdf_file, open(image_path, "rb") as image_file:
-        pdf_file.write(img2pdf.convert(image_path))
+        pdf_file.write(img2pdf.convert(image_file))
     latex_text=get_latext_text(pdf_path,page_num, bookname, bookId)
     latex_text = latex_text.replace("[MISSING_PAGE_EMPTY:1]", "")
     if latex_text == "":
@@ -766,7 +768,6 @@ def get_latext_text(pdf_path, page_num, bookname, bookId):
             "--no-skipping"
         ]
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        # print(result.stderr)
         return result.stdout
     except Exception as e:
         print(f"An error occurred while processing {bookname}, page {page_num} with nougat: {str(e)}")
@@ -876,7 +877,6 @@ for idx, book in enumerate(books):
     if book.endswith('.pdf'):
         current_book_number=idx+1
         process_book(book, start_page, bookId)
-        book_number.delete_many({})
     else:
         print(f"skipping this {book} as it it is not a pdf file")
         continue
