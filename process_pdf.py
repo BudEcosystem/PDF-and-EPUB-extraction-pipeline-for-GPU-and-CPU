@@ -55,7 +55,6 @@ s3 = boto3.client('s3',
 
 bucket_name = os.environ['AWS_BUCKET_NAME']
 folder_name=os.environ['BOOK_FOLDER_NAME']
-# returns list of booknames
 
 def store_book_progress(bookname, page_num, bookId, current_book_number):
     book_progress.delete_many({})
@@ -90,26 +89,6 @@ def get_all_books_names(bucket_name, folder_name):
 
 # downlads particular book from aws and save it to system and return the bookpath
 @timeit
-def download_book_from_aws_Url(url,bookId):
-    try:
-        parsed_url = urlparse(url)
-        bucket_name = parsed_url.path.split('/')[-1]
-        file_key_list = list(filter(lambda x: x.startswith('prefix='), parsed_url.query.split('&')))
-        file_key = file_key_list[0].split('=')[1]
-        file_key=urllib.parse.unquote_plus(file_key)
-        folder_name = file_key_list[0].split('/')[0]
-        folder_name = folder_name.replace('prefix=', '') 
-        bookname = file_key.split('/')[-1]
-        os.makedirs(folder_name, exist_ok=True)
-        local_path = os.path.join(folder_name, os.path.basename(file_key))
-        s3.download_file(bucket_name, file_key, local_path)
-        return local_path,bookname 
-    except Exception as e:
-        print("An error occurred:", e)
-        data = {"bookId":{bookId},"book":{bookname}, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
-        error_collection.insert_one(data)
-        return None
-
 def download_book_from_aws(bookname, bookId):
   try:
     os.makedirs(folder_name, exist_ok=True)
@@ -139,8 +118,6 @@ def process_book(bookname, start_page, bookId):
     global current_bookId
     current_bookId=bookId
 
-    # book_path,bookname = download_book_from_aws(url, bookId)
-    # book_folder = book_path.split('/')[-1].replace('.pdf','')
     book_folder = bookname.replace('.pdf', '')
     book_path = download_book_from_aws(bookname, bookId)
     if not book_path:
@@ -148,7 +125,7 @@ def process_book(bookname, start_page, bookId):
     #extract figure and figure caption
     get_figure_and_captions(book_path, bookname, bookId)
     os.makedirs(book_folder, exist_ok=True)
-    book = PdfReader(book_path)  # Use book_path instead of bookname
+    book = PdfReader(book_path)  
     print(bookname)
     num_pages = len(book.pages)
     print(f"{bookname} has total {num_pages} page")
@@ -187,7 +164,8 @@ def process_book(bookname, start_page, bookId):
     except Exception as e:
         data = {"bookId":{bookId},"book":{bookname},"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
         error_collection.insert_one(data)
-    #find document by name replace figure caption witsh ""
+
+    #find document by name replace figure caption with ""
     document = bookdata.find_one({"bookId":bookId})
     
     if document:
@@ -235,10 +213,6 @@ def process_page(page_num, book_path, book_folder, bookname, bookId):
         "id":pageId,
         "layout_info":layout_blocks
     }
-
-    # if nougat_extraction:
-    #     page_obj["nougat_extraction"] = nougat_extraction[0]
-
     print(page_num, "done")
     os.remove(image_path)
     return page_obj, page_layout_info
@@ -689,7 +663,7 @@ def process_list(list_block,imagepath, output):
 #upload figure to aws and return aws url
 @timeit
 def upload_to_aws_s3(figure_image_path, figureId): 
-    folderName="book-set-2-Images"
+    folderName=os.environ['AWS_IMAGE_UPLOAD_FOLDER']
     s3_key = f"{folderName}/{figureId}.png"
     # Upload the image to the specified S3 bucket
     s3.upload_file(figure_image_path, bucket_name, s3_key)
@@ -831,44 +805,18 @@ def get_figure_and_captions(book_path,bookname,bookId):
 
 
 
-# if __name__=="__main__":
-#     # process all books
-#     books = get_all_books_names(bucket_name, folder_name+'/')
-#     print(len(books))
-#     # for idx, book in enumerate(books):
-#     #     bookId=uuid.uuid4().hex
-#     #     if(idx<28):
-#     #         print('skipping this book', book)
-#     #         continue
-#     #     if book.endswith('.pdf'):
-#     #         process_book(book, bookId)
-#     #     else:
-#     #         print(f"skipping this {book} as it it is not a pdf file")
-#     #         data = {"bookId":bookId,"book":book, "error":"Not a pdf file", "line_number":591}
-#     #         error_collection.insert_one(data)            
-#     #         continue
-#     # bookss=['A Beginners Guide to Python 3 Programming - John Hunt.pdf','A Concise Guide to Market Research - Marko Sarstedt- Erik Mooi.pdf']
-#     # for book in bookss:
-#     #     bookId=uuid.uuid4().hex
-#     #     process_book(book, bookId)
-#     bookId=uuid.uuid4().hex
-#     process_book("pgysics_1.pdf", bookId)
-#     # # process_book("https://s3.console.aws.amazon.com/s3/object/bud-datalake?region=ap-southeast-1&prefix=book-set-2/page_41.pdf")
-
-
 books = get_all_books_names(bucket_name, folder_name+'/')
-bookId=None
-start_page=0
-start_book=0
-prog_doc=list(book_progress.find())
-
-if len(prog_doc)>0:
-    start_page=prog_doc[-1]['page_num']
-    start_book=prog_doc[-1]['book_number']-1
-    bookId=prog_doc[-1]['bookId']
 
 for idx, book in enumerate(books):
-    book_com=list(book_number.find({}))
+    start_book=0
+    start_page=0
+    bookId=None
+    prog_doc=list(book_progress.find())
+    book_com=list(book_number.find())
+    if len(prog_doc)>0:
+        start_page=prog_doc[-1]['page_num']
+        start_book=prog_doc[-1]['book_number']-1
+        bookId=prog_doc[-1]['bookId']
     if len(book_com)>0:
         start_book=book_com[0]['book_number']
     if(idx<start_book):

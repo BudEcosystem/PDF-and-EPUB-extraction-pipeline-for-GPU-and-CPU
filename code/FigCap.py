@@ -113,9 +113,6 @@ def extract_figure_and_caption(input_path, output_path):
                 if 'pages_annotated' in bookData:
                     book_data=[]
     
-    id=uuid.uuid4().hex
-    f=open(f"book{id}.txt",'w')
-    f.write(str(book_data))
     return book_data
 
     
