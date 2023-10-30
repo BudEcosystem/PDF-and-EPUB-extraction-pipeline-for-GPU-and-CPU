@@ -3,7 +3,7 @@
 # Setup
 
 # Requirements.
-**OS: Linux , Mac**
+**Linux , Mac**
 **Python: > 3.8**
 
 **Step 1.**
