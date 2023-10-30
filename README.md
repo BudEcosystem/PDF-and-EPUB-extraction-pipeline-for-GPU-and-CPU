@@ -3,8 +3,8 @@
 # Setup
 
 # Requirements.
-OS - Linux, Mac
-Python -  > 3.8
+**OS: Linux , Mac**
+**Python: > 3.8**
 
 **Step 1.**
 Create the virtual environment: Use the python3 -m venv command to create a virtual environment. Replace your_env_name with the name you want to give to your virtual environment:
@@ -52,7 +52,7 @@ python process_pdf.py
 ```
 
 
-**note** 
+**Note** 
 if you are getting any installation error, then you can manully install package and model one by one
 for model installtion pls refere below mentiond website
 
