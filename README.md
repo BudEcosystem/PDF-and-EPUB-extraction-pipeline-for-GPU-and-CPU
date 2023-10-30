@@ -15,22 +15,30 @@ python3 -m venv your_env_name
 **Step 2.**
 Activate the virtual environment: You need to activate the virtual environment to start using it. Use the following command:
 
-`source your_env_name/bin/activate`
+```bash
+source your_env_name/bin/activate`
+```
 
 **Step 3.**
 Clone pdf_extraction_pipeline repo
 
-`git clone https://github.com/BudEcosystem/pdf_extraction_pipeline.git`
+```bash
+git clone https://github.com/BudEcosystem/pdf_extraction_pipeline.git
+```
 
 **Step 4.**
 Change directory using following command
 
-`cd .\pdf_extraction_pipeline`
+```bash 
+cd .\pdf_extraction_pipeline
+```
 
 **Step 5.**
 Installation, run requirements.txt file to install required packages
 
-`pip install -r requirements.txt`
+``` bash
+pip install -r requirements.txt
+```
 
 **Step 6.**
 Create .env file inside pdf_extraction_pipeline folder and copy the key content of example.eve to .env file
@@ -39,7 +47,9 @@ open .env and modify the environment variables
 **Step 7**
 Run process_pdf.py file
 
-`python process_pdf.py`
+```bash 
+python process_pdf.py
+```
 
 
 **note** 
