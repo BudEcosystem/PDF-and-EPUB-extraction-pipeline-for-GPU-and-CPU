@@ -54,8 +54,57 @@ python process_pdf.py
 
 **Note** 
 if you are getting any installation error, then manully install packages and models one by one,
-for model installtion pls refere below mentioned link
 
-(https://layout-parser.readthedocs.io/en/latest/notes/installation.html)
+## installtion of diffirent models
 
-after model installtion, install required packages one by one using `pip install package_name`
+**installtion of Layout Parser and Detectron2**
+To detect the layout of a document image (https://layout-parser.readthedocs.io/en/latest/notes/installation.html)
+
+```bash
+pip install layoutparser	
+```
+
+```bash
+pip install "layoutparser[effdet]"		
+```
+
+```bash
+pip install layoutparser torchvision && pip install "git+https://github.com/facebookresearch/detectron2.git@v0.5#egg=detectron2"		
+```
+
+```bash
+pip install "layoutparser[paddledetection]"		
+```
+
+```bash
+pip install "layoutparser[ocr]"		
+```
+
+```bash
+pip install layoutparser torchvision && pip install "detectron2@git+https://github.com/facebookresearch/detectron2.git@v0.5#egg=detectron2"
+
+```
+```bash
+pip install "layoutparser[ocr]"	
+```
+
+**nougat installation**
+To extract equation's latex code (https://github.com/facebookresearch/nougat)
+
+```bash
+pip install nougat-ocr
+```
+
+**LatexOcr**
+To extract latex code from image containg equation (https://github.com/lukas-blecher/LaTeX-OCR)
+
+```bash
+pip install "pix2tex[gui]"
+```
+
+**Installation of different packages**
+install required package by using following command
+
+```bash
+pip install package_name
+```
