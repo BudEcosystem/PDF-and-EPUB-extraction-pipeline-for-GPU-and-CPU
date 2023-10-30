@@ -53,9 +53,9 @@ python process_pdf.py
 
 
 **Note** 
-if you are getting any installation error, then you can manully install package and model one by one
-for model installtion pls refere below mentiond website
+if you are getting any installation error, then manully install packages and models one by one,
+for model installtion pls refere below mentioned link
 
 (https://layout-parser.readthedocs.io/en/latest/notes/installation.html)
 
-after installing model you can installed required packages one by one using pip install package_name
+after model installtion, install required packages one by one using `pip install package_name`
