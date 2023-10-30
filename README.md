@@ -8,8 +8,9 @@ Python -  > 3.8
 
 **Step 1.**
 Create the virtual environment: Use the python3 -m venv command to create a virtual environment. Replace your_env_name with the name you want to give to your virtual environment:
-
-`python3 -m venv your_env_name`
+```bash
+python3 -m venv your_env_name
+```
 
 **Step 2.**
 Activate the virtual environment: You need to activate the virtual environment to start using it. Use the following command:
