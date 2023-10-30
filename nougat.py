@@ -11,6 +11,6 @@ def gettext(pdf_path):
         print(result.stderr)
         print(result.stdout)
     except Exception as e:
-        print(f"An error occurred whi",e)
+        print(f"An error occurred while extracting pdf data through nougat",e)
         
 gettext("page_3.pdf")
