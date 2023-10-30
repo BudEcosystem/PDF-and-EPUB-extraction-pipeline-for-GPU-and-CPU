@@ -57,18 +57,54 @@ bucket_name = os.environ['AWS_BUCKET_NAME']
 folder_name=os.environ['BOOK_FOLDER_NAME']
 
 def store_book_progress(bookname, page_num, bookId, current_book_number):
+    """
+    Stores the progress of the book processing.
+
+    Args:
+    bookname (str): The name of the book being processed.
+    page_num (int): The current page number being processed.
+    bookId (str): A unique identifier for the book.
+    current_book_number (int): The current book number.
+
+    Returns:
+    None: The function stores the progress in the database.
+
+    This function stores the progress of the book processing, including the book name, current page number,
+    book identifier, and the current book number.
+    """
     book_progress.delete_many({})
     book_progress.insert_one({"bookId":bookId, "book":bookname, "book_number":current_book_number, "page_num":page_num})
     book_number.delete_many({})
 
 def signal_handler(sig, frame):
-    # Capture the progress when the script is interrupted
+    """
+    Handles capturing progress when the script is interrupted.
+
+    Args:
+    sig: The signal received.
+    frame: The current execution frame.
+
+    Returns:
+    None: The function captures the progress and exits.
+
+    This function is used to capture the progress when the script is interrupted by a signal. It stores the
+    progress of the current book processing and exits the script.
+    """
+
     if current_bookname and current_page_num is not None:
         store_book_progress(current_bookname, current_page_num, current_bookId,current_book_number)
     exit(0)
 
 def exit_handler():
-    # Capture the progress when the script exits normally
+    """
+    Handles capturing progress when the script exits normally.
+
+    Returns:
+    None: The function captures the progress and exits.
+
+    This function is used to capture the progress when the script exits normally. It stores the progress
+    of the current book processing and exits the script.
+    """
     if current_bookname and current_page_num is not None:
         store_book_progress(current_bookname, current_page_num, current_bookId, current_book_number)
 
@@ -82,17 +118,42 @@ current_book_number=None
 
 @timeit
 def get_all_books_names(bucket_name, folder_name):
+  '''
+    Get all books names from aws s3 bucket
+
+    Args:
+        bucket_name (str): The name of the AWS S3 bucket.
+        folder_name (str): The name of the folder within the bucket.
+
+    Returns:
+        list: A list of dictionaries representing the contents (objects) in the specified folder.
+    '''
   contents = s3.list_objects_v2(Bucket=bucket_name, Prefix=folder_name)
   pdf_file_names = [obj['Key'] for obj in contents.get('Contents', [])]
   book_names = [file_name.split('/')[1] for file_name in pdf_file_names]
   return book_names
 
-# downlads particular book from aws and save it to system and return the bookpath
 @timeit
 def download_book_from_aws(bookname, bookId):
+  """
+    Downloads a book from an AWS S3 bucket and saves it to a local directory.
+    
+    Args:
+    bookname (str): The name of the book to be downloaded.
+    bookId (str): A unique identifier for the book.
+
+    Returns:
+    str or None: If successful, returns the local file path where the book is saved.
+    If an error occurs, returns None.
+
+    Explaination:
+          This function attempts to download a book from an AWS S3 bucket using the provided
+    'bookname' and 'bookId'. It creates a local directory if it doesn't exist and saves
+    the downloaded book with the same name in that directory. If any errors occur during
+    the download process, the details are recorded in a database and 'None' is returned.
+  """
   try:
     os.makedirs(folder_name, exist_ok=True)
-    # Save the PDF with the bookname.pdf in the books folder
     local_path = os.path.join(folder_name, f'{bookname}')
     file_key = f'{folder_name}/{bookname}'
     response = s3.get_object(Bucket=bucket_name, Key=file_key)
@@ -108,6 +169,17 @@ def download_book_from_aws(bookname, bookId):
 
 @timeit
 def process_book(bookname, start_page, bookId):
+    """
+    Processes a PDF book, send each page for pdf for extarcting page data and stores the extracted page data in the database.
+
+    Args:
+    bookname (str): The name of the PDF book file.
+    start_page (int): The starting page number to resume processing.
+    bookId (str): A unique identifier for the book.
+
+    Returns:
+    None: The function stores processed page data in the database.
+    """
     newBookId=uuid.uuid4().hex
 
     if bookId is None:
@@ -192,9 +264,30 @@ def process_book(bookname, start_page, bookId):
     os.remove(book_path)
     shutil.rmtree(book_folder)
 
-#convert pages into images and return all pages data
 @timeit
 def process_page(page_num, book_path, book_folder, bookname, bookId):
+    """
+    Processes a page of a PDF book, convert it to image and send the required page data to process_image function to extract contents and layout information.
+
+    Args:
+    page_num (int): The page number to be processed.
+    book_path (str): The path to the PDF book file.
+    book_folder (str): The directory where processed page images are saved.
+    bookname (str): The name of the book.
+    bookId (str): A unique identifier for the book.
+
+    Returns:
+    tuple (dict, dict): A tuple containing two dictionaries.
+        - The first dictionary contains processed page content, tables, figures, and equations.
+        - The second dictionary contains layout information for the page.
+
+    This function processes a specific page of a PDF book (identified by 'page_num') located at 'book_path'.
+    and send the required page data to process_image function to extract contents and layout information.
+    and return the processed data as two dictionaries within a tuple. The first dictionary contains
+    'text', 'tables', 'figures', and 'equations' extracted from the page.
+    The second dictionary contains layout information.
+    After processing, the temporary page image is removed
+    """
     pdf_book = fitz.open(book_path)
     page_image = pdf_book[page_num]
     book_image = page_image.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
@@ -217,9 +310,31 @@ def process_page(page_num, book_path, book_folder, bookname, bookId):
     os.remove(image_path)
     return page_obj, page_layout_info
 
-#detect layout and return page data
 @timeit
 def process_image(imagepath, page_num, bookname, bookId, pdf_book):
+    """
+    Processes an image of a page from a PDF book, extracting content and layout information using different model.
+
+    Args:
+    imagepath (str): The file path to the image of the page.
+    page_num (int): The page number being processed.
+    bookname (str): The name of the book.
+    bookId (str): A unique identifier for the book.
+    pdf_book (PyMuPDF.PDF): An open PDF document using the PyMuPDF library.
+
+    Returns:
+    tuple (str, list, list, list, list): A tuple containing:
+        - Processed page content as a string.
+        - List of tables extracted from the page.
+        - List of figures extracted from the page.
+        - List of equations extracted from the page.
+        - List of layout information for the page.
+
+    This function processes an image of a specific page of a PDF book and extracts the page's content,
+    layout information, as well as any tables, figures, or equations present on the page.
+    The processed data is returned as a tuple containing the page content, tables, figures, equations, and layout.
+    If an error occurs during processing, empty values or lists are returned for that page
+    """
     try:
         image = cv2.imread(imagepath)
         image = image[..., ::-1]
@@ -328,7 +443,6 @@ def process_image(imagepath, page_num, bookname, bookId, pdf_book):
                     return "",[],[],[],[]
 
         
-        #extract page content based on their region
         if not pdFigCap and len(layout_blocks)==1 and layout_blocks[0]['type']=='Figure':
             x1, y1, x2, y2 = layout_blocks[0]['x_1'], layout_blocks[0]['y_1'], layout_blocks[0]['x_2'], layout_blocks[0]['y_2']
             img = cv2.imread(imagepath)
@@ -369,9 +483,27 @@ def process_image(imagepath, page_num, bookname, bookId, pdf_book):
             error_collection.insert_one(new_error_doc)
         return "", [],[],[],[]
 
-#sort the layout blocks and return page data 
 @timeit
-def sort_text_blocks_and_extract_data(blocks, imagepath,page_tables, page_figures, page_equations, pdFigCap):
+def sort_text_blocks_and_extract_data(blocks, imagepath, page_tables, page_figures, page_equations, pdFigCap):
+    """
+    Sorts and processes text blocks to extract different page content.
+
+    Args:
+    blocks (list of dict): A list of layout information blocks.
+    imagepath (str): The file path to the image of the page.
+    page_tables (list): A list to store extracted tables.
+    page_figures (list): A list to store extracted figures.
+    page_equations (list): A list to store extracted equations.
+    pdFigCap (bool): Indicates whether page has figure and captions extracted by pdfigcapx.
+
+    Returns:
+    str: Processed page content as a string.
+
+    This function takes a list of layout information blocks, sorts them based on their position,
+    and processes each block to extract different content. Depending on the type of block, it may
+    extract tables, figures, equations, text, titles, or lists. The processed page content is
+    returned as a string.
+    """
     sorted_blocks = sorted(blocks, key=lambda block: (block['y_1'] + block['y_2']) / 2)
     output = ""
     prev_block = None
@@ -400,32 +532,39 @@ def sort_text_blocks_and_extract_data(blocks, imagepath,page_tables, page_figure
     page_content = re.sub(r'\s+', ' ', output).strip()
     return page_content
 
-# #extract table and table_caption and return table object {id, data, caption}
 @timeit
 def process_table(table_block, imagepath, output, page_tables):
+    """
+    Processes a table block, extracts the table and table caption, and adds it's id to the output (for maintaining sequence).
+
+    Args:
+    table_block (dict): The layout information of the table block.
+    imagepath (str): The file path to the image.
+    output (str): The current page content being processed.
+    page_tables (list): A list to store extracted tables and captions.
+
+    Returns:
+    str: The updated page content with updated page_tables list
+
+    This function takes a table block's layout information, extracts the tables and table captions using bud-ocr
+    and stored the extracted table info to the 'page_tables' list and thier unique id's to the 'output'.
+    The updated page content is returned as a string.
+    """
     x1, y1, x2, y2 = table_block['x_1'], table_block['y_1'], table_block['x_2'], table_block['y_2']
-    # # Load the image
     img = cv2.imread(imagepath)
-    # Increase top boundary by 70 pixels
     y1 -= 70
     if y1 < 0:
         y1 = 0
-    # Increase left boundary to the image's width
     x1 = 0
-    # Increase right boundary by 20 pixels
     x2 += 20
     if x2 > img.shape[1]:
         x2 = img.shape[1]
-    # Increase bottom boundary by 20 pixels
     y2 += 20
     if y2 > img.shape[0]:
         y2 = img.shape[0]
-    # Crop the specified region
     cropped_image = img[int(y1):int(y2), int(x1):int(x2)]
-    # Save the cropped image
     table_image_path ="cropped_table.png"
     cv2.imwrite(table_image_path, cropped_image)
-    
     #process table and caption with bud-ocr
     output=process_book_page(table_image_path,page_tables, output)
 
@@ -436,6 +575,22 @@ def process_table(table_block, imagepath, output, page_tables):
 #extract figure and figure_caption and return figure object {id, figureUrl, caption}
 @timeit
 def process_figure(figure_block, imagepath, output, page_figures):
+    """
+    Processes a figure block, extracts the figures and figure captions, and adds it's id to the output (for maintaining sequence).
+
+    Args:
+    figure_block (dict): The layout information of the figure block.
+    imagepath (str): The file path to the image.
+    output (str): The current page content being processed.
+    page_figures (list): A list to store extracted figures and captions.
+
+    Returns:
+    str: The updated page content with updated page_figures list
+
+    This function takes a figure block's layout information, extracts the figure and caption
+    and stored the extracted figure info to the 'page_figures' list and thier unique id's to the 'output'.
+    The updated page content is returned as a string.
+    """
     # Process the "Figure" block
     x1, y1, x2, y2 = figure_block['x_1'], figure_block['y_1'], figure_block['x_2'], figure_block['y_2']
     img = cv2.imread(imagepath)
@@ -470,7 +625,24 @@ def process_figure(figure_block, imagepath, output, page_figures):
 
 @timeit
 def process_publeynet_figure(figure_block, imagepath, prev_block, next_block, output, page_figures):
-    print("process_figure2 called as pdffig is false")
+    """
+    Processes a figure block, extracts the figures and figure captions, and adds it's id to the output (for maintaining sequence).
+
+    Args:
+    figure_block (dict): The layout information of the figure block.
+    imagepath (str): The file path to the image.
+    prev_block (dict): The layout information of the previous block of the figure block.
+    next_block (dict): The layout information of the next block of the figure block.
+    output (str): The current page content being processed.
+    page_figures (list): A list to store extracted figures and captions.
+
+    Returns:
+    str: The updated page content with updated page_figures list
+
+    This function takes a figure block's layout information, extracts the figure and caption
+    and stored the extracted figure info to the 'page_figures' list and thier unique id's to the 'output'.
+    The updated page content is returned as a string.
+    """
     caption=""
     # Process the "Figure" block
     x1, y1, x2, y2 = figure_block['x_1'], figure_block['y_1'], figure_block['x_2'], figure_block['y_2']
@@ -564,6 +736,22 @@ def process_publeynet_figure(figure_block, imagepath, prev_block, next_block, ou
 #extract and return text from text block
 @timeit
 def process_text(text_block,imagepath, output):
+    """
+    Processes a text block, extracts the text, and adds it to the output (for maintaining sequence).
+
+    Args:
+    text_block (dict): The layout information of the text block.
+    imagepath (str): The file path to the image.
+    output (str): The current page content being processed.
+
+    Returns:
+    str: The updated page content
+
+    This function takes a text block's layout information, extracts the text using pytessaract
+    and add the extracted text to the 'output'
+    The updated page content is returned as a string.
+    """
+    
     x1, y1, x2, y2 = text_block['x_1'], text_block['y_1'], text_block['x_2'], text_block['y_2']
     # Load the image
     img = cv2.imread(imagepath)
@@ -597,6 +785,21 @@ def process_text(text_block,imagepath, output):
 #extract and return text from title block
 @timeit
 def process_title(title_block,imagepath, output):
+    """
+    Processes a title block, extracts the text, and adds it to the output (for maintaining sequence).
+
+    Args:
+    title_block (dict): The layout information of the title block.
+    imagepath (str): The file path to the image.
+    output (str): The current page content being processed.
+
+    Returns:
+    str: The updated page content
+
+    This function takes a title block's layout information, extracts the text using pytessaract
+    and add the extracted text to the 'output'
+    The updated page content is returned as a string.
+    """
     x1, y1, x2, y2 = title_block['x_1'], title_block['y_1'], title_block['x_2'], title_block['y_2']
     # Load the image
     img = cv2.imread(imagepath)
@@ -630,6 +833,21 @@ def process_title(title_block,imagepath, output):
 #extract and return text from list block
 @timeit
 def process_list(list_block,imagepath, output):
+    """
+    Processes a list block, extracts the list, and adds it to the output (for maintaining sequence).
+
+    Args:
+    list_block (dict): The layout information of the list block.
+    imagepath (str): The file path to the image.
+    output (str): The current page content being processed.
+
+    Returns:
+    str: The updated page content
+
+    This function takes a list block's layout information, extracts the text using pytessaract
+    and add the extracted text to the 'output'
+    The updated page content is returned as a string.
+    """
     x1, y1, x2, y2 = list_block['x_1'], list_block['y_1'], list_block['x_2'], list_block['y_2']
     # Load the image
     img = cv2.imread(imagepath)
@@ -663,6 +881,20 @@ def process_list(list_block,imagepath, output):
 #upload figure to aws and return aws url
 @timeit
 def upload_to_aws_s3(figure_image_path, figureId): 
+    """
+    Uploads an image to an Amazon S3 bucket and returns its URL.
+
+    Args:
+    figure_image_path (str): The local file path to the image to be uploaded.
+    figureId (str): A unique identifier for the image.
+
+    Returns:
+    str: The URL of the uploaded image in the Amazon S3 bucket.
+
+    This function takes an image located at 'figure_image_path', uploads it to an Amazon S3 bucket,
+    and returns the URL of the uploaded image. The image is identified by 'figureId' and stored
+    in the specified S3 bucket.
+    """
     folderName=os.environ['AWS_IMAGE_UPLOAD_FOLDER']
     s3_key = f"{folderName}/{figureId}.png"
     # Upload the image to the specified S3 bucket
@@ -674,6 +906,23 @@ def upload_to_aws_s3(figure_image_path, figureId):
 
 @timeit
 def extract_text_equation_with_nougat(image_path, page_equations, page_num, bookname, bookId):
+    """
+    Extracts text and equations from an image using Nougat OCR.
+
+    Args:
+    image_path (str): The file path to the image of the page.
+    page_equations (list): A list to store extracted equations.
+    page_num (int): The page number being processed.
+    bookname (str): The name of the book.
+    bookId (str): A unique identifier for the book.
+
+    Returns:
+    str: Processed page content as a string.
+
+    This function converts the input image into a PDF, extracts LaTeX equations using Nougat OCR,
+    and replaces the equations with unique identifiers. The extracted equations are stored in the
+    'page_equations' list. The processed page content is returned as a string.
+    """
     pdf_path ="page.pdf"
     with open(pdf_path, "wb") as pdf_file, open(image_path, "rb") as image_file:
         pdf_file.write(img2pdf.convert(image_file))
@@ -698,6 +947,23 @@ def extract_text_equation_with_nougat(image_path, page_equations, page_num, book
 
 @timeit
 def process_equation(equation_block, imagepath, output, page_equations):
+    """
+    Processes a equation block, extracts the equation, and adds it's id to the output (for maintaining sequence).
+
+    Args:
+    equation_block (dict): The layout information of the equation block.
+    imagepath (str): The file path to the image.
+    output (str): The current page content being processed.
+    page_equations (list): A list to store extracted equations.
+
+
+    Returns:
+    str: The updated page content
+
+    This function takes a equation block's layout information, extracts the equations
+    and add the extracted equations to the 'page_eqautions' list and thier ids to the 'output'
+    The updated page content is returned as a string.
+    """
     x1, y1, x2, y2 = equation_block['x_1'], equation_block['y_1'], equation_block['x_2'], equation_block['y_2']
     # # Load the image
     img = cv2.imread(imagepath)
@@ -735,6 +1001,21 @@ def process_equation(equation_block, imagepath, output, page_equations):
    
 @timeit
 def get_latext_text(pdf_path, page_num, bookname, bookId):
+    """
+    Extracts LaTeX text from a PDF using Nougat OCR.
+
+    Args:
+    pdf_path (str): The file path to the PDF.
+    page_num (int): The page number being processed.
+    bookname (str): The name of the book.
+    bookId (str): A unique identifier for the book.
+
+    Returns:
+    str: Extracted LaTeX text as a string.
+
+    This function uses Nougat OCR to extract LaTeX text from the specified PDF file ('pdf_path').
+    The extracted LaTeX text is returned as a string. 
+    """
     try:
         command=[
             "nougat",
@@ -763,6 +1044,21 @@ def latext_to_text_to_speech(text):
 
 @timeit
 def get_figure_and_captions(book_path,bookname,bookId):
+    """
+    Extracts figures and their captions from a pdf using PDFigCapx.
+
+    Args:
+    book_path (str): The file path to the pdf book.
+    bookname (str): The name of the book.
+    bookId (str): A unique identifier for the book.
+
+    Returns:
+    None: The function stores the extracted figures and captions in the database.
+
+    This function extracts figures and their captions from a PDF book. It splits the book into smaller
+    PDFs, processes them to extract figures and captions, and stores the data in a database. If no
+    figures are detected, a message is printed.
+    """
     document = figure_caption.find_one({"bookId":bookId})
     if document:
         return
@@ -804,27 +1100,30 @@ def get_figure_and_captions(book_path,bookname,bookId):
         return []
 
 
-
-books = get_all_books_names(bucket_name, folder_name+'/')
-
-for idx, book in enumerate(books):
-    start_book=0
-    start_page=0
-    bookId=None
-    prog_doc=list(book_progress.find())
-    book_com=list(book_number.find())
-    if len(prog_doc)>0:
-        start_page=prog_doc[-1]['page_num']
-        start_book=prog_doc[-1]['book_number']-1
-        bookId=prog_doc[-1]['bookId']
-    if len(book_com)>0:
-        start_book=book_com[0]['book_number']
-    if(idx<start_book):
-        print('skipping this book', book)
-        continue
-    if book.endswith('.pdf'):
-        current_book_number=idx+1
-        process_book(book, start_page, bookId)
-    else:
-        print(f"skipping this {book} as it it is not a pdf file")
-        continue
+if __name__ == "__main__":
+    books = get_all_books_names(bucket_name, folder_name + '/')
+    for idx, book in enumerate(books):
+        start_book = 0
+        start_page = 0
+        bookId = None
+        prog_doc = list(book_progress.find())
+        book_com = list(book_number.find())
+        
+        if len(prog_doc) > 0:
+            start_page = prog_doc[-1]['page_num']
+            start_book = prog_doc[-1]['book_number'] - 1
+            bookId = prog_doc[-1]['bookId']
+            
+        if len(book_com) > 0:
+            start_book = book_com[0]['book_number']
+            
+        if idx < start_book:
+            print('skipping this book', book)
+            continue
+        
+        if book.endswith('.pdf'):
+            current_book_number = idx + 1
+            process_book(book, start_page, bookId)
+        else:
+            print(f"skipping this {book} as it is not a pdf file")
+            continue
