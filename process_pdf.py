@@ -37,8 +37,8 @@ aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
 aws_region = os.environ['AWS_REGION']
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.aws_book_set_2
-bookdata = db.bookdata2
+db = client.books
+bookdata = db.book_set_2_new
 error_collection = db.error_collection
 figure_caption = db.figure_caption
 book_layout = db.book_layout
