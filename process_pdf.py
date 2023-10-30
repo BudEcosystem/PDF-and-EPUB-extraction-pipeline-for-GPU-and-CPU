@@ -4,7 +4,7 @@ import subprocess
 import pytesseract
 import sys
 from PIL import Image
-sys.path.append("code")
+sys.path.append("pdf_extraction_pipeline/code")
 from FigCap import extract_figure_and_caption
 from PIL import Image
 import os
