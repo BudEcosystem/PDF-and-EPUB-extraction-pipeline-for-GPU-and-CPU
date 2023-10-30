@@ -1,8 +1,8 @@
-## PDF-Data-Extraction-Pipeline
+# PDF-Data-Extraction-Pipeline
 
-# Setup
+## Setup
 
-# Requirements.
+### Requirements.
 **Linux OR Mac and**
 **Python: > 3.8**
 
