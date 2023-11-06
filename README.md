@@ -1,6 +1,6 @@
 # PDF-Data-Extraction-Pipeline
 
-**Project Summary:** This project utilizes a combination of models and python libraries, including Layout Parser, Detectron2, LatexOcr, Bud-OCR,PyMuPDF, pdf2img, pytesseract and more, to extract structured data from pdf document. It's designed to efficiently extract figures, figure captions, tables, table captions, equations, and text from pdf documents.
+**Project Summary:** This project utilizes a combination of various models and python libraries, including Layout Parser, Detectron2, LatexOcr, Bud-OCR,PyMuPDF, pdf2img, pytesseract and more, to extract structured data from pdf document. It's designed to efficiently extract figures, figure captions, tables, table captions, equations, and text from pdf documents.
 
 ## Code flow.
 ![Alt Text](path/to/your/image.png)
