@@ -77,7 +77,7 @@ def process_book_page(image_path, page_tables, output):
     files = {
         'file': (image_path, open(image_path, 'rb'))
     }
-    response = requests.post('http://91.203.132.119:8003/ocr', files=files)
+    response = requests.post(os.environ['BUD_OCR'], files=files)
 
     if response.status_code == 200:
         data = response.json()
@@ -104,6 +104,6 @@ def process_book_page(image_path, page_tables, output):
     return output  
 
 def should_skip_table(table):
-    if len(table)<=1:
+    if len(table) <= 1 or all(len(row) == 1 for row in table):
         return True
     return False
