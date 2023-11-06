@@ -1,11 +1,13 @@
-## PDF-Data-Extraction-Pipeline
+# PDF-Data-Extraction-Pipeline
 
-# Setup
+**Project Summary:** This project utilizes a combination of various python models and libraries, including Layout Parser, Detectron2, LatexOcr, Bud-OCR,PyMuPDF, pdf2img, pytessaract and more, to extract structured data from pdf document. It's designed to efficiently extract figures, figure captions, tables, table captions, equations, and text from pdf documents.
 
-# Requirements.
+## Code flow.
+![Alt Text](/home/bud-data-extraction/datapipeline/pdf_extraction_pipeline/flowChart.png)
+
+### System Requirements
 **Linux OR Mac and**
 **Python: > 3.8**
-
 **Step 1.**
 Create the virtual environment: Use the python3 -m venv command to create a virtual environment. Replace your_env_name with the name you want to give to your virtual environment:
 ```bash
