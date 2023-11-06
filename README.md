@@ -8,6 +8,8 @@
 ### System Requirements
 **Linux OR Mac and**
 **Python: > 3.8**
+
+### Quick Start
 **Step 1.**
 Create the virtual environment: Use the python3 -m venv command to create a virtual environment. Replace your_env_name with the name you want to give to your virtual environment:
 ```bash
@@ -49,11 +51,11 @@ python pdf_extraction_pipeline/process_pdf.py
 
 
 **Note** 
-if you are getting any installation error, then manully install packages and models one by one,
+if you are getting any installation error, then manually install packages and models one by one,
 
-## installtion of diffirent models
+## Installation of various models used
 
-**installtion of Layout Parser and Detectron2**
+**Installation of Layout Parser and Detectron2**
 To detect the layout of a document image (https://layout-parser.readthedocs.io/en/latest/notes/installation.html)
 
 ```bash
@@ -84,7 +86,7 @@ pip install layoutparser torchvision && pip install "detectron2@git+https://gith
 pip install "layoutparser[ocr]"	
 ```
 
-**nougat installation**
+**Nougat Installation**
 To extract equation's latex code (https://github.com/facebookresearch/nougat)
 
 ```bash
@@ -98,7 +100,7 @@ To extract latex code from image containg equation (https://github.com/lukas-ble
 pip install "pix2tex[gui]"
 ```
 
-**Installation of different packages**
+**Installation of various python packages**
 install required package by using following command
 
 ```bash
