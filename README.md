@@ -3,7 +3,7 @@
 **Project Summary:** This project utilizes a combination of various python models and libraries, including Layout Parser, Detectron2, LatexOcr, Bud-OCR,PyMuPDF, pdf2img, pytessaract and more, to extract structured data from pdf document. It's designed to efficiently extract figures, figure captions, tables, table captions, equations, and text from pdf documents.
 
 ## Code flow.
-![Alt Text](/home/bud-data-extraction/datapipeline/pdf_extraction_pipeline/flowChart.png)
+![Alt Text](flowChart.png)
 
 ### System Requirements
 **Linux OR Mac and**
