@@ -895,7 +895,7 @@ def upload_to_aws_s3(figure_image_path, figureId):
     and returns the URL of the uploaded image. The image is identified by 'figureId' and stored
     in the specified S3 bucket.
     """
-    folderName=os.environ['AWS_IMAGE_UPLOAD_FOLDER']
+    folderName=os.environ['AWS_PDF_IMAGE_UPLOAD_FOLDER']
     s3_key = f"{folderName}/{figureId}.png"
     # Upload the image to the specified S3 bucket
     s3.upload_file(figure_image_path, bucket_name, s3_key)
