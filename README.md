@@ -2,7 +2,7 @@
 
 **Project Summary:** This project utilizes a combination of various python models and libraries, including Layout Parser, Detectron2, LatexOcr, Bud-OCR,PyMuPDF, pdf2img, pytessaract and more, to extract figures, figure captions, tables, table captions, equations, and text from pdf documents.
 
-## Code flow.
+## Code flow for pdf data extraction
 ![Alt Text](flowChart.png)
 
 ### System Requirements
@@ -42,11 +42,15 @@ Create .env file inside pdf_extraction_pipeline folder and copy the key content 
 open .env and modify the environment variables 
 
 **Step 7**
-Run process_pdf.py file
+Run process_pdf.py file to expract pdf data and Run process_epub.py for epub data extraction.
 
 ```bash 
 python pdf_extraction_pipeline/process_pdf.py
 ```
+```bash 
+python pdf_extraction_pipeline/process_epub.py
+```
+
 
 
 
