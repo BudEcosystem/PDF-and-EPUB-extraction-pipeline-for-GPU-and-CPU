@@ -162,10 +162,8 @@ def get_toc_from_ncx(toc_contents):
           toc_contents (str): The contents of the toc file.
 
       Returns:
-          list: A list of dictionaries representing the table of content.
+          list: A list of string representing the table of content.
 
-      Raises:
-          xml.etree.ElementTree.ParseError: If the provided toc file is invalid.
     '''
     root = ET.fromstring(toc_contents)
     src_array = []
