@@ -42,7 +42,7 @@ Create .env file inside pdf_extraction_pipeline folder and copy the key content 
 open .env and modify the environment variables 
 
 **Step 7**
-Run process_pdf.py file to expract pdf data and Run process_epub.py for epub data extraction.
+Run process_pdf.py file to expract pdf data and Run process_epub.py file to extract epub data.
 
 ```bash 
 python pdf_extraction_pipeline/process_pdf.py

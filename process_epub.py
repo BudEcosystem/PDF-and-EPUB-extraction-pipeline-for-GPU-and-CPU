@@ -46,6 +46,15 @@ def get_all_epub_books_names(bucket_name, folder_name):
 
 
 def download_epub_from_aws(epub):
+    '''
+      Downloads a epub book from an AWS S3 bucket and saves it as a .zip file to a local directory.
+
+      Args:
+          epub(str): The name of the epub book to be downloaded.
+
+      Returns:
+          str: The path to the local directory where the EPUB book has been unzipped.
+    '''
     local_zip_path = f'{epub}.zip'
     file_key = f'{folder_name}/{epub}'
     s3.download_file(bucket_name, file_key, local_zip_path)
@@ -166,15 +175,29 @@ def get_toc_from_ncx(toc_contents):
 
     '''
     root = ET.fromstring(toc_contents)
-    src_array = []
+    toc_array = []
     for content_element in root.findall(".//{http://www.daisy.org/z3986/2005/ncx/}content"):
         src = content_element.get("src")
-        src_array.append(src)
+        toc_array.append(src)
 
-    return src_array
+    return toc_array
 
 
 def process_epub_book(epub):
+    '''
+    Process an EPUB book after downloading from AWS S3.
+
+    Args:
+        epub (str): The name of the EPUB book to be processed.
+
+    Returns:
+          None
+
+    This function downloads an EPUB book from AWS S3, extracts the table of contents (TOC) from
+    its 'toc.ncx' file, and processes the content of the book. The processed data is stored in a
+    database. Finally, the downloaded EPUB is removed.
+
+    '''
     unzip_folder_path = download_epub_from_aws(epub)
     relative_oebps_path = 'OEBPS'
 
@@ -222,10 +245,6 @@ def upload_to_aws_s3(figure_image_path, figureId):
 
     Returns:
     str: The URL of the uploaded image in the Amazon S3 bucket.
-
-    This function takes an image located at 'figure_image_path', uploads it to an Amazon S3 bucket,
-    and returns the URL of the uploaded image. The image is identified by 'figureId' and stored
-    in the specified S3 bucket.
     """
     folderName = os.environ['AWS_EPUB_IMAGE_UPLOAD_FOLDER']
     s3_key = f"{folderName}/{figureId}.png"
@@ -245,5 +264,6 @@ for book_number, epub in enumerate(all_epub_books, start=1):
         print(f"Processing Book {book_number}: {epub}")
         process_epub_book(epub)
 
+
+#Process single epub book
 # process_epub_book("asimov-genetic-effects-of-radiation.epub")
-# 
