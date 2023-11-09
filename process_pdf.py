@@ -5,9 +5,7 @@ import pytesseract
 import sys
 from PIL import Image
 sys.path.append("pdf_extraction_pipeline/code")
-sys.path.append("pdf_extraction_pipeline/utils")
 from FigCap import extract_figure_and_caption
-from cropImage import crop_image
 from PIL import Image
 import os
 import PyPDF2
@@ -25,7 +23,7 @@ import uuid
 from PyPDF2 import PdfReader
 from tablecaption import process_book_page
 from model_loader import ModelLoader 
-from utils import timeit
+from utils import timeit, crop_image
 from latext import latex_to_text
 from pix2tex.cli import LatexOCR
 load_dotenv()
@@ -973,30 +971,30 @@ def get_figure_and_captions(book_path,bookname,bookId):
         return []
 
 
-# if __name__ == "__main__":
-#     books = get_all_books_names(bucket_name, folder_name + '/')
-#     for idx, book in enumerate(books):
-#         start_book = 0
-#         start_page = 0
-#         bookId = None
-#         prog_doc = list(book_progress.find())
-#         book_com = list(book_number.find())
+if __name__ == "__main__":
+    books = get_all_books_names(bucket_name, folder_name + '/')
+    for idx, book in enumerate(books):
+        start_book = 0
+        start_page = 0
+        bookId = None
+        prog_doc = list(book_progress.find())
+        book_com = list(book_number.find())
         
-#         if len(prog_doc) > 0:
-#             start_page = prog_doc[-1]['page_num']
-#             start_book = prog_doc[-1]['book_number'] - 1
-#             bookId = prog_doc[-1]['bookId']
+        if len(prog_doc) > 0:
+            start_page = prog_doc[-1]['page_num']
+            start_book = prog_doc[-1]['book_number'] - 1
+            bookId = prog_doc[-1]['bookId']
             
-#         if len(book_com) > 0:
-#             start_book = book_com[0]['book_number']
+        if len(book_com) > 0:
+            start_book = book_com[0]['book_number']
             
-#         if idx < start_book:
-#             print('skipping this book', book)
-#             continue
+        if idx < start_book:
+            print('skipping this book', book)
+            continue
         
-#         if book.endswith('.pdf'):
-#             current_book_number = idx + 1
-#             process_book(book, start_page, bookId)
-#         else:
-#             print(f"skipping this {book} as it is not a pdf file")
-#             continue
+        if book.endswith('.pdf'):
+            current_book_number = idx + 1
+            process_book(book, start_page, bookId)
+        else:
+            print(f"skipping this {book} as it is not a pdf file")
+            continue
