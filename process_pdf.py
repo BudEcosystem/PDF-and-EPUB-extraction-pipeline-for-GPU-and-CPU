@@ -835,27 +835,9 @@ def process_equation(equation_block, imagepath, output, page_equations):
     and add the extracted equations to the 'page_eqautions' list and thier ids to the 'output'
     The updated page content is returned as a string.
     """
-    x1, y1, x2, y2 = equation_block['x_1'], equation_block['y_1'], equation_block['x_2'], equation_block['y_2']
-    # # Load the image
-    img = cv2.imread(imagepath)
-
-    x1 -= 5
-    y1 -= 5
-    x2 += 5
-    y2 += 5
-    
-    x1 = max(0, x1)
-    y1 = max(0, y1)
-    x2 = min(img.shape[1], x2)
-    y2 = min(img.shape[0], y2)
-    
-    cropped_image = img[int(y1):int(y2), int(x1):int(x2)]
-    equation_image_path ="cropped_equation.png"
-    cv2.imwrite(equation_image_path, cropped_image)
-
     equationId=uuid.uuid4().hex
+    equation_image_path = crop_image(equation_block,imagepath, listId)
     output += f"{{{{equation:{equationId}}}}}"
-
     img = Image.open(equation_image_path)
     model = LatexOCR()
     latex_text= model(img)
