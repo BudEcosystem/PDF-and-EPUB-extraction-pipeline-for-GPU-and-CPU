@@ -5,7 +5,9 @@ import pytesseract
 import sys
 from PIL import Image
 sys.path.append("pdf_extraction_pipeline/code")
+sys.path.append("pdf_extraction_pipeline/utils")
 from FigCap import extract_figure_and_caption
+from cropImage import crop_image
 from PIL import Image
 import os
 import PyPDF2
@@ -591,26 +593,8 @@ def process_figure(figure_block, imagepath, output, page_figures):
     and stored the extracted figure info to the 'page_figures' list and thier unique id's to the 'output'.
     The updated page content is returned as a string.
     """
-    # Process the "Figure" block
-    x1, y1, x2, y2 = figure_block['x_1'], figure_block['y_1'], figure_block['x_2'], figure_block['y_2']
-    img = cv2.imread(imagepath)
-    # Expand the bounding box by 5 pixels on every side
-    x1-=5
-    y1-=5
-    x2+=5
-    y2+=5
-
-    # Ensure the coordinates are within the image boundaries
-    x1=max(0,x1)
-    y1=max(0,y1)
-    x2=min(img.shape[1],x2)
-    y2=min(img.shape[0],y2)
-
-    #crop the expanded bounding box
-    figure_bbox = img[int(y1):int(y2), int(x1):int(x2)]
-    figureId=uuid.uuid4().hex
-    figure_image_path = f"figure_6{figureId}.png"
-    cv2.imwrite(figure_image_path,figure_bbox) 
+    figureId = uuid.uuid4().hex
+    figure_image_path = crop_image(figure_block,imagepath, figureId)
     output += f"{{{{figure:{figureId}}}}}"
 
     figure_url=upload_to_aws_s3(figure_image_path, figureId)
@@ -644,45 +628,12 @@ def process_publeynet_figure(figure_block, imagepath, prev_block, next_block, ou
     The updated page content is returned as a string.
     """
     caption=""
-    # Process the "Figure" block
-    x1, y1, x2, y2 = figure_block['x_1'], figure_block['y_1'], figure_block['x_2'], figure_block['y_2']
-    # Load the image
-    img = cv2.imread(imagepath)
-    # Expand the bounding box by 5 pixels on every side
-    x1-=5
-    y1-=5
-    x2+=5
-    y2+=5
-
-    # Ensure the coordinates are within the image boundaries
-    x1=max(0,x1)
-    y1=max(0,y1)
-    x2=min(img.shape[1],x2)
-    y2=min(img.shape[0],y2)
-
-    #crop the expanded bounding box
-    figure_bbox = img[int(y1):int(y2), int(x1):int(x2)]
-    figureId=uuid.uuid4().hex
-    figure_image_path = f"figure_6{figureId}.png"
-    cv2.imwrite(figure_image_path,figure_bbox) 
+    figureId = uuid.uuid4().hex
+    figure_image_path = crop_image(figure_block,imagepath, figureId)
     output += f"{{{{figure:{figureId}}}}}"
 
     if prev_block:
-        prev_x1, prev_y1, prev_x2, prev_y2 = prev_block['x_1'], prev_block['y_1'], prev_block['x_2'], prev_block['y_2']
-        prev_x1 -= 5
-        prev_y1 -= 5
-        prev_x2 += 5
-        prev_y2 += 5
-        # Ensure the coordinates are within the image boundaries
-        prev_x1 = max(0, prev_x1)
-        prev_y1 = max(0, prev_y1)
-        prev_x2 = min(img.shape[1], prev_x2)
-        prev_y2 = min(img.shape[0], prev_y2)
-        # Crop the bounding box for the block before the "Figure" block
-        prev_bbox = img[int(prev_y1):int(prev_y2), int(prev_x1):int(prev_x2)]
-        # Save the cropped bounding box as an image
-        prev_image_path = f"prev_block{figureId}.png"
-        cv2.imwrite(prev_image_path, prev_bbox)
+        prev_image_path = crop_image(prev_block,imagepath, figureId)
         #extraction of text from cropped image using pytesseract
         image =Image.open(prev_image_path)
         text = pytesseract.image_to_string(image)
@@ -695,23 +646,7 @@ def process_publeynet_figure(figure_block, imagepath, prev_block, next_block, ou
             os.remove(prev_image_path)
 
     if next_block:
-        next_x1, next_y1, next_x2, next_y2 =next_block['x_1'],next_block['y_1'],next_block['x_2'],next_block['y_2']
-         # Expand the bounding box by 5 pixels on every side
-        next_x1 -= 5
-        next_y1 -= 5
-        next_x2 += 5
-        next_y2 += 5
-        
-        # Ensure the coordinates are within the image boundaries
-        next_x1 = max(0, next_x1)
-        next_y1 = max(0, next_y1)
-        next_x2 = min(img.shape[1], next_x2)
-        next_y2 = min(img.shape[0], next_y2)
-        # Crop the bounding box for the block after the "Figure" block
-        next_bbox = img[int(next_y1):int(next_y2), int(next_x1):int(next_x2)]
-        # Save the cropped bounding box as an image
-        next_image_path = f"next_block_{figureId}.png"
-        cv2.imwrite(next_image_path, next_bbox)
+        next_image_path = crop_image(next_block,imagepath, figureId) 
         #extraction of text from cropped image using pytesseract
         image =Image.open(next_image_path)
         text = pytesseract.image_to_string(image)
@@ -750,28 +685,8 @@ def process_text(text_block,imagepath, output):
     and add the extracted text to the 'output'
     The updated page content is returned as a string.
     """
-    
-    x1, y1, x2, y2 = text_block['x_1'], text_block['y_1'], text_block['x_2'], text_block['y_2']
-    # Load the image
-    img = cv2.imread(imagepath)
-    # Add 10 pixels to each side of the rectangle
-    x1 -= 5
-    y1 -= 5
-    x2 += 5
-    y2 += 5
-    
-    # Ensure the coordinates are within the image boundaries
-    x1 = max(0, x1)
-    y1 = max(0, y1)
-    x2 = min(img.shape[1], x2)
-    y2 = min(img.shape[0], y2)
-    
-    # Crop the specified region
-    cropped_image = img[int(y1):int(y2), int(x1):int(x2)]
-    
-    # Save the cropped image
-    cropped_image_path = "text_block.png"
-    cv2.imwrite(cropped_image_path, cropped_image)
+    textId=uuid.uuid4().hex
+    cropped_image_path = crop_image(text_block,imagepath, textId)
     #extraction of text from cropped image using pytesseract
     image =Image.open(cropped_image_path)
     text = pytesseract.image_to_string(image)
@@ -798,27 +713,8 @@ def process_title(title_block,imagepath, output):
     and add the extracted text to the 'output'
     The updated page content is returned as a string.
     """
-    x1, y1, x2, y2 = title_block['x_1'], title_block['y_1'], title_block['x_2'], title_block['y_2']
-    # Load the image
-    img = cv2.imread(imagepath)
-    # Add 10 pixels to each side of the rectangle
-    x1 -= 5
-    y1 -= 5
-    x2 += 5
-    y2 += 5
-    
-    # Ensure the coordinates are within the image boundaries
-    x1 = max(0, x1)
-    y1 = max(0, y1)
-    x2 = min(img.shape[1], x2)
-    y2 = min(img.shape[0], y2)
-    
-    # Crop the specified region
-    cropped_image = img[int(y1):int(y2), int(x1):int(x2)]
-    
-    # Save the cropped image
-    cropped_image_path = "title_block.png"
-    cv2.imwrite(cropped_image_path, cropped_image)
+    titleId=uuid.uuid4().hex
+    cropped_image_path = crop_image(title_block,imagepath, titleId)
     #extraction of text from cropped image using pytesseract
     image =Image.open(cropped_image_path)
     text = pytesseract.image_to_string(image)
@@ -845,27 +741,8 @@ def process_list(list_block,imagepath, output):
     and add the extracted text to the 'output'
     The updated page content is returned as a string.
     """
-    x1, y1, x2, y2 = list_block['x_1'], list_block['y_1'], list_block['x_2'], list_block['y_2']
-    # Load the image
-    img = cv2.imread(imagepath)
-    # Add 10 pixels to each side of the rectangle
-    x1 -= 5
-    y1 -= 5
-    x2 += 5
-    y2 += 5
-    
-    # Ensure the coordinates are within the image boundaries
-    x1 = max(0, x1)
-    y1 = max(0, y1)
-    x2 = min(img.shape[1], x2)
-    y2 = min(img.shape[0], y2)
-    
-    # Crop the specified region
-    cropped_image = img[int(y1):int(y2), int(x1):int(x2)]
-    
-    # Save the cropped image
-    cropped_image_path = "list_block.png"
-    cv2.imwrite(cropped_image_path, cropped_image)
+    listId=uuid.uuid4().hex
+    cropped_image_path = crop_image(list_block,imagepath, listId)
     #extraction of text from cropped image using pytesseract
     image =Image.open(cropped_image_path)
     text = pytesseract.image_to_string(image)
@@ -1096,30 +973,30 @@ def get_figure_and_captions(book_path,bookname,bookId):
         return []
 
 
-if __name__ == "__main__":
-    books = get_all_books_names(bucket_name, folder_name + '/')
-    for idx, book in enumerate(books):
-        start_book = 0
-        start_page = 0
-        bookId = None
-        prog_doc = list(book_progress.find())
-        book_com = list(book_number.find())
+# if __name__ == "__main__":
+#     books = get_all_books_names(bucket_name, folder_name + '/')
+#     for idx, book in enumerate(books):
+#         start_book = 0
+#         start_page = 0
+#         bookId = None
+#         prog_doc = list(book_progress.find())
+#         book_com = list(book_number.find())
         
-        if len(prog_doc) > 0:
-            start_page = prog_doc[-1]['page_num']
-            start_book = prog_doc[-1]['book_number'] - 1
-            bookId = prog_doc[-1]['bookId']
+#         if len(prog_doc) > 0:
+#             start_page = prog_doc[-1]['page_num']
+#             start_book = prog_doc[-1]['book_number'] - 1
+#             bookId = prog_doc[-1]['bookId']
             
-        if len(book_com) > 0:
-            start_book = book_com[0]['book_number']
+#         if len(book_com) > 0:
+#             start_book = book_com[0]['book_number']
             
-        if idx < start_book:
-            print('skipping this book', book)
-            continue
+#         if idx < start_book:
+#             print('skipping this book', book)
+#             continue
         
-        if book.endswith('.pdf'):
-            current_book_number = idx + 1
-            process_book(book, start_page, bookId)
-        else:
-            print(f"skipping this {book} as it is not a pdf file")
-            continue
+#         if book.endswith('.pdf'):
+#             current_book_number = idx + 1
+#             process_book(book, start_page, bookId)
+#         else:
+#             print(f"skipping this {book} as it is not a pdf file")
+#             continue
