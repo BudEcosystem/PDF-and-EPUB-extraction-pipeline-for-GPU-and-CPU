@@ -572,7 +572,7 @@ def process_table(table_block, imagepath, output, page_tables):
         os.remove(table_image_path)
     return output
 
-#extract figure and figure_caption and return figure object {id, figureUrl, caption}
+
 @timeit
 def process_figure(figure_block, imagepath, output, page_figures):
     """
@@ -733,7 +733,6 @@ def process_publeynet_figure(figure_block, imagepath, prev_block, next_block, ou
         os.remove(figure_image_path)
     return output    
 
-#extract and return text from text block
 @timeit
 def process_text(text_block,imagepath, output):
     """
@@ -782,7 +781,6 @@ def process_text(text_block,imagepath, output):
         os.remove(cropped_image_path)
     return output
 
-#extract and return text from title block
 @timeit
 def process_title(title_block,imagepath, output):
     """
@@ -830,7 +828,6 @@ def process_title(title_block,imagepath, output):
         os.remove(cropped_image_path)
     return output
 
-#extract and return text from list block
 @timeit
 def process_list(list_block,imagepath, output):
     """
@@ -878,7 +875,6 @@ def process_list(list_block,imagepath, output):
         os.remove(cropped_image_path)
     return output
 
-#upload figure to aws and return aws url
 @timeit
 def upload_to_aws_s3(figure_image_path, figureId): 
     """
