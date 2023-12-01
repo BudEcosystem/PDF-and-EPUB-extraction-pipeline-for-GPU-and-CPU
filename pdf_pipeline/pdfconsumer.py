@@ -1,0 +1,124 @@
+import pika
+import json
+import sys
+import cv2
+import os
+import PyPDF2
+from PyPDF2 import PdfReader
+import fitz
+import boto3
+import numpy as np
+from dotenv import load_dotenv
+sys.path.append("pdf_extraction_pipeline")
+from utils import timeit
+from PIL import Image
+import pymongo
+from pdf_producer import table_bank_queue, publeynet_queue, mfd_queue, pdfigcap_queue
+from model_loader import ModelLoader 
+from rabbitmq_connection import get_rabbitmq_connection, get_channel
+
+connection = get_rabbitmq_connection()
+channel = get_channel(connection)
+
+load_dotenv()
+
+aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
+aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
+aws_region = os.environ['AWS_REGION']
+
+# Create an S3 client
+s3 = boto3.client('s3',
+                   aws_access_key_id=aws_access_key_id,
+                   aws_secret_access_key=aws_secret_access_key,
+                   region_name=aws_region)
+
+client = pymongo.MongoClient(os.environ['DATABASE_URL'])
+db = client.bookssssss
+error_collection = db.error_collection
+book_details=db.book_details
+
+bucket_name = os.environ['AWS_BUCKET_NAME']
+folder_name=os.environ['BOOK_FOLDER_NAME']
+
+
+
+@timeit
+def download_book_from_aws(bookname, bookId):
+  try:
+    os.makedirs(folder_name, exist_ok=True)
+    local_path = os.path.join(folder_name, f'{bookname}')
+    file_key = f'{folder_name}/{bookname}'
+    response = s3.get_object(Bucket=bucket_name, Key=file_key)
+    pdf_data = response['Body'].read()
+    with open(local_path, 'wb') as f:
+      f.write(pdf_data)
+    return local_path   
+  except Exception as e:
+    print("An error occurred:", e)
+    data = {"bookId":{bookId},"book":{bookname}, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
+    return None
+
+@timeit
+def process_book(ch, method, properties, body): 
+    message = json.loads(body)
+    book = message["book"]
+    bookname = book['book']
+    bookId = book['bookId']
+    book_details.update_one(
+        {'bookId': bookId},
+       {'$set': {'status': 'processing'}}
+    )
+    book_folder = bookname.replace('.pdf', '')
+    book_path = download_book_from_aws(bookname, bookId)
+    if not book_path:
+         return 
+    os.makedirs(book_folder, exist_ok=True)
+    book = PdfReader(book_path)  
+    print(bookname)
+    num_pages = len(book.pages)
+    if num_pages>15:
+      pdfigcap_queue('pdfigcap_queue',book_path,bookname, bookId)
+    print(f"{bookname} has total {num_pages} page")     
+    try:
+        for page_num in range(0,num_pages):
+            process_page(page_num, book_path, book_folder, bookname, bookId,num_pages)
+        
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+    except Exception as e:
+        data = {"bookId":{bookId},"book":{bookname},"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+
+
+  
+@timeit
+def process_page(page_num, book_path, book_folder, bookname, bookId,num_pages):
+    pdf_book = fitz.open(book_path)
+    page_image = pdf_book[page_num]
+    book_image = page_image.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
+    image_path = os.path.join(book_folder, f'page_{page_num + 1}.jpg')
+    book_image.save(image_path)
+    absolute_image_path = os.path.abspath(image_path)
+    publeynet_queue('publeynet_queue',absolute_image_path, page_num, bookname, bookId,num_pages)
+    table_bank_queue('table_bank_queue',absolute_image_path, page_num, bookname, bookId, num_pages )
+    mfd_queue('mfd_queue',absolute_image_path, page_num, bookname, bookId,num_pages )
+
+
+def consume_pdf_processing_queue():
+    try:
+        # Declare the queue
+        channel.queue_declare(queue='pdf_processing_queue')
+        # Set up the callback function for handling messages from the queue
+        channel.basic_consume(queue='pdf_processing_queue', on_message_callback=process_book)
+
+        print(' [*] Waiting for messages on pdf_processing_queue. To exit, press CTRL+C')
+        channel.start_consuming()
+
+    except KeyboardInterrupt:
+        pass
+
+
+if __name__ == "__main__":
+    try:
+        consume_pdf_processing_queue()
+    except KeyboardInterrupt:
+        pass

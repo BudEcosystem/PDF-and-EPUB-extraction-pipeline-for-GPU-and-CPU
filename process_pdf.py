@@ -2,8 +2,10 @@ import numpy as np
 from dotenv import load_dotenv
 import subprocess
 import pytesseract
+import psutil
 import sys
-from PIL import Image
+# from nougat.utils.checkpoint import get_checkpoint
+
 sys.path.append("pdf_extraction_pipeline/code")
 from FigCap import extract_figure_and_caption
 from PIL import Image
@@ -12,6 +14,8 @@ import PyPDF2
 import img2pdf
 import fitz
 import shutil
+import GPUtil
+
 import traceback
 import boto3
 import re
@@ -30,6 +34,7 @@ load_dotenv()
 import os
 import signal
 import atexit
+# CHECKPOINT = get_checkpoint('nougat')
 
 # Configure AWS credentials
 aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
@@ -195,11 +200,13 @@ def process_book(bookname, start_page, bookId):
     if not book_path:
          return 
     #extract figure and figure caption
-    get_figure_and_captions(book_path, bookname, bookId)
     os.makedirs(book_folder, exist_ok=True)
     book = PdfReader(book_path)  
     print(bookname)
     num_pages = len(book.pages)
+    if(num_pages>15):
+        get_figure_and_captions(book_path, bookname, bookId)
+
     print(f"{bookname} has total {num_pages} page")
     try:
         for page_num in range(start_page,num_pages):
@@ -378,7 +385,6 @@ def process_image(imagepath, page_num, bookname, bookId, pdf_book):
             layout_blocks.append(output_item)
 
         document = figure_caption.find_one({"bookId":bookId})
-
         if document:
             pdFigCap=True
             layout_blocks = [block for block in layout_blocks if block['type'] != 'Figure']
@@ -455,7 +461,7 @@ def process_image(imagepath, page_num, bookname, bookId, pdf_book):
             if image.height>1500:
                 page = pdf_book[page_num]
                 text = page.get_text(sort=True)
-                page_content = text = re.sub(r'\s+', ' ', text)
+                page_content = re.sub(r'\s+', ' ', text)
             else:
                 figure_url = upload_to_aws_s3(imagepath,figureId)
                 page_figures.append({
@@ -572,7 +578,6 @@ def process_table(table_block, imagepath, output, page_tables):
         os.remove(table_image_path)
     return output
 
-
 @timeit
 def process_figure(figure_block, imagepath, output, page_figures):
     """
@@ -627,11 +632,13 @@ def process_publeynet_figure(figure_block, imagepath, prev_block, next_block, ou
     """
     caption=""
     figureId = uuid.uuid4().hex
-    figure_image_path = crop_image(figure_block,imagepath, figureId)
+    figure_image_path =crop_image(figure_block,imagepath, figureId)
+    print(figure_image_path)
     output += f"{{{{figure:{figureId}}}}}"
 
     if prev_block:
-        prev_image_path = crop_image(prev_block,imagepath, figureId)
+        prevId=uuid.uuid4().hex
+        prev_image_path = crop_image(prev_block,imagepath, prevId)
         #extraction of text from cropped image using pytesseract
         image =Image.open(prev_image_path)
         text = pytesseract.image_to_string(image)
@@ -644,7 +651,8 @@ def process_publeynet_figure(figure_block, imagepath, prev_block, next_block, ou
             os.remove(prev_image_path)
 
     if next_block:
-        next_image_path = crop_image(next_block,imagepath, figureId) 
+        nextId=uuid.uuid4().hex
+        next_image_path = crop_image(next_block,imagepath, nextId) 
         #extraction of text from cropped image using pytesseract
         image =Image.open(next_image_path)
         text = pytesseract.image_to_string(image)
@@ -777,6 +785,7 @@ def upload_to_aws_s3(figure_image_path, figureId):
 
 @timeit
 def extract_text_equation_with_nougat(image_path, page_equations, page_num, bookname, bookId):
+    
     """
     Extracts text and equations from an image using Nougat OCR.
 
@@ -812,6 +821,12 @@ def extract_text_equation_with_nougat(image_path, page_equations, page_num, book
     
     page_content = re.sub(pattern, replace_with_uuid, latex_text)
     page_content = re.sub(r'\s+', ' ', page_content).strip()
+    process = psutil.Process(os.getpid())
+    print(f"Memory Usage for nougat function: {process.memory_info().rss / (1024 ** 2):.2f} MB")
+    gpus = GPUtil.getGPUs()
+    for i, gpu in enumerate(gpus):
+        print(f"GPU {i + 1} - GPU Name: {gpu.name}")
+        print(f"  GPU Utilization: {gpu.load * 100:.2f}%")
     if os.path.exists(pdf_path):
         os.remove(pdf_path)
     return page_content
@@ -836,7 +851,7 @@ def process_equation(equation_block, imagepath, output, page_equations):
     The updated page content is returned as a string.
     """
     equationId=uuid.uuid4().hex
-    equation_image_path = crop_image(equation_block,imagepath, listId)
+    equation_image_path = crop_image(equation_block,imagepath, equationId)
     output += f"{{{{equation:{equationId}}}}}"
     img = Image.open(equation_image_path)
     model = LatexOCR()
@@ -854,21 +869,6 @@ def process_equation(equation_block, imagepath, output, page_equations):
    
 @timeit
 def get_latext_text(pdf_path, page_num, bookname, bookId):
-    """
-    Extracts LaTeX text from a PDF using Nougat OCR.
-
-    Args:
-    pdf_path (str): The file path to the PDF.
-    page_num (int): The page number being processed.
-    bookname (str): The name of the book.
-    bookId (str): A unique identifier for the book.
-
-    Returns:
-    str: Extracted LaTeX text as a string.
-
-    This function uses Nougat OCR to extract LaTeX text from the specified PDF file ('pdf_path').
-    The extracted LaTeX text is returned as a string. 
-    """
     try:
         command=[
             "nougat",
@@ -912,6 +912,12 @@ def get_figure_and_captions(book_path,bookname,bookId):
     PDFs, processes them to extract figures and captions, and stores the data in a database. If no
     figures are detected, a message is printed.
     """
+    process = psutil.Process(os.getpid())
+    print(f"Memory Usage for figure caption function: {process.memory_info().rss / (1024 ** 2):.2f} MB")
+    gpus = GPUtil.getGPUs()
+    for i, gpu in enumerate(gpus):
+        print(f"GPU {i + 1} - GPU Name: {gpu.name}")
+        print(f"  GPU Utilization: {gpu.load * 100:.2f}%")
     document = figure_caption.find_one({"bookId":bookId})
     if document:
         return
@@ -944,6 +950,13 @@ def get_figure_and_captions(book_path,bookname,bookId):
             print("Book's figure and figure caption saved in the database")
         else:
             print(f"no figure detected by pdfigcapx for this book {bookname}")
+        process = psutil.Process(os.getpid())
+        print(f"Memory Usage for figure caption function: {process.memory_info().rss / (1024 ** 2):.2f} MB")
+        gpus = GPUtil.getGPUs()
+        for i, gpu in enumerate(gpus):
+            print(f"GPU {i + 1} - GPU Name: {gpu.name}")
+            print(f"  GPU Utilization: {gpu.load * 100:.2f}%")
+            print()
     except Exception as e:
         if os.path.exists(output_directory):
             shutil.rmtree(output_directory)   
@@ -980,3 +993,5 @@ if __name__ == "__main__":
         else:
             print(f"skipping this {book} as it is not a pdf file")
             continue
+
+

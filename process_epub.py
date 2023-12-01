@@ -12,7 +12,7 @@ load_dotenv()
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.books
-epub_data =db.epub_books
+epub_data =db.epub_book
 # Configure AWS credentials
 aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
 aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
@@ -104,6 +104,7 @@ def extract_data(elem, section_data=[], base_path=''):
                     temp['content'] = child + ' '
                     temp['figures'] = []
                     temp['tables'] = []
+                    temp['code_snippet'] = []
         elif child.name:
             if child.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
                 if section_data and section_data[-1]['content'].endswith('{{title}} '):
@@ -113,6 +114,7 @@ def extract_data(elem, section_data=[], base_path=''):
                     temp['content'] = '{{title}}' + ' '
                     temp['figures'] = []
                     temp['tables'] = []
+                    temp['code_snippet'] = []
             elif (child.name == 'img' and
                   child.parent and
                   ('mediaobject' in child.parent.get('class', []) or child.parent.get('id') == 'cover-image')):
@@ -155,6 +157,7 @@ def extract_data(elem, section_data=[], base_path=''):
                     temp['content'] = '{{table:' + table['id'] + '}} '
                     temp['tables'] = [table]
                     temp['figures'] = []
+                    temp['code_snippet'] = []
             elif child.contents:
                 section_data = extract_data(
                     child, section_data=section_data, base_path=base_path)
@@ -228,7 +231,7 @@ def process_epub_book(epub):
                     document = {
                         'book': epub,
                         'fileName': fileName,
-                        'data': section_data
+                        'sections': section_data
                     }
                     epub_data.insert_one(document)
 
@@ -265,5 +268,5 @@ for book_number, epub in enumerate(all_epub_books, start=1):
         process_epub_book(epub)
 
 
-#Process single epub book
+# #Process single epub book
 # process_epub_book("asimov-genetic-effects-of-radiation.epub")

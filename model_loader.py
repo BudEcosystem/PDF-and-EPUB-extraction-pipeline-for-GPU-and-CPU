@@ -11,7 +11,8 @@ class ModelLoader:
             cls._instances[model_name]._model = lp.Detectron2LayoutModel(
                 model_config['config'],
                 extra_config=model_config['extra_config'],
-                label_map=model_config['label_map']
+                label_map=model_config['label_map'],
+                device=model_config['device']
             )
         return cls._instances[model_name]
     
@@ -22,17 +23,20 @@ class ModelLoader:
             'PubLayNet': {
                 'config': 'lp://PubLayNet/mask_rcnn_X_101_32x8d_FPN_3x/config',
                 'extra_config': ["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],
-                'label_map': {0: "Text", 1: "Title", 2: "List", 3: "Table", 4: "Figure"}
+                'label_map': {0: "Text", 1: "Title", 2: "List", 3: "Table", 4: "Figure"},
+                'device':'cuda'
             },
             'TableBank': {
                 'config': 'lp://TableBank/faster_rcnn_R_50_FPN_3x/config',
                 'extra_config': ["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],
-                'label_map': {0: "Table"}
+                'label_map': {0: "Table"},
+                'device':'cuda'
             },
             'MathFormulaDetection': {
                 'config': 'lp://MFD/faster_rcnn_R_50_FPN_3x/config',
                 'extra_config': ["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],
-                'label_map': {1: "Equation"}
+                'label_map': {1: "Equation"},
+                'device':'cuda'
             }
         }
         
