@@ -10,7 +10,7 @@ python pdf_extraction_pipeline/pdf_pipeline/nougat_consumer.py
 ```
 
 ```bash 
-python3 pdf_extraction_pipeline/pdf_pipeline/check_ptm_comsuer.py
+python pdf_extraction_pipeline/pdf_pipeline/check_ptm_comsuer.py
 ```
 
 ```bash 
