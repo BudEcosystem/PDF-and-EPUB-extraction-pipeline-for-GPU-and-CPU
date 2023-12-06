@@ -6,6 +6,10 @@ python pdf_extraction_pipeline/pdf_pipeline/book_completion_consumer.py
 ```
 
 ```bash 
+python pdf_extraction_pipeline/pdf_pipeline/page_extraction_consumer.py
+```
+
+```bash 
 python pdf_extraction_pipeline/pdf_pipeline/nougat_consumer.py
 ```
 
