@@ -157,20 +157,45 @@ def nougat_queue(queue_name,image_path,total_nougat_pages,book_page_num, page_nu
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
 
 
+def page_extraction_queue(queue_name,book_pages,bookname,bookId):
+    page_extraction_queue = {
+        "queue": queue_name,
+        "book_pages":book_pages,
+        "bookname": bookname,
+        "bookId": bookId
+    }
 
-def store_book_details():
-    books= get_all_books_names(bucket_name, folder_name + '/')
-    books=books[128:]
-    print(books)
-    for book in books:
-        book_data={
-            "bookId":uuid.uuid4().hex,
-            "book":book,
-            "status":"not_extracted"
-        }
-        book_details.insert_one(book_data)
+    channel.queue_declare(queue=queue_name)
+    channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(page_extraction_queue))
+    print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
 
-# store all books from aws to book_details collection before running
+def nougat_pdf_queue(queue_name,pdf_path,bookname,bookId):
+    nougat_pdf_queue = {
+        "queue": queue_name,
+        "pdf_path":pdf_path,
+        "bookname": bookname,
+        "bookId": bookId
+    }
+
+    channel.queue_declare(queue=queue_name)
+    channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(nougat_pdf_queue))
+    print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
+
+
+
+# def store_book_details():
+#     books= get_all_books_names(bucket_name, folder_name + '/')
+#     books=books[127:]
+#     print(books)
+#     # for book in books:
+#     #     book_data={
+#     #         "bookId":uuid.uuid4().hex,
+#     #         "book":book,
+#     #         "status":"not_extracted"
+#     #     }
+#     #     book_details.insert_one(book_data)
+
+# # store all books from aws to book_details collection before running
 # store_book_details()
 
 if __name__ == "__main__":

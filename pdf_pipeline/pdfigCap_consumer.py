@@ -4,6 +4,9 @@ from dotenv import load_dotenv
 import sys
 import os
 import shutil
+import GPUtil
+import psutil
+
 sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
 
@@ -59,6 +62,12 @@ def get_figure_and_captions(ch, method, properties, body):
                 pdf_writer.write(output_file)   
     try:
         book_data=extract_figure_and_caption(output_directory, book_output)
+        process = psutil.Process(os.getpid())
+        print(f"Memory Usage for figure caption function: {process.memory_info().rss / (1024 ** 2):.2f} MB")
+        gpus = GPUtil.getGPUs()
+        for i, gpu in enumerate(gpus):
+            print(f"GPU {i + 1} - GPU Name: {gpu.name}")
+            print(f"  GPU Utilization: {gpu.load * 100:.2f}%")
         if os.path.exists(output_directory):
             shutil.rmtree(output_directory)   
         if os.path.exists(book_output):

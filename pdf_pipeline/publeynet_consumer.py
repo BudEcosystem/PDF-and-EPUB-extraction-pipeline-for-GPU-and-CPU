@@ -26,63 +26,70 @@ publaynet_done=db.publaynet_done
 
 
 def publaynet_layout(ch, method, properties, body):
-    print("hello")
-    message = json.loads(body)
-    print(message)
-    job = message['job']
-    total_pages=message['total_pages']
-    image_path = message["image_path"]
-    page_num = message["page_num"]
-    bookname = message["bookname"]
-    bookId = message["bookId"]
+    try:
+        print("hello")
+        message = json.loads(body)
+        print(message)
+        job = message['job']
+        total_pages = message['total_pages']
+        image_path = message["image_path"]
+        page_num = message["page_num"]
+        bookname = message["bookname"]
+        bookId = message["bookId"]
 
-    image = cv2.imread(image_path)
-    image = image[..., ::-1] 
-    publaynet = ModelLoader("PubLayNet")
-    publaynet_model = publaynet.model
-    publaynet_layouts = publaynet_model.detect(image)
-    layout_blocks = []
-    for item in publaynet_layouts:
-        if item.type != "Table":
-            output_item = {
-                "x_1": item.block.x_1,
-                "y_1": item.block.y_1,
-                "x_2": item.block.x_2,
-                "y_2": item.block.y_2,
-                'type': item.type
+        image = cv2.imread(image_path)
+        image = image[..., ::-1] 
+        publaynet = ModelLoader("PubLayNet")
+        publaynet_model = publaynet.model
+        publaynet_layouts = publaynet_model.detect(image)
+        layout_blocks = []
+        for item in publaynet_layouts:
+            if item.type != "Table":
+                output_item = {
+                    "x_1": item.block.x_1,
+                    "y_1": item.block.y_1,
+                    "x_2": item.block.x_2,
+                    "y_2": item.block.y_2,
+                    'type': item.type
+                }
+                layout_blocks.append(output_item)
+        book_page_data = {
+            'page_num': page_num,
+            "job": job,
+            'image_path': image_path,
+            'status': 'done',
+            'result': layout_blocks
+        }
+        existing_book = publaynet_book_job_details.find_one({"bookId": bookId})
+        if existing_book:
+            publaynet_book_job_details.update_one(
+                {"_id": existing_book["_id"]},
+                {"$push": {"pages": book_page_data}}
+            )
+        else:
+            new_book_document = {
+                "bookId": bookId,
+                "bookname": bookname,
+                "pages": [book_page_data]
             }
-            layout_blocks.append(output_item)
-    book_page_data={
-        'page_num':page_num,
-        "job":job,
-        'image_path':image_path,
-        'status':'done',
-        'result':layout_blocks
-    }
-    existing_book = publaynet_book_job_details.find_one({"bookId": bookId})
-    if existing_book:
-        publaynet_book_job_details.update_one(
-            {"_id": existing_book["_id"]},
-            {"$push": {"pages": book_page_data}}
-        )
-    else:
-        new_book_document = {
-            "bookId": bookId,
-            "bookname": bookname,
-            "pages": [book_page_data]
-        }
-        publaynet_book_job_details.insert_one(new_book_document)
+            publaynet_book_job_details.insert_one(new_book_document)
 
-    if total_pages == (page_num + 1):
-        new_ptm_book_document = {
-            "bookId": bookId,
-            "bookname": bookname,
-            "ptm": "PubLaynet done"
-        }
-        publaynet_done.insert_one(new_ptm_book_document)
-        check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
-    ch.basic_ack(delivery_tag=method.delivery_tag)
-    
+        if total_pages == (page_num + 1):
+            new_ptm_book_document = {
+                "bookId": bookId,
+                "bookname": bookname,
+                "ptm": "PubLaynet done"
+            }
+            publaynet_done.insert_one(new_ptm_book_document)
+            check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
+
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+        # Log the error or perform any necessary actions
+
+    finally:
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+
 
 
 def consume_publaynet_queue():

@@ -965,9 +965,9 @@ def get_figure_and_captions(book_path,bookname,bookId):
         print(f"Unable to get figure and figure caption for this {bookname}, {str(e)}, line_number {traceback.extract_tb(e.__traceback__)[-1].lineno}")
         return []
 
-
 if __name__ == "__main__":
     books = get_all_books_names(bucket_name, folder_name + '/')
+   
     for idx, book in enumerate(books):
         start_book = 0
         start_page = 0

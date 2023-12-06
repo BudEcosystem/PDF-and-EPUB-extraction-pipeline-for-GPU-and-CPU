@@ -7,6 +7,8 @@ load_dotenv()
 import os
 import pika
 import json
+from datetime import datetime
+
 import shutil
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
@@ -25,38 +27,45 @@ book_other_pages_done=db.book_other_pages_done
 bucket_name = os.environ['AWS_BUCKET_NAME']
 folder_name=os.environ['BOOK_FOLDER_NAME']
 
-
 @timeit
 def book_complete(ch, method, properties, body):
-    message = json.loads(body)
-    job = message['job']
-    bookname = message["bookname"]
-    bookId = message["bookId"]
-    print(bookId)
-    other_pages = book_other_pages_done.find_one({"bookId": bookId})
-    nougat_pages_done = nougat_done.find_one({"bookId": bookId})
-    if other_pages  and nougat_pages_done:
-        book_pages_document = book_other_pages.find_one({"bookId": bookId})
-        nougat_pages_document = nougat_pages.find_one({"bookId": bookId})
-        if book_pages_document  and nougat_pages_document:
-            all_pages = book_pages_document["pages"] + nougat_pages_document["pages"]
-            sorted_pages = sorted(all_pages, key=lambda x: x["page_num"])
-            new_document = {
-                "bookId": bookId,
-                "book": book_pages_document["book"],
-                "pages": sorted_pages
-            }
-            bookdata.insert_one(new_document)
-            book_details.update_one({"bookId": bookId}, {"$set": {"status": "extracted"}})
-            book_folder=bookname.split(".")[0]
-            if os.path.exists(book_folder):
-                shutil.rmtree(book_folder)
-            book_path = os.path.join(folder_name, f'{bookname}')
-            if os.path.exists(book_path):
-                os.remove(book_path)            
-    else:
-        print("not yet completed")
-    ch.basic_ack(delivery_tag=method.delivery_tag)
+    try:
+        message = json.loads(body)
+        job = message['job']
+        bookname = message["bookname"]
+        bookId = message["bookId"]
+        print(bookId)
+        other_pages = book_other_pages_done.find_one({"bookId": bookId})
+        nougat_pages_done = nougat_done.find_one({"bookId": bookId})
+        if other_pages  and nougat_pages_done:
+            book_pages_document = book_other_pages.find_one({"bookId": bookId})
+            nougat_pages_document = nougat_pages.find_one({"bookId": bookId})
+            if book_pages_document  and nougat_pages_document:
+                all_pages = book_pages_document["pages"] + nougat_pages_document["pages"]
+                sorted_pages = sorted(all_pages, key=lambda x: x["page_num"])
+                new_document = {
+                    "bookId": bookId,
+                    "book": book_pages_document["book"],
+                    "pages": sorted_pages
+                }
+                bookdata.insert_one(new_document)
+                current_time = datetime.now().strftime("%H:%M:%S")
+                book_details.update_one({"bookId": bookId}, {"$set": {"status": "extracted","end_time": current_time}})
+                book_folder=bookname.split(".")[0]
+                # if os.path.exists(book_folder):
+                #     shutil.rmtree(book_folder)
+                # book_path = os.path.join(folder_name, f'{bookname}')
+                # if os.path.exists(book_path):
+                #     os.remove(book_path)            
+        else:
+            print("Not yet completed")
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+        # Log the error or perform any necessary actions
+
+    finally:
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+
 
 def consume_book_completion_queue():
     try:

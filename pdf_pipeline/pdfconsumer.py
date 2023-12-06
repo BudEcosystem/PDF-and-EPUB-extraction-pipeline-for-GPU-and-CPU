@@ -3,11 +3,14 @@ import json
 import sys
 import cv2
 import os
+import traceback
 import PyPDF2
 from PyPDF2 import PdfReader
 import fitz
 import boto3
 import numpy as np
+from datetime import datetime
+
 from dotenv import load_dotenv
 sys.path.append("pdf_extraction_pipeline")
 from utils import timeit
@@ -45,6 +48,7 @@ folder_name=os.environ['BOOK_FOLDER_NAME']
 @timeit
 def download_book_from_aws(bookname, bookId):
   try:
+    print('bookname')
     os.makedirs(folder_name, exist_ok=True)
     local_path = os.path.join(folder_name, f'{bookname}')
     file_key = f'{folder_name}/{bookname}'
@@ -60,33 +64,40 @@ def download_book_from_aws(bookname, bookId):
 
 @timeit
 def process_book(ch, method, properties, body): 
-    message = json.loads(body)
-    book = message["book"]
-    bookname = book['book']
-    bookId = book['bookId']
-    book_details.update_one(
-        {'bookId': bookId},
-       {'$set': {'status': 'processing'}}
-    )
-    book_folder = bookname.replace('.pdf', '')
-    book_path = download_book_from_aws(bookname, bookId)
-    if not book_path:
-         return 
-    os.makedirs(book_folder, exist_ok=True)
-    book = PdfReader(book_path)  
-    print(bookname)
-    num_pages = len(book.pages)
-    if num_pages>15:
-      pdfigcap_queue('pdfigcap_queue',book_path,bookname, bookId)
-    print(f"{bookname} has total {num_pages} page")     
     try:
+        print("hello word")
+        message = json.loads(body)
+        book = message["book"]
+        bookname = book['book']
+        bookId = book['bookId']
+        print("bookId")
+        # time_zone = pytz.timezone('Asia/Kolkata')
+        # print("hbhds",time_zone)
+        current_time = datetime.now().strftime("%H:%M:%S")
+
+        print(current_time)
+        book_details.update_one(
+            {'bookId': bookId},
+            {'$set': {'status': 'processing','timestamp': current_time}}
+        )
+        book_folder = bookname.replace('.pdf', '')
+        book_path = download_book_from_aws(bookname, bookId)
+        if not book_path:
+            return 
+        os.makedirs(book_folder, exist_ok=True)
+        book = PdfReader(book_path)  
+        print(bookname)
+        num_pages = len(book.pages)
+        if num_pages>15:
+            pdfigcap_queue('pdfigcap_queue',book_path,bookname, bookId)
+        print(f"{bookname} has total {num_pages} page")     
         for page_num in range(0,num_pages):
             process_page(page_num, book_path, book_folder, bookname, bookId,num_pages)
-        
-        ch.basic_ack(delivery_tag=method.delivery_tag)
     except Exception as e:
-        data = {"bookId":{bookId},"book":{bookname},"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
+        data = {"bookId":{bookId},"book":{bookname},"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}    
+    finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
+
 
 
   
@@ -115,6 +126,8 @@ def consume_pdf_processing_queue():
 
     except KeyboardInterrupt:
         pass
+    except Exception as e:
+        print(f"Error: {e}")
 
 
 if __name__ == "__main__":
