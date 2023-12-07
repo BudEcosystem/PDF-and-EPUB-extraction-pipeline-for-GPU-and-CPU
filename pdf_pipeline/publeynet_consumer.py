@@ -1,3 +1,5 @@
+# pylint: disable=all
+# type: ignore
 import pika
 import json
 import sys
@@ -10,6 +12,7 @@ import pymongo
 from pdf_producer import check_ptm_completion_queue
 from model_loader import ModelLoader 
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
+import layoutparser as lp
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
@@ -23,6 +26,12 @@ db = client.bookssssss
 error_collection = db.error_collection
 publaynet_book_job_details=db.publaynet_book_job_details
 publaynet_done=db.publaynet_done
+
+
+
+publaynet_model = lp.Detectron2LayoutModel('lp://PubLayNet/mask_rcnn_X_101_32x8d_FPN_3x/config',
+                                 extra_config=["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],
+                                 label_map= {0: "Text", 1: "Title", 2: "List", 3: "Table", 4: "Figure"})
 
 
 def publaynet_layout(ch, method, properties, body):
@@ -39,8 +48,6 @@ def publaynet_layout(ch, method, properties, body):
 
         image = cv2.imread(image_path)
         image = image[..., ::-1] 
-        publaynet = ModelLoader("PubLayNet")
-        publaynet_model = publaynet.model
         publaynet_layouts = publaynet_model.detect(image)
         layout_blocks = []
         for item in publaynet_layouts:

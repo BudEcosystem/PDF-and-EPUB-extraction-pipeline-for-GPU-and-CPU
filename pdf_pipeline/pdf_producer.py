@@ -1,3 +1,5 @@
+# pylint: disable=all
+# type: ignore
 import json
 import pika
 from dotenv import load_dotenv
@@ -169,17 +171,43 @@ def page_extraction_queue(queue_name,book_pages,bookname,bookId):
     channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(page_extraction_queue))
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
 
-def nougat_pdf_queue(queue_name,pdf_path,bookname,bookId):
-    nougat_pdf_queue = {
+
+def other_pages_queue(queue_name,others_pages,bookname,bookId):
+    other_pages_queue = {
         "queue": queue_name,
-        "pdf_path":pdf_path,
+        "other_pages":others_pages,
         "bookname": bookname,
         "bookId": bookId
     }
 
     channel.queue_declare(queue=queue_name)
-    channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(nougat_pdf_queue))
+    channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(other_pages_queue))
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
+
+
+def latex_ocr_queue(queue_name,latex_pages,bookname,bookId):
+    latex_ocr_queue = {
+        "queue": queue_name,
+        "latex_pages":latex_pages,
+        "bookname": bookname,
+        "bookId": bookId
+    }
+
+    channel.queue_declare(queue=queue_name)
+    channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(latex_ocr_queue))
+    print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
+
+# def nougat_pdf_queue(queue_name,pdf_path,bookname,bookId):
+#     nougat_pdf_queue = {
+#         "queue": queue_name,
+#         "pdf_path":pdf_path,
+#         "bookname": bookname,
+#         "bookId": bookId
+#     }
+
+#     channel.queue_declare(queue=queue_name)
+#     channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(nougat_pdf_queue))
+#     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
 
 
 

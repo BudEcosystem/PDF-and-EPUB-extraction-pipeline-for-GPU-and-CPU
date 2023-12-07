@@ -1,3 +1,5 @@
+# pylint: disable=all
+# type: ignore
 import pika
 import json
 import sys
@@ -9,6 +11,7 @@ import pymongo
 from pdf_producer import check_ptm_completion_queue
 from model_loader import ModelLoader
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
+import layoutparser as lp
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
@@ -19,7 +22,12 @@ error_collection = db.error_collection
 figure_caption = db.figure_caption
 mfd_book_job_details=db.mfd_book_job_details
 mfd_done=db.mfd_done
- 
+
+
+mathformuladetection_model = lp.Detectron2LayoutModel('lp://MFD/faster_rcnn_R_50_FPN_3x/config',
+                                 extra_config=["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],
+                                 label_map={1: "Equation"})
+
 
 
 def mathformuladetection_layout(ch, method, properties, body):
@@ -35,8 +43,6 @@ def mathformuladetection_layout(ch, method, properties, body):
 
         image = cv2.imread(image_path)
         image = image[..., ::-1] 
-        mathformuladetection = ModelLoader("MathFormulaDetection")
-        mathformuladetection_model = mathformuladetection.model
         mathformuladetection_layoutds = mathformuladetection_model.detect(image)
         layout_blocks = []
         for item in mathformuladetection_layoutds:  

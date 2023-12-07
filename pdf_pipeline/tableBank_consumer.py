@@ -1,3 +1,5 @@
+# pylint: disable=all
+# type: ignore
 import pika
 import json
 import sys
@@ -23,6 +25,12 @@ db = client.bookssssss
 table_bank_book_job_details=db.table_bank_book_job_details
 table_bank_done=db.table_bank_done
 
+import layoutparser as lp
+
+tablebank_model = lp.Detectron2LayoutModel('lp://TableBank/faster_rcnn_R_50_FPN_3x/config',
+                                 extra_config=["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],
+                                 label_map={0: "Table"})
+
 def tableBank_layout(ch, method, properties, body):
     try:
         print("hello")
@@ -37,8 +45,6 @@ def tableBank_layout(ch, method, properties, body):
 
         image = cv2.imread(image_path)
         image = image[..., ::-1] 
-        tablebank = ModelLoader("TableBank")
-        tablebank_model = tablebank.model
         tablebank_layouts = tablebank_model.detect(image)
         layout_blocks = []
         for item in tablebank_layouts:  

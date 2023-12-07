@@ -1,9 +1,10 @@
+# pylint: disable=all
+# type: ignore
 import numpy as np
 from dotenv import load_dotenv
 import subprocess
 import pytesseract
 import traceback
-import pytz
 import sys
 sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
@@ -27,7 +28,7 @@ from tablecaption import process_book_page
 from utils import timeit, crop_image
 import pika
 import json
-from pdf_producer import nougat_queue, book_completion_queue
+from pdf_producer import nougat_queue, book_completion_queue, other_pages_queue, latex_ocr_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
 connection = get_rabbitmq_connection()
@@ -64,85 +65,49 @@ mfd_done=db.mfd_done
 publaynet_book_job_details=db.publaynet_book_job_details
 table_bank_book_job_details=db.table_bank_book_job_details
 mfd_book_job_details=db.mfd_book_job_details
-book_other_pages=db.book_other_pages
-book_other_pages_done=db.book_other_pages_done
+
 
 def extract_pages(ch, method, properties, body):
     try:
         message = json.loads(body)
-
         page_results=message['book_pages']
         bookname = message["bookname"]
         bookId = message["bookId"]
         nougat_pages = []
-        print(page_results)
-        f=open('hhdd.txt','w')
-        f.write(str(page_results))
+        other_pages=[]
+        latex_ocr_pages=[]
+
         for page_num_str, results in page_results.items():
             page_num=int(page_num_str)
-            page_object = process_page_result(results, page_num, bookId, bookname, nougat_pages)
-            if page_object is not None:
-                book_document = book_other_pages.find_one({"bookId": bookId})
-                if book_document:
-                    book_other_pages.update_one({"_id": book_document["_id"]}, {"$push": {"pages": page_object}})
-                else:
-                    new_book_document = {
-                        "bookId": bookId,
-                        "book": bookname,  
-                        "pages": [page_object]
-                    }
-                    book_other_pages.insert_one(new_book_document)
-        book_other_pages_done.insert_one({"bookId": bookId, "book": bookname, "status": "book_other_pages_done"})
-        book_completion_queue("book_completion_queue", bookname, bookId) 
-        total_nougat_pages = len(nougat_pages)
-        for page_num, page in enumerate(nougat_pages):
-            nougat_queue('nougat_queue', page['image_path'], total_nougat_pages, page['page_num'], page_num,page['bookname'], page['bookId'])
-        else:
-            print("not yet completed")
+            process_page_result(results, page_num, bookId, bookname, nougat_pages, other_pages,latex_ocr_pages) 
+        
+        # //send other page to other_pages_queue
+        other_pages_queue('other_pages_queue', other_pages, bookname, bookId)   
+
+        # send latex_ocr_pages to latex_ocr_queue
+        # latex_ocr_queue('latex_ocr_queue',latex_ocr_pages,bookname,bookId)
+
+        # send nougat_pages to nougat_queue   
+        # total_nougat_pages = len(nougat_pages)
+        # for page_num, page in enumerate(nougat_pages):
+            # nougat_queue('nougat_queue', page['image_path'], total_nougat_pages, page['page_num'], page_num,page['bookname'], page['bookId'])
+
     except Exception as e:
         error={"bookId":{bookId},"book":{bookname},"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
         print(error)    
-
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-
-
-
-def process_page_result(results, page_num, bookId,bookname,nougat_pages):
-    
-    if not results:
-        page_obj={
-        "page_num":page_num,
-        "text":"",
-        "tables":[],
-        "figures":[],
-        "equations":[]
-        }
-        return page_obj
-
+def process_page_result(results, page_num, bookId,bookname,nougat_pages,other_pages,latex_ocr_pages):
     image_path=results[0]['image_path']
-    page_content,page_tables, page_figures, page_equations=process_page(results,image_path, page_num, bookId,bookname, nougat_pages)
-    if all(value is None for value in [page_content, page_tables, page_figures, page_equations]):
-        return None
-    pageId= uuid.uuid4().hex
-    page_obj={
-        "page_num":page_num,
-        "text":page_content,
-        "tables":page_tables,
-        "figures":page_figures,
-        "equations":page_equations
-    }
-    return page_obj
+    process_page(results,image_path, page_num, bookId,bookname, nougat_pages, other_pages,latex_ocr_pages)
 
-
-def process_page(results, image_path, page_num, bookId,bookname,nougat_pages):
+def process_page(results, image_path, page_num, bookId,bookname,nougat_pages,other_pages,latex_ocr_pages):
     try:
+        print(results)
         pdFigCap = False
-
-    # Check the status in the figure_caption collection
+       # Check the status in the figure_caption collection
         document_status = figure_caption.find_one({"bookId": bookId, "status": "success"})
-
         if document_status:
             pdFigCap = True
             results = [block for block in results if block['type'] != 'Figure']
@@ -184,10 +149,6 @@ def process_page(results, image_path, page_num, bookId,bookname,nougat_pages):
             if figures_block:
                 results.extend(figures_block)
 
-        page_tables = []
-        page_figures = []
-        page_equations = []
-
         if not results or not any(block['type'] in ["Table", "Figure"] for block in results):
             nougat_pages.append({
                 "image_path":image_path,
@@ -195,203 +156,30 @@ def process_page(results, image_path, page_num, bookId,bookname,nougat_pages):
                 "bookname": bookname, 
                 "bookId": bookId
             })
-            return None,None,None,None
-       
-        if not pdFigCap and len(results)==1 and results[0]['type']=='Figure':
-            x1, y1, x2, y2 = results[0]['x_1'], results[0]['y_1'], results[0]['x_2'], results[0]['y_2']
-            img = cv2.imread(image_path)
-            figure_bbox = img[int(y1):int(y2), int(x1):int(x2)]
-            figureId=uuid.uuid4().hex
-            figure_image_path = f"wrong{figureId}.png"
-            cv2.imwrite(figure_image_path,figure_bbox) 
-            image = Image.open(figure_image_path)
-            page_content=''
-            if image.height>1300:
-                text = pytesseract.image_to_string(image)
-                page_content = re.sub(r'\s+', ' ', text)
-            else:
-                # figure_url = upload_to_aws_s3(imagepath,figureId)
-                page_figures.append({
-                    "id":figureId,
-                    "url":'figure_url',
-                    "caption": ""
-                })
-            if os.path.exists(figure_image_path):
-                os.remove(figure_image_path)
-            return page_content, page_tables,page_figures,page_equations
-            
-
-        page_content = sort_text_blocks_and_extract_data(results, image_path, page_tables, page_figures, page_equations, pdFigCap)
-
-        return page_content, page_tables, page_figures, page_equations
+        elif any(block['type'] == "Equation" for block in results):
+            latex_ocr_pages.append({
+                "results": results,
+                "image_path": image_path,
+                "bookname": bookname,
+                "bookId": bookId,
+                "page_num": page_num,
+                "pdFigCap": pdFigCap
+            })
+        else:
+            other_pages.append({
+                "results":results,
+                "image_path":image_path,
+                "bookname":bookname,
+                "bookId":bookId,
+                "page_num":page_num,
+                "pdFigCap":pdFigCap
+            })     
     except Exception as e:
         print(f"An error occurred while processing {bookname}, page {page_num}: {str(e)}, line_numbe {traceback.extract_tb(e.__traceback__)[-1].lineno}")
-        return [],[],[],[]
-
-def sort_text_blocks_and_extract_data(blocks, imagepath, page_tables, page_figures, page_equations, pdFigCap):
-    sorted_blocks = sorted(blocks, key=lambda block: (block['y_1'] + block['y_2']) / 2)
-    output = ""
-    prev_block = None
-    next_block = None
-    for i, block in enumerate(sorted_blocks): 
-        if i > 0:
-            prev_block = sorted_blocks[i - 1]
-        if i < len(sorted_blocks) - 1:
-            next_block = sorted_blocks[i + 1]  
-        if block['type'] == "Table":
-            output = process_table(imagepath, output, page_tables)
-        elif block['type'] == "Figure":
-            if pdFigCap:
-                output = process_figure(block, imagepath, output, page_figures)
-            else:
-                output=process_publeynet_figure(block, imagepath, prev_block, next_block, output, page_figures)  
-        elif block['type'] == "Text":
-            output = process_text(block, imagepath, output)
-        elif block['type'] == "Title":
-            output = process_title(block, imagepath, output)
-        elif block['type'] == "List":
-            output = process_list(block, imagepath, output)
-        elif block['type']=='Equation':
-            output=process_equation(block, imagepath, output, page_equations)
-
-    page_content = re.sub(r'\s+', ' ', output).strip()
-    return page_content
-
-@timeit
-def process_table(imagepath, output, page_tables):
-    output=process_book_page(imagepath,page_tables, output)
-    return output
-
-@timeit
-def process_figure(figure_block, imagepath, output, page_figures):
-    figureId = uuid.uuid4().hex
-    figure_image_path = crop_image(figure_block,imagepath, figureId)
-    output += f"{{{{figure:{figureId}}}}}"
-
-    # figure_url=upload_to_aws_s3(figure_image_path, figureId)
-    page_figures.append({
-        "id":figureId,
-        "url":"figure_url",
-        "caption": figure_block['caption']
-    })
-    if os.path.exists(figure_image_path):
-        os.remove(figure_image_path)
-    return output    
-
-@timeit
-def process_publeynet_figure(figure_block, imagepath, prev_block, next_block, output, page_figures):
-    caption=""
-    figureId = uuid.uuid4().hex
-    figure_image_path =crop_image(figure_block,imagepath, figureId)
-    print(figure_image_path)
-    output += f"{{{{figure:{figureId}}}}}"
-
-    if prev_block:
-        prevId=uuid.uuid4().hex
-        prev_image_path = crop_image(prev_block,imagepath, prevId)
-        #extraction of text from cropped image using pytesseract
-        image =Image.open(prev_image_path)
-        text = pytesseract.image_to_string(image)
-        text = re.sub(r'\s+', ' ', text).strip()
-        pattern = r"(Fig\.|Figure)\s+\d+"
-        match = re.search(pattern, text)
-        if match:
-            caption = text
-        if os.path.exists(prev_image_path):
-            os.remove(prev_image_path)
-
-    if next_block:
-        nextId=uuid.uuid4().hex
-        next_image_path = crop_image(next_block,imagepath, nextId) 
-        #extraction of text from cropped image using pytesseract
-        image =Image.open(next_image_path)
-        text = pytesseract.image_to_string(image)
-        text = re.sub(r'\s+', ' ',text).strip()
-        pattern = r"(Fig\.|Figure)\s+\d+"
-        match = re.search(pattern, text)
-        if match:
-            caption = text
-        if os.path.exists(next_image_path):
-            os.remove(next_image_path)
-
-    # figure_url=upload_to_aws_s3(figure_image_path, figureId)
-    page_figures.append({
-        "id":figureId,
-        "url":'figure_url',
-        "caption":caption
-    })
-    if os.path.exists(figure_image_path):
-        os.remove(figure_image_path)
-    return output    
-
-@timeit
-def process_text(text_block,imagepath, output):
-    textId=uuid.uuid4().hex
-    cropped_image_path = crop_image(text_block,imagepath, textId)
-    #extraction of text from cropped image using pytesseract
-    image =Image.open(cropped_image_path)
-    text = pytesseract.image_to_string(image)
-    output+=text
-    #delete cropped image
-    if os.path.exists(cropped_image_path):
-        os.remove(cropped_image_path)
-    return output
-
-@timeit
-def process_title(title_block,imagepath, output):
-   
-    titleId=uuid.uuid4().hex
-    cropped_image_path = crop_image(title_block,imagepath, titleId)
-    #extraction of text from cropped image using pytesseract
-    image =Image.open(cropped_image_path)
-    text = pytesseract.image_to_string(image)
-    output+=text
-    #delete cropped image
-    if os.path.exists(cropped_image_path):
-        os.remove(cropped_image_path)
-    return output
-
-@timeit
-def process_list(list_block,imagepath, output):
-    listId=uuid.uuid4().hex
-    cropped_image_path = crop_image(list_block,imagepath, listId)
-    #extraction of text from cropped image using pytesseract
-    image =Image.open(cropped_image_path)
-    text = pytesseract.image_to_string(image)
-    output+=text
-    #delete cropped image
-    if os.path.exists(cropped_image_path):
-        os.remove(cropped_image_path)
-    return output
-
-
-@timeit
-def process_equation(equation_block, imagepath, output, page_equations):
-    equationId=uuid.uuid4().hex
-    equation_image_path = crop_image(equation_block,imagepath, equationId)
-    output += f"{{{{equation:{equationId}}}}}"
-    img = Image.open(equation_image_path)
-    latex_text= latex_ocr_model(img)
-    text_to_speech=latext_to_text_to_speech(latex_text)
-    page_equations.append(
-       {'id': equationId, 'text':latex_text, 'text_to_speech':text_to_speech} 
-    )
-    if os.path.exists(equation_image_path):
-        os.remove(equation_image_path)
-    return output
- 
-
-@timeit
-def latext_to_text_to_speech(text):
-    # Remove leading backslashes and add dollar signs at the beginning and end of the text
-    text = "${}$".format(text.lstrip('\\'))
-    # Convert the LaTeX text to text to speech
-    text_to_speech = latex_to_text(text)
-    return text_to_speech
 
 
 def consume_page_extraction_queue():
-    try:
+    try:    
         # Declare the queue
         channel.queue_declare(queue='page_extraction_queue')
 

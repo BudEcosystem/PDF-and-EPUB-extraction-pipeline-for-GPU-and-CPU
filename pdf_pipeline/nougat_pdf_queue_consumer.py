@@ -1,3 +1,5 @@
+# pylint: disable=all
+# type: ignore
 from dotenv import load_dotenv
 import subprocess
 import sys

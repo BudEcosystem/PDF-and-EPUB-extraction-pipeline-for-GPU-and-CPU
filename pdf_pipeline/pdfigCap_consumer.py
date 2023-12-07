@@ -1,3 +1,5 @@
+# pylint: disable=all
+# type: ignore
 import pika
 import json
 from dotenv import load_dotenv

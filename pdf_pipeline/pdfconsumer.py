@@ -1,3 +1,5 @@
+# pylint: disable=all
+# type: ignore
 import pika
 import json
 import sys
@@ -60,7 +62,6 @@ def download_book_from_aws(bookname, bookId):
   except Exception as e:
     print("An error occurred:", e)
     data = {"bookId":{bookId},"book":{bookname}, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
-    return None
 
 @timeit
 def process_book(ch, method, properties, body): 
@@ -126,8 +127,7 @@ def consume_pdf_processing_queue():
 
     except KeyboardInterrupt:
         pass
-    except Exception as e:
-        print(f"Error: {e}")
+
 
 
 if __name__ == "__main__":

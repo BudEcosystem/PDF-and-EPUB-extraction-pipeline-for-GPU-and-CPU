@@ -1,3 +1,5 @@
+# pylint: disable=all
+# type: ignore
 import numpy as np
 from dotenv import load_dotenv
 import subprocess
@@ -76,12 +78,14 @@ def check_ptm_status(ch, method, properties, body):
         table_done_document = table_bank_done.find_one({"bookId": bookId})
         mfd_done_document = mfd_done.find_one({"bookId": bookId})
         pdFigCap = figure_caption.find_one({"bookId": bookId})
+
         if publeynet_done_document and table_done_document and mfd_done_document and pdFigCap:
             collections = [publaynet_book_job_details, table_bank_book_job_details, mfd_book_job_details]
             page_results = {}
+
             for collection in collections:
-                document = collection.find_one({"bookId": bookId})
-                if document:
+                documents = collection.find({"bookId": bookId})  # Use find() to get multiple documents
+                for document in documents:
                     for page in document.get("pages", []):
                         page_num = page["page_num"]
                         result_array = page.get("result", [])
@@ -92,9 +96,17 @@ def check_ptm_status(ch, method, properties, body):
                         # Initialize an empty list for the page if it doesn't exist in the dictionary
                         if page_num not in page_results:
                             page_results[page_num] = []
-
-                        # Append the results to the page-specific list
                         page_results[page_num].extend(result_array)
+
+            for page_num, result_array in page_results.items():
+                if not result_array:
+                    # Fetch image_path from publeynet_collection for the given page_num
+                    publeynet_document = publaynet_book_job_details.find_one({"bookId": bookId, "pages.page_num": page_num})
+                    for page in publeynet_document['pages']:
+                        if page['page_num']==page_num:
+                            image_path=page['image_path']
+                            page_results[page_num].append({"image_path": image_path})
+
             page_extraction_queue('page_extraction_queue', page_results, bookname, bookId)          
         else:
             print("not yet completed")
@@ -122,7 +134,6 @@ def consume_ptm_completion_queue():
 
 if __name__ == "__main__":
     try:
-        consume_ptm_completion_queue()
-        
+        consume_ptm_completion_queue()      
     except KeyboardInterrupt:
         pass

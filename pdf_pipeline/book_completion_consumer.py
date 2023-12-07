@@ -1,3 +1,5 @@
+# pylint: disable=all
+# type: ignore
 from dotenv import load_dotenv
 import pymongo
 import sys
@@ -24,6 +26,8 @@ nougat_pages=db.nougat_pages
 book_other_pages=db.book_other_pages
 nougat_done=db.nougat_done
 book_other_pages_done=db.book_other_pages_done
+latex_pages=db.latex_pages
+latex_pages_done=db.latex_pages_done
 bucket_name = os.environ['AWS_BUCKET_NAME']
 folder_name=os.environ['BOOK_FOLDER_NAME']
 
@@ -37,35 +41,59 @@ def book_complete(ch, method, properties, body):
         print(bookId)
         other_pages = book_other_pages_done.find_one({"bookId": bookId})
         nougat_pages_done = nougat_done.find_one({"bookId": bookId})
-        if other_pages  and nougat_pages_done:
+        latex_ocr_pages = latex_pages_done.find_one({"bookId": bookId})
+        if other_pages and nougat_pages_done and latex_ocr_pages:
             book_pages_document = book_other_pages.find_one({"bookId": bookId})
             nougat_pages_document = nougat_pages.find_one({"bookId": bookId})
-            if book_pages_document  and nougat_pages_document:
-                all_pages = book_pages_document["pages"] + nougat_pages_document["pages"]
+            latex_pages_document = latex_pages.find_one({"bookId": bookId})
+
+            # Count the number of present documents
+            present_documents_count = sum(
+                bool(doc) for doc in [book_pages_document, nougat_pages_document, latex_pages_document]
+            )
+
+            if present_documents_count >= 2:
+                # If two or more documents are present, sort the pages
+                all_pages = (
+                    book_pages_document["pages"]
+                    + nougat_pages_document["pages"]
+                    + latex_pages_document["pages"]
+                )
                 sorted_pages = sorted(all_pages, key=lambda x: x["page_num"])
                 new_document = {
                     "bookId": bookId,
-                    "book": book_pages_document["book"],
-                    "pages": sorted_pages
+                    "book": bookname,
+                    "pages": sorted_pages,
                 }
-                bookdata.insert_one(new_document)
-                current_time = datetime.now().strftime("%H:%M:%S")
-                book_details.update_one({"bookId": bookId}, {"$set": {"status": "extracted","end_time": current_time}})
-                book_folder=bookname.split(".")[0]
-                # if os.path.exists(book_folder):
-                #     shutil.rmtree(book_folder)
-                # book_path = os.path.join(folder_name, f'{bookname}')
-                # if os.path.exists(book_path):
-                #     os.remove(book_path)            
+            else:
+                # If only one document is present, do not sort
+                pages_to_add = []
+                if book_pages_document:
+                    pages_to_add += book_pages_document["pages"]
+                if nougat_pages_document:
+                    pages_to_add += nougat_pages_document["pages"]
+                if latex_pages_document:
+                    pages_to_add += latex_pages_document["pages"]
+
+                new_document = {
+                    "bookId": bookId,
+                    "book": bookname,
+                    "pages": pages_to_add,
+                }
+
+            bookdata.insert_one(new_document)
+            current_time = datetime.now().strftime("%H:%M:%S")
+            book_details.update_one(
+                {"bookId": bookId},
+                {"$set": {"status": "extracted", "end_time": current_time}},
+            )
         else:
             print("Not yet completed")
     except Exception as e:
         print(f"An error occurred: {str(e)}")
         # Log the error or perform any necessary actions
-
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
-
 
 def consume_book_completion_queue():
     try:

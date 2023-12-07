@@ -1,3 +1,5 @@
+# pylint: disable=all
+# type: ignore
 from dotenv import load_dotenv
 import subprocess
 import sys
@@ -136,23 +138,24 @@ def split_pdf(pdf_path, max_pages=5):
 @timeit
 def extract_text_equation_with_nougat():
     try:
+        get_nougat_text('output_1.pdf')
         # nougat_pages= [{'image_path': '/home/azureuser/prakash/output_1/page_1.jpg', 'page_num': 0, 'bookname': 'output_1.pdf', 'bookId': '87665865'}, {'image_path': '/home/azureuser/prakash/output_1/page_2.jpg', 'page_num': 1, 'bookname': 'output_1.pdf', 'bookId': '87665865'}, {'image_path': '/home/azureuser/prakash/output_1/page_3.jpg', 'page_num': 2, 'bookname': 'output_1.pdf', 'bookId': '87665865'}, {'image_path': '/home/azureuser/prakash/output_1/page_4.jpg', 'page_num': 3, 'bookname': 'output_1.pdf', 'bookId': '87665865'}, {'image_path': '/home/azureuser/prakash/output_1/page_5.jpg', 'page_num': 4, 'bookname': 'output_1.pdf', 'bookId': '87665865'}, {'image_path': '/home/azureuser/prakash/output_1/page_6.jpg', 'page_num': 5, 'bookname': 'output_1.pdf', 'bookId': '87665865'}, {'image_path': '/home/azureuser/prakash/output_1/page_7.jpg', 'page_num': 6, 'bookname': 'output_1.pdf', 'bookId': '87665865'}, {'image_path': '/home/azureuser/prakash/output_1/page_8.jpg', 'page_num': 7, 'bookname': 'output_1.pdf', 'bookId': '87665865'}, {'image_path': '/home/azureuser/prakash/output_1/page_9.jpg', 'page_num': 8, 'bookname': 'output_1.pdf', 'bookId': '87665865'}, {'image_path': '/home/azureuser/prakash/output_1/page_10.jpg', 'page_num': 9, 'bookname': 'output_1.pdf', 'bookId': '87665865'}, {'image_path': '/home/azureuser/prakash/output_1/page_11.jpg', 'page_num': 10, 'bookname': 'output_1.pdf', 'bookId': '87665865'}, {'image_path': '/home/azureuser/prakash/output_1/page_12.jpg', 'page_num': 11, 'bookname': 'output_1.pdf', 'bookId': '87665865'}, {'image_path': '/home/azureuser/prakash/output_1/page_13.jpg', 'page_num': 12, 'bookname': 'output_1.pdf', 'bookId': '87665865'}, {'image_path': '/home/azureuser/prakash/output_1/page_14.jpg', 'page_num': 13, 'bookname': 'output_1.pdf', 'bookId': '87665865'}, {'image_path': '/home/azureuser/prakash/output_1/page_15.jpg', 'page_num': 14, 'bookname': 'output_1.pdf', 'bookId': '87665865'}, {'image_path': '/home/azureuser/prakash/output_1/page_20.jpg', 'page_num': 19, 'bookname': 'output_1.pdf', 'bookId': '87665865'}]
-        bookname = "hello"
-        bookId = "23445"
-        # pages_numbers = []
+        # bookname = "hello"
+        # bookId = "23445"
+        # # pages_numbers = []
         # pdf_name = "nougat.pdf"
-        # page_nums = [page['page_num'] for page in nougat_pages]
-        # print(page_nums)
+        # # page_nums = [page['page_num'] for page in nougat_pages]
+        # # print(page_nums)
        
         # image_paths = [page['image_path'] for page in nougat_pages]
         # with open(pdf_name, 'wb') as pdf_file:
         #     pdf_file.write(img2pdf.convert(image_paths))
 
-        # pdf_paths = split_pdf(pdf_name)
+        # pdf_paths = split_pdf('/home/azureuser/prakash/output_1.pdf')
         
-        pdf_paths=['nougat_part_0_5.pdf','nougat_part_5_10.pdf','nougat_part_10_15.pdf','nougat_part_15_16.pdf']
-        for pdf_path in pdf_paths:
-            nougat_pdf_queue('nougat_pdf_queue',pdf_path,bookname,bookId)
+        # pdf_paths=['nougat_part_0_5.pdf','nougat_part_5_10.pdf','nougat_part_10_15.pdf','nougat_part_15_16.pdf']
+        # for pdf_path in pdf_paths:
+        #     nougat_pdf_queue('nougat_pdf_queue',pdf_path,bookname,bookId)
         
             # if message=='success':
             #     path = 'pdfs' + '/' + pdf_path
