@@ -17,12 +17,66 @@ channel = get_channel(connection)
 
 load_dotenv()
 
+
+
+# latex_ocr_model = LatexOCR()
+# Configure AWS credentials
+aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
+aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
+aws_region = os.environ['AWS_REGION']
+
+# Create an S3 client
+s3 = boto3.client('s3',
+                   aws_access_key_id=aws_access_key_id,
+                   aws_secret_access_key=aws_secret_access_key,
+                   region_name=aws_region)
+
+bucket_name = os.environ['AWS_BUCKET_NAME']
+folder_name=os.environ['BOOK_FOLDER_NAME']
+
+s3_base_url = os.getenv("S3_BASE_URL")
+s3_folder_path_latex = os.getenv("S3_FOLDER_PATH_LATEX")
+
+
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.bookssssss
 figure_caption = db.figure_caption
 nougat_done=db.nougat_done
 book_other_pages_done=db.book_other_pages_done
 latex_pages_done=db.latex_pages_done
+
+def upload_to_s3(filepath):
+    """
+    Uploads a file to S3
+    Args:
+        filepath (str): The path to the file to upload.
+        bookname (str): The name of the book.
+        bookId (str): The ID of the book.
+        page_num (int): The page number of the page to upload.
+    Returns:
+        str: The URL of the uploaded file.
+    """
+    try:
+        # Generate a random filename
+        filename = uuid.uuid4().hex
+        # Get the file extension
+        extension = filepath.split('.')[-1]
+        # Create the new filename
+        key = f"{s3_folder_path_latex}/{filename}.{extension}"
+        # Upload the file to S3
+        s3.upload_file(
+            Filename=filepath, 
+            Bucket=bucket_name, 
+            Key=key
+        )
+        # Get the URL of the uploaded file
+        url = f"{s3_base_url}/{key}"
+        return url
+    except Exception as e:
+        print(error)
+        return None
+
+
 def extract_pages(ch, method, properties, body):
     try:
         message = json.loads(body)
@@ -50,6 +104,11 @@ def extract_pages(ch, method, properties, body):
         total_latex_pages=len(latex_ocr_pages)
         if total_latex_pages>0:
             for page_num, page_result in enumerate(latex_ocr_pages):
+                # upload page_result images to s3
+                # replace in image_path in page_result with s3 url
+                image_path = page_result['image_path']
+                new_image_path = upload_to_s3(image_path)
+                page_result['image_path'] = new_image_path
                 latex_ocr_queue('latex_ocr_queue',page_result,total_latex_pages,page_num, bookname, bookId)
             print("latex_ocr pages sent, sending nougat pages .....")
         else:
@@ -172,5 +231,7 @@ def consume_page_extraction_queue():
 if __name__ == "__main__":
     try:
         consume_page_extraction_queue()
+        # s3_url = upload_to_s3("../flowChart.png")
+        # print(s3_url)
     except KeyboardInterrupt:
         pass

@@ -186,7 +186,7 @@ def other_pages_queue(queue_name,page_result, total_other_pages,page_num, bookna
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
 
 
-def latex_ocr_queue(queue_name,page_result, total_latex_pages,page_num, bookname, bookId):
+def latex_ocr_queue(queue_name, page_result, total_latex_pages, page_num, bookname, bookId):
     latex_ocr_queue = {
         "queue": queue_name,
         "page_result":page_result,
