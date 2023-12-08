@@ -38,18 +38,18 @@ from utils import timeit
         
 # gettext("/home/azureuser/prakash2/pdf_extraction_pipeline/page_3.pdf")
   
-from PIL import Image
-from pix2tex.cli import LatexOCR
-model = LatexOCR()
-@timeit
-def getLatex():
-    img = Image.open('/home/azureuser/prakash2/cropeed2cb855e00657422c94e9c63440dc17fa.png')
+# from PIL import Image
+# from pix2tex.cli import LatexOCR
+# model = LatexOCR()
+# @timeit
+# def getLatex():
+#     img = Image.open('/home/azureuser/prakash2/cropeed2cb855e00657422c94e9c63440dc17fa.png')
    
-    latex_text=model(img)
-    print(latex_text)
+#     latex_text=model(img)
+#     print(latex_text)
 
-getLatex()
-# image_path="/home/azureuser/prakash/cropeedfb46a046c29f4270b441b895dc73c24f.png"
+# getLatex()
+# # image_path="/home/azureuser/prakash/cropeedfb46a046c29f4270b441b895dc73c24f.png"
 # files = {
 #         'file': (image_path, open(image_path, 'rb'))
 #     }

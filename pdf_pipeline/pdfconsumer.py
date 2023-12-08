@@ -1,25 +1,19 @@
 # pylint: disable=all
 # type: ignore
-import pika
 import json
 import sys
-import cv2
 import os
 import traceback
-import PyPDF2
 from PyPDF2 import PdfReader
 import fitz
 import boto3
-import numpy as np
 from datetime import datetime
 
 from dotenv import load_dotenv
 sys.path.append("pdf_extraction_pipeline")
 from utils import timeit
-from PIL import Image
 import pymongo
-from pdf_producer import table_bank_queue, publeynet_queue, mfd_queue, pdfigcap_queue
-from model_loader import ModelLoader 
+from pdf_producer import table_bank_queue, publeynet_queue, mfd_queue, pdfigcap_queue, error_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
 connection = get_rabbitmq_connection()
@@ -41,6 +35,7 @@ client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.bookssssss
 error_collection = db.error_collection
 book_details=db.book_details
+figure_caption = db.figure_caption
 
 bucket_name = os.environ['AWS_BUCKET_NAME']
 folder_name=os.environ['BOOK_FOLDER_NAME']
@@ -61,21 +56,17 @@ def download_book_from_aws(bookname, bookId):
     return local_path   
   except Exception as e:
     print("An error occurred:", e)
-    data = {"bookId":{bookId},"book":{bookname}, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
+    error = {"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
+    error_queue('error_queue','pdfconsumer', bookname, bookId, error)
 
 @timeit
 def process_book(ch, method, properties, body): 
     try:
-        print("hello word")
         message = json.loads(body)
         book = message["book"]
         bookname = book['book']
         bookId = book['bookId']
-        print("bookId")
-        # time_zone = pytz.timezone('Asia/Kolkata')
-        # print("hbhds",time_zone)
         current_time = datetime.now().strftime("%H:%M:%S")
-
         print(current_time)
         book_details.update_one(
             {'bookId': bookId},
@@ -89,17 +80,19 @@ def process_book(ch, method, properties, body):
         book = PdfReader(book_path)  
         print(bookname)
         num_pages = len(book.pages)
+        print(f"{bookname} has total {num_pages} page")  
         if num_pages>15:
             pdfigcap_queue('pdfigcap_queue',book_path,bookname, bookId)
-        print(f"{bookname} has total {num_pages} page")     
+        elif num_pages<15:
+            figure_caption.insert_one({"bookId": bookId, "book": bookname, "pages": [], "status":"failed"})   
         for page_num in range(0,num_pages):
             process_page(page_num, book_path, book_folder, bookname, bookId,num_pages)
     except Exception as e:
-        data = {"bookId":{bookId},"book":{bookname},"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}    
+        error = {"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
+        print(error) 
+        error_queue('error_queue','pdfconsumer', bookname, bookId, error)   
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
-
-
 
   
 @timeit

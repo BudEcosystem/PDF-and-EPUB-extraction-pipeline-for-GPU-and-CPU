@@ -1,15 +1,13 @@
 # pylint: disable=all
 # type: ignore
-import pika
 import json
 import sys
 import cv2
+import traceback
 import os
 sys.path.append("pdf_extraction_pipeline")
-from PIL import Image
 import pymongo
-from pdf_producer import check_ptm_completion_queue
-from model_loader import ModelLoader
+from pdf_producer import check_ptm_completion_queue, error_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 import layoutparser as lp
 
@@ -18,8 +16,6 @@ channel = get_channel(connection)
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.bookssssss
-error_collection = db.error_collection
-figure_caption = db.figure_caption
 mfd_book_job_details=db.mfd_book_job_details
 mfd_done=db.mfd_done
 
@@ -83,7 +79,9 @@ def mathformuladetection_layout(ch, method, properties, body):
             mfd_done.insert_one(new_ptm_book_document)
             check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
     except Exception as e:
-        print(f"An error occurred: {str(e)}")
+        error = {"page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        print(print(error))
+        error_queue('error_queue','mfd_consumer',bookname, bookId, error)
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 

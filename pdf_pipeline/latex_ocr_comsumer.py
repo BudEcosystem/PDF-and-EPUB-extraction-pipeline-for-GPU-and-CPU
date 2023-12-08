@@ -1,35 +1,23 @@
 # pylint: disable=all
 # type: ignore
-import numpy as np
 from dotenv import load_dotenv
-import subprocess
 import pytesseract
 import traceback
-import pytz
 import sys
 sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
 from PIL import Image
 import os
-import PyPDF2
-import img2pdf
-import fitz
-import shutil
 import boto3
 import re
-import cv2
 import pymongo
-from urllib.parse import urlparse
-import urllib
 import uuid
 from latext import latex_to_text
 from pix2tex.cli import LatexOCR
-from PyPDF2 import PdfReader
 from tablecaption import process_book_page
 from utils import timeit, crop_image
-import pika
 import json
-from pdf_producer import book_completion_queue
+from pdf_producer import book_completion_queue, error_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
 connection = get_rabbitmq_connection()
@@ -37,7 +25,6 @@ channel = get_channel(connection)
 
 load_dotenv()
 
-# latex_ocr_model = LatexOCR()
 # Configure AWS credentials
 aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
 aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
@@ -56,15 +43,6 @@ model = LatexOCR()
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.bookssssss
-bookdata = db.book_set_2_new
-error_collection = db.error_collection
-figure_caption = db.figure_caption
-table_bank_done=db.table_bank_done
-publaynet_done=db.publaynet_done
-mfd_done=db.mfd_done
-publaynet_book_job_details=db.publaynet_book_job_details
-table_bank_book_job_details=db.table_bank_book_job_details
-mfd_book_job_details=db.mfd_book_job_details
 latex_pages=db.latex_pages
 latex_pages_done=db.latex_pages_done
 
@@ -92,12 +70,12 @@ def extract_latex_pages(ch, method, properties, body):
             latex_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"latex pages Done"})
             book_completion_queue("book_completion_queue",bookname, bookId)
     except Exception as e:
-        print(e)
+        error = {"page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        print(print(error))
+        error_queue('error_queue','latex_ocr_consumer',bookname, bookId, error)
     finally:
         print("ack received")
         ch.basic_ack(delivery_tag=method.delivery_tag)
-
-    
 
 
 def process_pages(page):
@@ -245,8 +223,6 @@ def process_text(text_block,imagepath, output):
         print("error while process text",e)  
     
     
-    
-
 @timeit
 def process_title(title_block,imagepath, output):
     try:

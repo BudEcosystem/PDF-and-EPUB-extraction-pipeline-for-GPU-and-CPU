@@ -1,7 +1,6 @@
 # pylint: disable=all
 # type: ignore
 import json
-import pika
 from dotenv import load_dotenv
 import pymongo
 import os
@@ -201,17 +200,19 @@ def latex_ocr_queue(queue_name,page_result, total_latex_pages,page_num, bookname
     channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(latex_ocr_queue))
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
 
-# def nougat_pdf_queue(queue_name,pdf_path,bookname,bookId):
-#     nougat_pdf_queue = {
-#         "queue": queue_name,
-#         "pdf_path":pdf_path,
-#         "bookname": bookname,
-#         "bookId": bookId
-#     }
 
-#     channel.queue_declare(queue=queue_name)
-#     channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(nougat_pdf_queue))
-#     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
+def error_queue(queue_name,consumer_name,bookname, bookId,error):
+    error_queue = {
+        "queue": queue_name,
+        'consumer_name':consumer_name,
+        "bookname":bookname,
+        "bookId":bookId,
+        "error": error
+    }
+
+    channel.queue_declare(queue=queue_name)
+    channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(error_queue))
+    print(f" [x] Sent {error} sent to {queue_name}")
 
 
 

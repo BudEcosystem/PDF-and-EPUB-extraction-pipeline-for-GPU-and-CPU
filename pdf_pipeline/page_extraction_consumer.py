@@ -1,34 +1,15 @@
 # pylint: disable=all
 # type: ignore
-import numpy as np
 from dotenv import load_dotenv
-import subprocess
-import pytesseract
 import traceback
 import sys
 sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
-from PIL import Image
 import os
-import PyPDF2
-import img2pdf
-import fitz
-import shutil
-import boto3
-import re
-import cv2
 import pymongo
-from urllib.parse import urlparse
-import urllib
-import uuid
-from latext import latex_to_text
-from pix2tex.cli import LatexOCR
-from PyPDF2 import PdfReader
-from tablecaption import process_book_page
-from utils import timeit, crop_image
-import pika
 import json
-from pdf_producer import nougat_queue, book_completion_queue, other_pages_queue, latex_ocr_queue
+import traceback
+from pdf_producer import nougat_queue,other_pages_queue, latex_ocr_queue, error_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
 connection = get_rabbitmq_connection()
@@ -36,37 +17,12 @@ channel = get_channel(connection)
 
 load_dotenv()
 
-
-
-latex_ocr_model = LatexOCR()
-# Configure AWS credentials
-aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
-aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
-aws_region = os.environ['AWS_REGION']
-
-# Create an S3 client
-s3 = boto3.client('s3',
-                   aws_access_key_id=aws_access_key_id,
-                   aws_secret_access_key=aws_secret_access_key,
-                   region_name=aws_region)
-
-bucket_name = os.environ['AWS_BUCKET_NAME']
-folder_name=os.environ['BOOK_FOLDER_NAME']
-
-
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.bookssssss
-bookdata = db.book_set_2_new
-error_collection = db.error_collection
 figure_caption = db.figure_caption
-table_bank_done=db.table_bank_done
-publaynet_done=db.publaynet_done
-mfd_done=db.mfd_done
-publaynet_book_job_details=db.publaynet_book_job_details
-table_bank_book_job_details=db.table_bank_book_job_details
-mfd_book_job_details=db.mfd_book_job_details
-
-
+nougat_done=db.nougat_done
+book_other_pages_done=db.book_other_pages_done
+latex_pages_done=db.latex_pages_done
 def extract_pages(ch, method, properties, body):
     try:
         message = json.loads(body)
@@ -83,25 +39,35 @@ def extract_pages(ch, method, properties, body):
         
         # //send other page to other_pages_queue
         total_other_pages=len(other_pages)
-        for page_num, page_result in enumerate(other_pages):
-            other_pages_queue('other_pages_queue',page_result, total_other_pages,page_num, bookname, bookId)
-        # //other_pages sent 
-        print("other pages sent, sending latex_ocr pages...")
-        
+        if total_other_pages>0:
+            for page_num, page_result in enumerate(other_pages):
+                other_pages_queue('other_pages_queue',page_result, total_other_pages,page_num, bookname, bookId)
+            print("other pages sent, sending latex_ocr pages...")
+        else:
+            book_other_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"latex pages Done"})
+
         # send latex_ocr_pages to latex_ocr_queue
         total_latex_pages=len(latex_ocr_pages)
-        for page_num, page_result in enumerate(latex_ocr_pages):
-            latex_ocr_queue('latex_ocr_queue',page_result,total_latex_pages,page_num, bookname, bookId)
-        print("latex_ocr pages sent, sending nougat pages .....")
+        if total_latex_pages>0:
+            for page_num, page_result in enumerate(latex_ocr_pages):
+                latex_ocr_queue('latex_ocr_queue',page_result,total_latex_pages,page_num, bookname, bookId)
+            print("latex_ocr pages sent, sending nougat pages .....")
+        else:
+            latex_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"latex pages Done"})
 
         # send nougat_pages to nougat_queue   
         total_nougat_pages = len(nougat_pages)
-        for page_num, page in enumerate(nougat_pages):
-            nougat_queue('nougat_queue', page['image_path'], total_nougat_pages, page['page_num'], page_num,page['bookname'], page['bookId'])
-        print('nougat pages sent')
+        if total_nougat_pages>0:
+            for page_num, page in enumerate(nougat_pages):
+                nougat_queue('nougat_queue', page['image_path'], total_nougat_pages, page['page_num'], page_num,page['bookname'], page['bookId'])
+            print('nougat pages sent')
+        else:
+            nougat_done.insert_one({"bookId":bookId,"book":bookname,"status":"nougat pages Done"})
+
     except Exception as e:
-        error={"bookId":{bookId},"book":{bookname},"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
-        print(error)    
+        error={"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
+        print(error)
+        error_queue('error_queue','page_extraction_consumer',bookname, bookId, error)    
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -182,7 +148,9 @@ def process_page(results, image_path, page_num, bookId,bookname,nougat_pages,oth
                 "pdFigCap":pdFigCap
             })     
     except Exception as e:
-        print(f"An error occurred while processing {bookname}, page {page_num}: {str(e)}, line_numbe {traceback.extract_tb(e.__traceback__)[-1].lineno}")
+        error={"page":{page_num}, "error":{str(e)}, "line_number": {traceback.extract_tb(e.__traceback__)[-1].lineno}}
+        print(error)
+        error_queue('error_queue','page_extraction_consumer',bookname, bookId, error)
 
 
 def consume_page_extraction_queue():
@@ -201,8 +169,6 @@ def consume_page_extraction_queue():
     except KeyboardInterrupt:
         pass
    
-
-
 if __name__ == "__main__":
     try:
         consume_page_extraction_queue()

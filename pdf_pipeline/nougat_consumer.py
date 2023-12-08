@@ -5,33 +5,23 @@ import subprocess
 import sys
 sys.path.append("pdf_extraction_pipeline")
 from utils import timeit
-from PIL import Image
 import os
-import PyPDF2
-import shutil
 import GPUtil
 import psutil
-
 import img2pdf
-import fitz
 import traceback
 import re
 import pymongo
 import uuid
-from PyPDF2 import PdfReader
 from latext import latex_to_text
-import pika
 import json
 
-from pdf_producer import book_completion_queue
-from nougat.utils.checkpoint import get_checkpoint
+from pdf_producer import book_completion_queue, error_queue
 
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
-
-# CHECKPOINT = get_checkpoint('nougat')
 
 load_dotenv()
 
@@ -51,7 +41,6 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
         page_num=message['page_num']
         bookname= message['bookname']
         bookId=message['bookId']
-        job = message['job']
     
         page_equations=[]
         pdf_file_name ="page.pdf"
@@ -97,9 +86,11 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
             nougat_done.insert_one({"bookId":bookId,"book":bookname,"status":"nougat pages Done"})
             book_completion_queue("book_completion_queue",bookname, bookId)
     except Exception as e:
-        print(f'error occured while processing  of book {bookname} though nougat {str(e)}') 
+        error = {"page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        print(print(error))
+        error_queue('error_queue','nougat_consumer',bookname, bookId, error)
     finally:
-        print("message acconsjdfsjb")
+        print("message ack")
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
