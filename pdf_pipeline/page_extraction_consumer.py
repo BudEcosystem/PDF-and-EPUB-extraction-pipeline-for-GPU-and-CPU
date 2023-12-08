@@ -24,8 +24,8 @@ import uuid
 from latext import latex_to_text
 from pix2tex.cli import LatexOCR
 from PyPDF2 import PdfReader
-from tablecaption import process_book_page
-from utils import timeit, crop_image
+# from tablecaption import process_book_page
+# from utils import timeit, crop_image
 import pika
 import json
 from pdf_producer import nougat_queue, book_completion_queue, other_pages_queue, latex_ocr_queue
@@ -38,7 +38,7 @@ load_dotenv()
 
 
 
-latex_ocr_model = LatexOCR()
+# latex_ocr_model = LatexOCR()
 # Configure AWS credentials
 aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
 aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
@@ -53,6 +53,9 @@ s3 = boto3.client('s3',
 bucket_name = os.environ['AWS_BUCKET_NAME']
 folder_name=os.environ['BOOK_FOLDER_NAME']
 
+s3_base_url = os.getenv("S3_BASE_URL")
+s3_folder_path_latex = os.getenv("S3_FOLDER_PATH_LATEX")
+
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.bookssssss
@@ -65,6 +68,37 @@ mfd_done=db.mfd_done
 publaynet_book_job_details=db.publaynet_book_job_details
 table_bank_book_job_details=db.table_bank_book_job_details
 mfd_book_job_details=db.mfd_book_job_details
+
+def upload_to_s3(filepath):
+    """
+    Uploads a file to S3
+    Args:
+        filepath (str): The path to the file to upload.
+        bookname (str): The name of the book.
+        bookId (str): The ID of the book.
+        page_num (int): The page number of the page to upload.
+    Returns:
+        str: The URL of the uploaded file.
+    """
+    try:
+        # Generate a random filename
+        filename = uuid.uuid4().hex
+        # Get the file extension
+        extension = filepath.split('.')[-1]
+        # Create the new filename
+        key = f"{s3_folder_path_latex}/{filename}.{extension}"
+        # Upload the file to S3
+        s3.upload_file(
+            Filename=filepath, 
+            Bucket=bucket_name, 
+            Key=key
+        )
+        # Get the URL of the uploaded file
+        url = f"{s3_base_url}/{key}"
+        return url
+    except Exception as e:
+        print(error)
+        return None
 
 
 def extract_pages(ch, method, properties, body):
@@ -91,7 +125,12 @@ def extract_pages(ch, method, properties, body):
         # send latex_ocr_pages to latex_ocr_queue
         total_latex_pages=len(latex_ocr_pages)
         for page_num, page_result in enumerate(latex_ocr_pages):
-            latex_ocr_queue('latex_ocr_queue',page_result,total_latex_pages,page_num, bookname, bookId)
+            # upload page_result images to s3
+            # replace in image_path in page_result with s3 url
+            image_path = page_result['image_path']
+            new_image_path = upload_to_s3(image_path)
+            page_result['image_path'] = new_image_path
+            latex_ocr_queue('latex_ocr_queue', page_result, total_latex_pages, page_num, bookname, bookId)
         print("latex_ocr pages sent, sending nougat pages .....")
 
         # send nougat_pages to nougat_queue   
@@ -206,5 +245,7 @@ def consume_page_extraction_queue():
 if __name__ == "__main__":
     try:
         consume_page_extraction_queue()
+        # s3_url = upload_to_s3("../flowChart.png")
+        # print(s3_url)
     except KeyboardInterrupt:
         pass

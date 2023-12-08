@@ -52,6 +52,9 @@ s3 = boto3.client('s3',
 bucket_name = os.environ['AWS_BUCKET_NAME']
 folder_name=os.environ['BOOK_FOLDER_NAME']
 
+s3_base_url = os.getenv("S3_BASE_URL")
+s3_folder_path_latex = os.getenv("S3_FOLDER_PATH_LATEX")
+
 model = LatexOCR()
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
@@ -67,6 +70,24 @@ table_bank_book_job_details=db.table_bank_book_job_details
 mfd_book_job_details=db.mfd_book_job_details
 latex_pages=db.latex_pages
 latex_pages_done=db.latex_pages_done
+
+def download_from_s3(bucket, key, filename):
+    """
+    Download file from s3
+    """
+    try:
+        directory = os.path.dirname(os.path.abspath(__file__))
+        img_directory = os.path.join(directory, "../latex_images")
+        os.makedirs(img_directory, exist_ok=True)
+        filepath = os.path.normpath(os.path.join(img_directory, filename))
+        s3.download_file(
+            Filename=filepath, 
+            Bucket=bucket, 
+            Key=key)
+        return filepath
+    except Exception as e:
+        print(e)
+        return None
 
 def extract_latex_pages(ch, method, properties, body):
     try:
@@ -97,26 +118,30 @@ def extract_latex_pages(ch, method, properties, body):
         print("ack received")
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    
-
-
 def process_pages(page):
     try:
-        page_tables=[]
-        page_figures=[]
-        page_equations=[]
+        page_tables = []
+        page_figures = []
+        page_equations = []
         results = page.get("results", [])
+        # now this is s3 url
         image_path = page.get("image_path", "")
+        key = image_path.replace(s3_base_url + "/", "")
+        filename = key.replace(s3_folder_path_latex + "/", "")
+        # download image from s3
+        local_file_path = download_from_s3(bucket_name, key, filename)
+        page["image_path"] = local_file_path
         pdFigCap = page.get("pdFigCap", False)
         page_num = page.get("page_num", "")
-        page_content= sort_text_blocks_and_extract_data(results, image_path,page_tables,page_figures,page_equations, pdFigCap)
+        page_content = sort_text_blocks_and_extract_data(results, image_path, page_tables, page_figures, page_equations, pdFigCap)
         page_obj={
-            "page_num":page_num,
-            "content":page_content,
-            "tables":page_tables,
-            "figures":page_figures,
-            "equations":page_equations
+            "page_num": page_num,
+            "content": page_content,
+            "tables": page_tables,
+            "figures": page_figures,
+            "equations": page_equations
         }
+        os.remove(local_file_path)
         return page_obj
     except Exception as e:
         print("error while page",e)
@@ -329,5 +354,11 @@ if __name__ == "__main__":
     try:
         consume_latex_ocr_queue()      
         # extract_latex_pages()
+        # image_path = "https://bud-datalake.s3.ap-southeast-1.amazonaws.com/latex_ocr_images/9a5fbff763bb42c7802bb24a396fc4f3.png"
+        # key = image_path.replace(s3_base_url + "/", "")
+        # filename = key.replace(s3_folder_path_latex + "/", "")
+        # download image from s3
+        # local_file_path = download_from_s3(bucket_name, key, filename)
+        # print(local_file_path)
     except KeyboardInterrupt:
         pass
