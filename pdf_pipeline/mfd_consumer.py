@@ -24,10 +24,10 @@ mfd_book_job_details=db.mfd_book_job_details
 mfd_done=db.mfd_done
 
 
-mathformuladetection_model = lp.Detectron2LayoutModel('lp://MFD/faster_rcnn_R_50_FPN_3x/config',
-                                 extra_config=["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],
-                                 label_map={1: "Equation"})
-
+mathformuladetection_model= lp.Detectron2LayoutModel(
+                            config_path ="lp://MFD/faster_rcnn_R_50_FPN_3x/config",
+                            label_map={1: "Equation"},
+                            extra_config=["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8] )
 
 
 def mathformuladetection_layout(ch, method, properties, body):

@@ -82,16 +82,23 @@ def extract_pages(ch, method, properties, body):
             process_page_result(results, page_num, bookId, bookname, nougat_pages, other_pages,latex_ocr_pages) 
         
         # //send other page to other_pages_queue
-        other_pages_queue('other_pages_queue', other_pages, bookname, bookId)   
-
+        total_other_pages=len(other_pages)
+        for page_num, page_result in enumerate(other_pages):
+            other_pages_queue('other_pages_queue',page_result, total_other_pages,page_num, bookname, bookId)
+        # //other_pages sent 
+        print("other pages sent, sending latex_ocr pages...")
+        
         # send latex_ocr_pages to latex_ocr_queue
-        # latex_ocr_queue('latex_ocr_queue',latex_ocr_pages,bookname,bookId)
+        total_latex_pages=len(latex_ocr_pages)
+        for page_num, page_result in enumerate(latex_ocr_pages):
+            latex_ocr_queue('latex_ocr_queue',page_result,total_latex_pages,page_num, bookname, bookId)
+        print("latex_ocr pages sent, sending nougat pages .....")
 
         # send nougat_pages to nougat_queue   
-        # total_nougat_pages = len(nougat_pages)
-        # for page_num, page in enumerate(nougat_pages):
-            # nougat_queue('nougat_queue', page['image_path'], total_nougat_pages, page['page_num'], page_num,page['bookname'], page['bookId'])
-
+        total_nougat_pages = len(nougat_pages)
+        for page_num, page in enumerate(nougat_pages):
+            nougat_queue('nougat_queue', page['image_path'], total_nougat_pages, page['page_num'], page_num,page['bookname'], page['bookId'])
+        print('nougat pages sent')
     except Exception as e:
         error={"bookId":{bookId},"book":{bookname},"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
         print(error)    
@@ -180,6 +187,8 @@ def process_page(results, image_path, page_num, bookId,bookname,nougat_pages,oth
 
 def consume_page_extraction_queue():
     try:    
+        channel_number = channel.channel_number
+        print(f"Channel number: {channel_number}")
         # Declare the queue
         channel.queue_declare(queue='page_extraction_queue')
 

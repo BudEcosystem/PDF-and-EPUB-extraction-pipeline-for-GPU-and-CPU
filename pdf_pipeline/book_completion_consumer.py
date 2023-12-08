@@ -49,7 +49,7 @@ def book_complete(ch, method, properties, body):
 
             # Count the number of present documents
             present_documents_count = sum(
-                bool(doc) for doc in [book_pages_document, nougat_pages_document, latex_pages_document]
+                bool(doc) for doc in [book_pages_document, nougat_pages_document]
             )
 
             if present_documents_count >= 2:
@@ -97,6 +97,8 @@ def book_complete(ch, method, properties, body):
 
 def consume_book_completion_queue():
     try:
+        channel_number = channel.channel_number
+        print(f"Channel number: {channel_number}")
         # Declare the queue
         channel.queue_declare(queue='book_completion_queue')
 
@@ -108,8 +110,9 @@ def consume_book_completion_queue():
 
     except KeyboardInterrupt:
         pass
-
-
+    finally:
+        channel.close()
+        connection.close()
 
 if __name__ == "__main__":
     try:

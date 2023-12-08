@@ -172,10 +172,12 @@ def page_extraction_queue(queue_name,book_pages,bookname,bookId):
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
 
 
-def other_pages_queue(queue_name,others_pages,bookname,bookId):
+def other_pages_queue(queue_name,page_result, total_other_pages,page_num, bookname, bookId):
     other_pages_queue = {
         "queue": queue_name,
-        "other_pages":others_pages,
+        "page_result":page_result,
+        "total_other_pages":total_other_pages,
+        "page_num":page_num,
         "bookname": bookname,
         "bookId": bookId
     }
@@ -185,10 +187,12 @@ def other_pages_queue(queue_name,others_pages,bookname,bookId):
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
 
 
-def latex_ocr_queue(queue_name,latex_pages,bookname,bookId):
+def latex_ocr_queue(queue_name,page_result, total_latex_pages,page_num, bookname, bookId):
     latex_ocr_queue = {
         "queue": queue_name,
-        "latex_pages":latex_pages,
+        "page_result":page_result,
+        "total_latex_pages":total_latex_pages,
+        "page_num":page_num,
         "bookname": bookname,
         "bookId": bookId
     }

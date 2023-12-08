@@ -72,24 +72,25 @@ book_other_pages_done=db.book_other_pages_done
 def extract_other_pages(ch, method, properties, body):
     try:
         message = json.loads(body)
-        print(message)
-        pages_results=message['other_pages']
+        total_other_pages=message['total_other_pages']
+        pages_result=message['page_result']
         bookname = message["bookname"]
         bookId = message["bookId"]
-        for page in pages_results:
-            page_obj= process_pages(page)
-            document=book_other_pages.find_one({'bookId':bookId})
-            if document:
-                book_other_pages.update_one({"_id":document["_id"]}, {"$push": {"pages": page_obj}})
-            else:
-                new_book_document = {
-                    "bookId": bookId,
-                    "book": bookname,  
-                    "pages": [page_obj]
-                }
-                book_other_pages.insert_one(new_book_document)
-        book_other_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"other pages Done"})
-        book_completion_queue("book_completion_queue",bookname, bookId)
+        page_num=message['page_num']
+        page_obj= process_pages(pages_result)
+        document=book_other_pages.find_one({'bookId':bookId})
+        if document:
+            book_other_pages.update_one({"_id":document["_id"]}, {"$push": {"pages": page_obj}})
+        else:
+            new_book_document = {
+                "bookId": bookId,
+                "book": bookname,  
+                "pages": [page_obj]
+            }
+            book_other_pages.insert_one(new_book_document)
+        if total_other_pages==page_num+1:
+            book_other_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"other pages Done"})
+            book_completion_queue("book_completion_queue",bookname, bookId)
     except Exception as e:
         print(e)
     finally:

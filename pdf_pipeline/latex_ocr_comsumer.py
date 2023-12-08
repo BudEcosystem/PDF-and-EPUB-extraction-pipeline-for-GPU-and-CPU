@@ -52,6 +52,7 @@ s3 = boto3.client('s3',
 bucket_name = os.environ['AWS_BUCKET_NAME']
 folder_name=os.environ['BOOK_FOLDER_NAME']
 
+model = LatexOCR()
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.bookssssss
@@ -67,33 +68,34 @@ mfd_book_job_details=db.mfd_book_job_details
 latex_pages=db.latex_pages
 latex_pages_done=db.latex_pages_done
 
-def extract_latex_pages():
+def extract_latex_pages(ch, method, properties, body):
     try:
-        # message = json.loads(body)
-        # print(message)
-        # pages_results=message['latex_pages']
-        pages_results= [{'results': [{'x_1': 218.18670654296875, 'y_1': 2216.549072265625, 'x_2': 1616.80078125, 'y_2': 2477.67333984375, 'type': 'Text', 'image_path': '/home/azureuser/prakash/output_2/page_6.jpg'}, {'x_1': 225.19680786132812, 'y_1': 234.2555694580078, 'x_2': 463.64044189453125, 'y_2': 294.0711669921875, 'type': 'Title', 'image_path': '/home/azureuser/prakash/output_2/page_6.jpg'}, {'x_1': 219.01083374023438, 'y_1': 340.3992614746094, 'x_2': 1616.5682373046875, 'y_2': 824.836669921875, 'type': 'Text', 'image_path': '/home/azureuser/prakash/output_2/page_6.jpg'}, {'x_1': 336.001708984375, 'y_1': 1307.069580078125, 'x_2': 1502.7852783203125, 'y_2': 2186.296142578125, 'type': 'Table', 'image_path': '/home/azureuser/prakash/output_2/page_6.jpg'}, {'x_1': 479.0030212402344, 'y_1': 1573.6387939453125, 'x_2': 1318.937255859375, 'y_2': 2007.815673828125, 'type': 'Equation', 'image_path': '/home/azureuser/prakash/output_2/page_6.jpg'}, {'x_1': 316.9840546697039, 'y_1': 1304.6366366366365, 'x_2': 1505.6742596810936, 'y_2': 2184.1201201201197, 'type': 'Figure', 'caption': 'Fig. 1.9 The Tinn-R text editor. Each bracket style has a distinctive colour. Under Options->Main->Editor, the font size can be increased. Under Options->Main->Application->R,you can specify the path for R. Select the Rgui.exe file in the directory C:\\Program Files\\R\\R-2.7.1\\bin (assuming default installation settings). Adjust the R directory if you use a differentR version. This option allows sending blocks of code directly to R by highlighting code andclicking one of the icons above the file name'}], 'image_path': '/home/azureuser/prakash/output_2/page_6.jpg', 'bookname': 'output_2.pdf', 'bookId': '76874rf', 'page_num': 5, 'pdFigCap': True}, {'results': [{'x_1': 324.66717529296875, 'y_1': 1841.6123046875, 'x_2': 1491.63134765625, 'y_2': 2350.459716796875, 'type': 'Table', 'image_path': '/home/azureuser/prakash/output_2/page_8.jpg'}, {'x_1': 244.31036376953125, 'y_1': 1320.2064208984375, 'x_2': 1337.520751953125, 'y_2': 1376.8568115234375, 'type': 'Equation', 'image_path': '/home/azureuser/prakash/output_2/page_8.jpg'}, {'x_1': 316.9840546697039, 'y_1': 1833.9939939939939, 'x_2': 1505.6742596810936, 'y_2': 2350.846846846847, 'type': 'Figure', 'caption': 'Fig. 1.11 R is waiting for more code, as an incomplete command has been typed. Either addthe remaining code or press ‘‘escape’’ to abort the boxplot command'}], 'image_path': '/home/azureuser/prakash/output_2/page_8.jpg', 'bookname': 'output_2.pdf', 'bookId': '76874rf', 'page_num': 7, 'pdFigCap': True},{'results': [{'x_1': 233.15745544433594, 'y_1': 1967.5355224609375, 'x_2': 1593.453857421875, 'y_2': 2311.07177734375, 'type': 'Text', 'image_path': '/home/azureuser/prakash/output_2/page_9.jpg'}, {'x_1': 331.02178955078125, 'y_1': 552.8185424804688, 'x_2': 1505.067626953125, 'y_2': 1723.0263671875, 'type': 'Table', 'image_path': '/home/azureuser/prakash/output_2/page_9.jpg'}, {'x_1': 594.6592407226562, 'y_1': 1437.848876953125, 'x_2': 1198.1834716796875, 'y_2': 1478.45703125, 'type': 'Equation', 'image_path': '/home/azureuser/prakash/output_2/page_9.jpg'}, {'x_1': 316.9840546697039, 'y_1': 562.7027027027027, 'x_2': 1505.6742596810936, 'y_2': 1717.2852852852852, 'type': 'Figure', 'caption': 'Fig. 1.12 The window that is obtained by clicking Help->Html help from the help menu in R.Search Engine & Keywords allows searching for functions, commands, and keywords. Youwill need to switch off any pop-up blockers'}], 'image_path': '/home/azureuser/prakash/output_2/page_9.jpg', 'bookname': 'output_2.pdf', 'bookId': '76874rf', 'page_num': 8, 'pdFigCap': True},{'results': [{'x_1': 217.73353576660156, 'y_1': 1330.966796875, 'x_2': 1598.81005859375, 'y_2': 1802.5146484375, 'type': 'Text', 'image_path': '/home/azureuser/prakash/output_2/page_14.jpg'}, {'x_1': 347.414794921875, 'y_1': 264.9136657714844, 'x_2': 1503.9525146484375, 'y_2': 1096.74951171875, 'type': 'Table', 'image_path': '/home/azureuser/prakash/output_2/page_14.jpg'}, {'x_1': 392.6797180175781, 'y_1': 542.591796875, 'x_2': 1124.5792236328125, 'y_2': 834.2861938476562, 'type': 'Equation', 'image_path': '/home/azureuser/prakash/output_2/page_14.jpg'}, {'x_1': 316.9840546697039, 'y_1': 241.75375375375373, 'x_2': 1505.6742596810936, 'y_2': 1121.2372372372372, 'type': 'Figure', 'caption': 'Fig. 1.15 Our Tinn-R code. Note that we copied the code up to, and including, the final roundbracket. We should have dragged the mouse one line lower to include the hidden enter that willexecute the xyplot command'}], 'image_path': '/home/azureuser/prakash/output_2/page_14.jpg', 'bookname': 'output_2.pdf', 'bookId': '76874rf', 'page_num': 13, 'pdFigCap': True}]
-        # bookname = message["bookname"]
-        bookId = "8677667"
-        for page in pages_results:
-            page_obj= process_pages(page)
-            document=latex_pages.find_one({'bookId':bookId})
-            if document:
-                latex_pages.update_one({"_id":document["_id"]}, {"$push": {"pages": page_obj}})
-            else:
-                new_book_document = {
-                    "bookId": bookId,
-                    "book": bookname,  
-                    "pages": [page_obj]
-                }
-                latex_pages.insert_one(new_book_document)
-        latex_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"latex pages Done"})
-        # book_completion_queue("book_completion_queue",bookname, bookId)
+        message = json.loads(body)
+        total_latex_pages=message['total_latex_pages']
+        pages_result=message['page_result']
+        bookname = message["bookname"]
+        bookId = message["bookId"]
+        page_num=message['page_num']
+        page_obj= process_pages(pages_result)
+        document=latex_pages.find_one({'bookId':bookId})
+        if document:
+            latex_pages.update_one({"_id":document["_id"]}, {"$push": {"pages": page_obj}})
+        else:
+            new_book_document = {
+                "bookId": bookId,
+                "book": bookname,  
+                "pages": [page_obj]
+            }
+            latex_pages.insert_one(new_book_document)
+
+        if total_latex_pages==page_num+1:
+            latex_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"latex pages Done"})
+            book_completion_queue("book_completion_queue",bookname, bookId)
     except Exception as e:
         print(e)
     finally:
         print("ack received")
-        # ch.basic_ack(delivery_tag=method.delivery_tag)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
     
 
@@ -285,14 +287,7 @@ def process_equation(equation_block, imagepath, output, page_equations):
         output += f"{{{{equation:{equationId}}}}}"
         img = Image.open(equation_image_path)
         print(img)
-        # latex_text="458jbdfhfbv"
-        try:
-            model = LatexOCR()
-            latex_text= model(img)
-            print(latex_text)
-        except Exception as e:
-            print(e)
-        print("hellosdshhf")
+        latex_text= model(img)
         text_to_speech=latext_to_text_to_speech(latex_text)
         page_equations.append(
             {'id': equationId, 'text':latex_text, 'text_to_speech':text_to_speech}
@@ -332,7 +327,7 @@ def consume_latex_ocr_queue():
 
 if __name__ == "__main__":
     try:
-        # consume_latex_ocr_queue()      
-        extract_latex_pages()
+        consume_latex_ocr_queue()      
+        # extract_latex_pages()
     except KeyboardInterrupt:
         pass

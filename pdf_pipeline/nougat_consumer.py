@@ -99,6 +99,7 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
     except Exception as e:
         print(f'error occured while processing  of book {bookname} though nougat {str(e)}') 
     finally:
+        print("message acconsjdfsjb")
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
@@ -124,6 +125,7 @@ def get_latext_text(pdf_path, bookname, bookId):
         for i, gpu in enumerate(gpus):
             print(f"GPU {i + 1} - GPU Name: {gpu.name}")
             print(f"  GPU Utilization: {gpu.load * 100:.2f}%")
+            print(result.stderr)
         return result.stdout
     except Exception as e:
         print(f"An error occurred while processing {bookname}, page {page_num} with nougat: {str(e)}")
@@ -141,7 +143,6 @@ def consume_nougat_queue():
     try:
          # Declare the queue
         channel.queue_declare(queue='nougat_queue')
-
         # Set up the callback function for handling messages from the queue
         channel.basic_consume(queue='nougat_queue', on_message_callback=extract_text_equation_with_nougat)
 
