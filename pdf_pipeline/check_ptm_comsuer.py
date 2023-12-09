@@ -90,6 +90,9 @@ def consume_ptm_completion_queue():
 
     except KeyboardInterrupt:
         pass
+    finally:
+        channel.close()
+        connection.close()
    
 
 

@@ -7,6 +7,8 @@ sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
 import os
 import pymongo
+import uuid
+import boto3
 import json
 import traceback
 from pdf_producer import nougat_queue,other_pages_queue, latex_ocr_queue, error_queue
@@ -73,7 +75,7 @@ def upload_to_s3(filepath):
         url = f"{s3_base_url}/{key}"
         return url
     except Exception as e:
-        print(error)
+        print(e)
         return None
 
 
@@ -227,6 +229,10 @@ def consume_page_extraction_queue():
 
     except KeyboardInterrupt:
         pass
+    finally:
+        channel.close()
+        connection.close()
+
    
 if __name__ == "__main__":
     try:

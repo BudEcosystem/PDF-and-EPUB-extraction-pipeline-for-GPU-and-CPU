@@ -251,6 +251,10 @@ def consume_other_pages_queue():
 
     except KeyboardInterrupt:
         pass
+    finally:
+        channel.close()
+        connection.close()
+
    
 
 

@@ -114,7 +114,8 @@ def process_pages(page):
         page["image_path"] = local_file_path
         pdFigCap = page.get("pdFigCap", False)
         page_num = page.get("page_num", "")
-        page_content = sort_text_blocks_and_extract_data(results, image_path, page_tables, page_figures, page_equations, pdFigCap)
+        new_image_path=page["image_path"]
+        page_content = sort_text_blocks_and_extract_data(results, new_image_path, page_tables, page_figures, page_equations, pdFigCap)
         page_obj={
             "page_num": page_num,
             "content": page_content,
@@ -326,6 +327,10 @@ def consume_latex_ocr_queue():
 
     except KeyboardInterrupt:
         pass
+    finally:
+        channel.close()
+        connection.close()
+
    
 
 

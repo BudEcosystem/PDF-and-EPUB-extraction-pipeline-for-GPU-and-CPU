@@ -45,7 +45,7 @@ def store_errors(ch, method, properties, body):
         print("error while storing erros", e)
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
-
+   
 
 def consume_error_queue():
     try:
@@ -60,6 +60,10 @@ def consume_error_queue():
 
     except KeyboardInterrupt:
         pass
+    finally:
+        channel.close()
+        connection.close()
+
    
 
 

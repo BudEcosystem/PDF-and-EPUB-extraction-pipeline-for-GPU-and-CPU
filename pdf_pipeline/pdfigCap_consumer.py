@@ -105,6 +105,10 @@ def consume_pdfigcap_queue():
 
     except KeyboardInterrupt:
         pass
+    finally:
+        channel.close()
+        connection.close()
+
 
 
 

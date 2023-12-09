@@ -97,6 +97,10 @@ def consume_mfd_queue():
 
     except KeyboardInterrupt:
         pass
+    finally:
+        channel.close()
+        connection.close()
+
    
 
 if __name__ == "__main__":

@@ -120,6 +120,10 @@ def consume_pdf_processing_queue():
 
     except KeyboardInterrupt:
         pass
+    finally:
+        channel.close()
+        connection.close()
+
 
 
 
