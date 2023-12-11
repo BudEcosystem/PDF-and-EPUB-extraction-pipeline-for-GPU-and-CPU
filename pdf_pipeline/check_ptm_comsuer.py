@@ -8,7 +8,7 @@ sys.path.append("pdf_extraction_pipeline")
 import os
 import pymongo
 import json
-from pdf_producer import page_extraction_queue,error_queue
+from pdf_producer import page_extraction_queue, error_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
 connection = get_rabbitmq_connection()
@@ -66,7 +66,7 @@ def check_ptm_status(ch, method, properties, body):
                             image_path=page['image_path']
                             page_results[page_num].append({"image_path": image_path})
 
-            page_extraction_queue('page_extraction_queue', page_results, bookname, bookId)          
+            page_extraction_queue('page_extraction_queue', page_results, bookname,bookId)
         else:
             print("not yet completed")
     except Exception as e:

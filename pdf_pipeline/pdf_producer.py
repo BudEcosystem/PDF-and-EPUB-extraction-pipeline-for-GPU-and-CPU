@@ -199,6 +199,20 @@ def latex_ocr_queue(queue_name, page_result, total_latex_pages, page_num, bookna
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
 
 
+def table_queue(queue_name, tableId, image_path, page_num, bookname, bookId):
+    table_queue = {
+        "queue": queue_name,
+        "tableId":tableId,
+        "image_path":image_path,
+        "page_num":page_num,
+        "bookname": bookname,
+        "bookId": bookId
+    }
+    channel.queue_declare(queue=queue_name)
+    channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(table_queue))
+    print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
+
+
 def error_queue(queue_name, bookname, bookId,error):
     error_queue = {
         "queue": queue_name,

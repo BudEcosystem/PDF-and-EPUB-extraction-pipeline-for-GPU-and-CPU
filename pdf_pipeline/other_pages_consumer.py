@@ -15,7 +15,7 @@ import uuid
 from tablecaption import process_book_page
 from utils import timeit, crop_image
 import json
-from pdf_producer import book_completion_queue, error_queue
+from pdf_producer import book_completion_queue, error_queue, table_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
 connection = get_rabbitmq_connection()
@@ -51,7 +51,7 @@ def extract_other_pages(ch, method, properties, body):
         bookname = message["bookname"]
         bookId = message["bookId"]
         page_num=message['page_num']
-        page_obj= process_pages(pages_result)
+        page_obj= process_pages(pages_result, bookname, bookId)
         document=book_other_pages.find_one({'bookId':bookId})
         if document:
             book_other_pages.update_one({"_id":document["_id"]}, {"$push": {"pages": page_obj}})
@@ -73,10 +73,8 @@ def extract_other_pages(ch, method, properties, body):
         print("ack received")
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    
 
-
-def process_pages(page):
+def process_pages(page, bookname, bookId):
     page_tables=[]
     page_figures=[]
     page_equations=[]
@@ -84,7 +82,7 @@ def process_pages(page):
     image_path = page.get("image_path", "")
     pdFigCap = page.get("pdFigCap", False)
     page_num = page.get("page_num", "")
-    page_content= sort_text_blocks_and_extract_data(results, image_path,page_tables,page_figures,page_equations, pdFigCap)
+    page_content= sort_text_blocks_and_extract_data(results, image_path,page_figures,page_equations, pdFigCap, bookname, bookId, page_num)
     page_obj={
         "page_num":page_num,
         "content":page_content,
@@ -94,7 +92,7 @@ def process_pages(page):
         }
     return page_obj
 
-def sort_text_blocks_and_extract_data(blocks, imagepath, page_tables, page_figures, page_equations, pdFigCap):
+def sort_text_blocks_and_extract_data(blocks, imagepath, page_figures, page_equations, pdFigCap, bookname, bookId, page_num):
     sorted_blocks = sorted(blocks, key=lambda block: (block['y_1'] + block['y_2']) / 2)
     output = ""
     prev_block = None
@@ -105,7 +103,7 @@ def sort_text_blocks_and_extract_data(blocks, imagepath, page_tables, page_figur
         if i < len(sorted_blocks) - 1:
             next_block = sorted_blocks[i + 1]  
         if block['type'] == "Table":
-            output = process_table(imagepath, output, page_tables)
+            output = process_table(imagepath, output, bookname, bookId, page_num)
         elif block['type'] == "Figure":
             if pdFigCap:
                 output = process_figure(block, imagepath, output, page_figures)
@@ -122,9 +120,10 @@ def sort_text_blocks_and_extract_data(blocks, imagepath, page_tables, page_figur
     return page_content
 
 @timeit
-def process_table(imagepath, output, page_tables):
-    # output=process_book_page(imagepath,page_tables, output)
-    output+=""
+def process_table(imagepath, output,bookname, bookId, page_num):
+    tableId = uuid.uuid4().hex
+    output += f"{{{{table:{tableId}}}}}"
+    table_queue('table_queue',tableId,imagepath,page_num,bookname,bookId)
     return output
 
 @timeit

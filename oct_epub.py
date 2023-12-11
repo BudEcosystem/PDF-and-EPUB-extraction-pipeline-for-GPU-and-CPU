@@ -5,11 +5,12 @@ from PIL import Image
 from urllib.parse import urlparse
 import urllib
 from latext import latex_to_text
-from pix2tex.cli import LatexOCR
 import boto3
 from botocore.exceptions import ClientError
 from pymongo import MongoClient
 import uuid
+from latext import latex_to_text
+from pix2tex.cli import LatexOCR
 import json
 import xml.etree.ElementTree as ET
 from lxml import etree
@@ -19,7 +20,7 @@ from utils import timeit
 # Configure AWS credentials
 aws_access_key_id = 'AKIA4CKBAUILYLX23AO7'
 aws_secret_access_key = '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'
-aws_region = 'ap-south-1'
+aws_region = 'ap-southeast-1'
 
 mongo_connection_string = "mongodb+srv://inference_user:PrNLLcDRhEz4en9Q@budecosystem.qig24.mongodb.net/"
 
@@ -31,9 +32,10 @@ s3 = boto3.client('s3',
 
 bucket_name = 'bud-datalake'
 folder_name = 'Books/Oct29-1/'
-
+s3_base_url = "https://bud-datalake.s3.ap-southeast-1.amazonaws.com"
 # print(aws_access_key_id)
 
+latex_ocr=LatexOCR()
 
 def mongo_init(connection_string=None):
     """
@@ -92,6 +94,16 @@ def get_aws_s3_contents(bucket_name, folder_name):
             break
     print(len(contents))
     return contents
+
+
+def download_aws_image(key):
+    try:
+        os.makedirs(folder_name, exist_ok=True)
+        local_path = os.path.join(folder_name, os.path.basename(key))
+        s3.download_file(bucket_name, key, local_path)
+        return os.path.abspath(local_path)
+    except Exception as e:
+        print(e)
 
 
 def get_file_object_aws(book, filename):
@@ -331,12 +343,15 @@ def extract_data(elem, book, filename, db, section_data=[]):
                         temp['equations'] = []
 
             elif child.name == 'img':
-                print('figure hre')
+                print("figure here from img")
                 img = {}
                 img['id'] = uuid.uuid4().hex
-                # aws_path = f'https://{bucket_name}.s3-{
-                #     aws_region}.amazonaws.com/{folder_name}{book}/OEBPS/'
-                # img['url'] = aws_path+child['src']
+                parent2 = child.find_parent('div')
+                print(parent2.get('class', []))
+
+                #aws_path = f'https://{bucket_name}.s3.{
+                #aws_region}.amazonaws.com/{folder_name}{book}/OEBPS/'
+                #img['url'] = aws_path+child['src']
                 img['caption'] = ''
                 caption_element = child.find_previous_sibling(
                     'p', class_='caption')
@@ -347,18 +362,19 @@ def extract_data(elem, book, filename, db, section_data=[]):
                 if caption_element:
                     img['caption'] = caption_element.get_text(strip=True)
                 elif caption_element2:
-                    img['caption'] = caption_element2.get_text(strip=True)
+                    img['caption'] = caption_element.get_text(strip=True)
                 elif p_parent:
                     figcap = p_parent.find_next_sibling(
                         'p', class_=re.compile('figcap|fm-figure-caption', re.I))
                     img['caption'] = figcap.get_text(
                         strip=True) if figcap else ''
                 parent = child.find_parent('figure')
-                is_equation_image = child.find_parent(
-                    'p', class_='center1')
-                if is_equation_image:
-                    continue
-                if parent:
+                imagewrap_parent = child.find_parent('div', class_='imagewrap')
+                if imagewrap_parent:
+                    p = imagewrap_parent.find('p')
+                    if p:
+                        img['caption'] = p.get_text(strip=True)
+                elif parent:
                     figcaption_tag = parent.find('figcaption')
                     h6_tag = parent.find('h6')
                     captag1 = parent.find('p', class_='figurecaption')
@@ -371,8 +387,14 @@ def extract_data(elem, book, filename, db, section_data=[]):
                 else:
                     sibling_paragraph = child.find_next(
                         'p', class_='figcaption')
+                    caption_p = child.find_parent('p', class_='center')
                     if sibling_paragraph:
                         img['caption'] = sibling_paragraph.get_text(strip=True)
+                    if caption_p:
+                        next_p = caption_p.find_next_sibling(
+                            'p', class_='caption')
+                        if next_p and 'caption' in next_p.get('class', []):
+                            img['caption'] = next_p.get_text(strip=True)
 
                 if section_data:
                     section_data[-1]['content'] += '{{figure:' + img['id'] + '}} '
@@ -407,7 +429,6 @@ def extract_data(elem, book, filename, db, section_data=[]):
                 # Look for the parent div with class 'Table'
                 parent_div = child.find_parent(
                     'div', class_=re.compile('Table|group|table-contents', re.I))
-
                 if parent_div:
                     second_parent = parent_div.find_parent('table')
                     if second_parent:
@@ -466,32 +487,147 @@ def extract_data(elem, book, filename, db, section_data=[]):
                         db['table_with_no_caption'].insert_one(
                             {'book': book, 'filename': filename, 'tables': [table]})
 
-            elif child.name == 'p' and 'center1' in child.get('class', []):
-                print("euation_here")
+            elif child.name == 'p' and 'center1' in child.get('class', []) and not child.find('img'):
                 equation_Id = uuid.uuid4().hex
-                img_tag = child.find('img')
-                aws_path = f'https://{bucket_name}.s3-{aws_region}.amazonaws.com/{folder_name}{book}/OEBPS/'
-                img_aws_url= aws_path+img_tag['src']
-                print(img_aws_url)
-                # img = Image.open(equation_image_path)
-                # model = LatexOCR()
-                # latex_text= model(img)
-                # text_to_speech = latext_to_text_to_speech(latex_text)
-                # eqaution_data = {'id': equation_Id,
-                #                  'text': "", 'text_to_speech': text_to_speech}
-                # if section_data:
-                #     section_data[-1]['content'] += '{{equation:' + equation_Id + '}} '
-                #     if 'equation' in section_data[-1]:
-                #         section_data[-1]['equation'].append(eqaution_data)
-                #     else:
-                #         section_data[-1]['equation'] = [eqaution_data]
-                # else:
-                #     temp['title'] = ''
-                #     temp['content'] = '{{equation:' + equation_Id + '}} '
-                #     temp['tables'] = []
-                #     temp['figures'] = []
-                #     temp['code_snippet'] = []
-                #     temp['equations'] = [eqaution_data]
+                equation_text = child.get_text(strip=True)
+                if equation_text.startswith('Figure'):
+                    # Skip processing if it starts with "Figure"
+                    continue
+                eqaution_data = {'id': equation_Id,
+                                 'text': equation_text}
+                if section_data:
+                    section_data[-1]['content'] += '{{equation:' + \
+                        equation_Id + '}} '
+                    if 'equations' in section_data[-1]:
+                        section_data[-1]['equations'].append(eqaution_data)
+                    else:
+                        section_data[-1]['equations'] = [eqaution_data]
+                else:
+                    temp['title'] = ''
+                    temp['content'] = '{{equation:' + equation_Id + '}} '
+                    temp['tables'] = []
+                    temp['figures'] = []
+                    temp['code_snippet'] = []
+                    temp['equations'] = [eqaution_data]
+
+            # equation as text
+            elif child.name == 'div' and 'Kindlecenter' in child.get('class', []):
+                equation_Id = uuid.uuid4().hex
+                equation_text = child.get_text(strip=True)
+                eqaution_data = {'id': equation_Id,
+                                 'text': equation_text}
+                if section_data:
+                    section_data[-1]['content'] += '{{equation:' + \
+                        equation_Id + '}} '
+                    if 'equations' in section_data[-1]:
+                        section_data[-1]['equations'].append(eqaution_data)
+                    else:
+                        section_data[-1]['equations'] = [eqaution_data]
+                else:
+                    temp['title'] = ''
+                    temp['content'] = '{{equation:' + equation_Id + '}} '
+                    temp['tables'] = []
+                    temp['figures'] = []
+                    temp['code_snippet'] = []
+                    temp['equations'] = [eqaution_data]
+
+             # 100%  equation image
+           
+            elif child.name == 'div' and ('equationNumbered' in child.get('class', []) or 'informalEquation' in child.get('class', [])):
+                equation_image = child.find('img')
+                equation_Id = uuid.uuid4().hex
+                if equation_image:
+                    aws_path = f'https://{bucket_name}.s3.{ aws_region}.amazonaws.com/{folder_name}{book}/OEBPS/'
+                    img_url = aws_path + equation_image['src']
+                    print("This is equation image")
+                    img_key = img_url.replace(s3_base_url + "/", "")
+                    equation_image_path = download_aws_image(img_key)
+                    img = Image.open(equation_image_path)
+                    latex_text= latex_ocr(img)
+                    text_to_speech=latext_to_text_to_speech(latex_text)
+                    eqaution_data={'id': equation_Id, 'text':latex_text, 'text_to_speech':text_to_speech}
+                    print("this is equation image")
+                else:
+                    equation_text = child.get_text(strip=True)
+                    eqaution_data = {'id': equation_Id,
+                                     'text': equation_text}
+                if section_data:
+                    section_data[-1]['content'] += '{{equation:' + \
+                        equation_Id + '}} '
+                    if 'equations' in section_data[-1]:
+                        section_data[-1]['equations'].append(eqaution_data)
+                    else:
+                        section_data[-1]['equations'] = [eqaution_data]
+                else:
+                    temp['title'] = ''
+                    temp['content'] = '{{equation:' + equation_Id + '}} '
+                    temp['tables'] = []
+                    temp['figures'] = []
+                    temp['code_snippet'] = []
+                    temp['equations'] = [eqaution_data]
+
+            # 100% equation image
+            elif child.name == 'div' and 'imagewrap' in child.get('class', []) and not child.find('p'):
+                equation_Id = uuid.uuid4().hex
+                equation_image = child.find('img')
+                if book == "Basic Electrical and Electronics Engineering (9789332579170)" and equation_image and equation_image.get('id', '').startswith('eq'):
+                    aws_path = f'https://{bucket_name}.s3.{aws_region}.amazonaws.com/{folder_name}{book}/OEBPS/'
+                    img_url = aws_path + equation_image['src']
+                    print("This is equation image")
+                    img_key = img_url.replace(s3_base_url + "/", "")
+                    print(img_key)
+                    equation_image_path = download_aws_image(img_key)
+                    img = Image.open(equation_image_path)
+                    latex_text= latex_ocr(img)
+                    text_to_speech=latext_to_text_to_speech(latex_text)
+                    eqaution_data={'id': equation_Id, 'text':latex_text, 'text_to_speech':text_to_speech}
+                else:
+                    aws_path = f'https://{bucket_name}.s3.{aws_region}.amazonaws.com/{folder_name}{book}/OEBPS/'
+                    img_url = aws_path+equation_image['src']
+                    print("this is equation image")
+                    img_key = img_url.replace(s3_base_url + "/", "")
+                    print(img_key)
+                    equation_image_path = download_aws_image(img_key)
+                    img = Image.open(equation_image_path)
+                    latex_text= latex_ocr(img)
+                    text_to_speech=latext_to_text_to_speech(latex_text)
+                    eqaution_data={'id': equation_Id, 'text':latex_text, 'text_to_speech':text_to_speech}
+                if section_data:
+                    section_data[-1]['content'] += '{{equation:' + \
+                        equation_Id + '}} '
+                    if 'equations' in section_data[-1]:
+                        section_data[-1]['equations'].append(eqaution_data)
+                    else:
+                        section_data[-1]['equations'] = [eqaution_data]
+                else:
+                    temp['title'] = ''
+                    temp['content'] = '{{equation:' + equation_Id + '}} '
+                    temp['tables'] = []
+                    temp['figures'] = []
+                    temp['code_snippet'] = []
+                    temp['equations'] = [eqaution_data]
+
+            # handling equaiton as text
+            elif child.name == 'math':
+                print("equation here")
+                equation_Id = uuid.uuid4().hex
+                equation_text = child.get_text(strip=True)
+                eqaution_data = {'id': equation_Id,
+                                 'text': equation_text}
+                if section_data:
+                    section_data[-1]['content'] += '{{equation:' + \
+                        equation_Id + '}} '
+                    if 'equations' in section_data[-1]:
+                        section_data[-1]['equations'].append(eqaution_data)
+                    else:
+                        section_data[-1]['equations'] = [eqaution_data]
+                else:
+                    temp['title'] = ''
+                    temp['content'] = '{{equation:' + equation_Id + '}} '
+                    temp['tables'] = []
+                    temp['figures'] = []
+                    temp['code_snippet'] = []
+                    temp['equations'] = [eqaution_data]
 
             elif child.name == 'pre':
                 code_tags = child.find_all('code')
@@ -763,4 +899,4 @@ def get_all_books_info(bucket_name, folder_name):
 # process_all_books()
 
 
-get_book_data('Calculus I (9781465454126)')
+get_book_data('AC Circuits and Power Systems in Practice (9781118924594)')

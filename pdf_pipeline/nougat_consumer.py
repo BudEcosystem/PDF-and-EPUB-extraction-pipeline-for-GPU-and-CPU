@@ -16,9 +16,9 @@ import uuid
 from latext import latex_to_text
 import json
 
-from pdf_producer import book_completion_queue, error_queue
 
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
+from pdf_producer import book_completion_queue, error_queue
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
@@ -83,8 +83,11 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
         if os.path.exists(pdf_path):
             os.remove(pdf_path)
         if total_nougat_pages==page_num+1:
+            print("hello workd")
             nougat_done.insert_one({"bookId":bookId,"book":bookname,"status":"nougat pages Done"})
-            book_completion_queue("book_completion_queue",bookname, bookId)
+            print("dsdsd")
+            book_completion_queue('book_completion_queue', bookname, bookId)
+            print("after finish")
     except Exception as e:
         error = {"consumer":"nougat_consumer","page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
@@ -151,7 +154,7 @@ if __name__ == "__main__":
     try:
         consume_nougat_queue()     
     except KeyboardInterrupt:
-        pass
+        passs
   
 
 

@@ -14,10 +14,9 @@ import pymongo
 import uuid
 from latext import latex_to_text
 from pix2tex.cli import LatexOCR
-from tablecaption import process_book_page
 from utils import timeit, crop_image
 import json
-from pdf_producer import book_completion_queue, error_queue
+from pdf_producer import book_completion_queue, error_queue, table_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
 connection = get_rabbitmq_connection()
@@ -75,7 +74,7 @@ def extract_latex_pages(ch, method, properties, body):
         bookname = message["bookname"]
         bookId = message["bookId"]
         page_num=message['page_num']
-        page_obj= process_pages(pages_result)
+        page_obj= process_pages(pages_result, bookname, bookId, page_num)
         document=latex_pages.find_one({'bookId':bookId})
         if document:
             latex_pages.update_one({"_id":document["_id"]}, {"$push": {"pages": page_obj}})
@@ -99,7 +98,7 @@ def extract_latex_pages(ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
-def process_pages(page):
+def process_pages(page, bookname, bookId, page_num):
     try:
         page_tables = []
         page_figures = []
@@ -115,7 +114,7 @@ def process_pages(page):
         pdFigCap = page.get("pdFigCap", False)
         page_num = page.get("page_num", "")
         new_image_path=page["image_path"]
-        page_content = sort_text_blocks_and_extract_data(results, new_image_path, page_tables, page_figures, page_equations, pdFigCap)
+        page_content = sort_text_blocks_and_extract_data(results, new_image_path, page_tables, page_figures, page_equations, pdFigCap, bookname,bookId,page_num)
         page_obj={
             "page_num": page_num,
             "content": page_content,
@@ -128,7 +127,7 @@ def process_pages(page):
     except Exception as e:
         print("error while page",e)
 
-def sort_text_blocks_and_extract_data(blocks, imagepath, page_tables, page_figures, page_equations, pdFigCap):
+def sort_text_blocks_and_extract_data(blocks, imagepath, page_tables, page_figures, page_equations, pdFigCap, bookname, bookId, page_num):
     try:
         print("hello")
         sorted_blocks = sorted(blocks, key=lambda block: (block['y_1'] + block['y_2']) / 2)
@@ -142,7 +141,7 @@ def sort_text_blocks_and_extract_data(blocks, imagepath, page_tables, page_figur
             if i < len(sorted_blocks) - 1:
                 next_block = sorted_blocks[i + 1]  
             if block['type'] == "Table":
-                output = process_table(imagepath, output, page_tables)
+                output = process_table(imagepath, output, bookname,bookId, page_num)
             elif block['type'] == "Figure":
                 if pdFigCap:
                     output = process_figure(block, imagepath, output, page_figures)
@@ -164,12 +163,12 @@ def sort_text_blocks_and_extract_data(blocks, imagepath, page_tables, page_figur
 
 
 @timeit
-def process_table(imagepath, output, page_tables):
-    try:
-        output=process_book_page(imagepath,page_tables, output)
-        return output
-    except Exception as e:
-        print("error procwss",e)
+def process_table(imagepath, output, bookname, bookId, page_num):
+    tableId = uuid.uuid4().hex
+    output += f"{{{{table:{tableId}}}}}"
+    table_queue('table_queue',tableId,imagepath,page_num,bookname,bookId)
+    return output
+
 
 @timeit
 def process_figure(figure_block, imagepath, output, page_figures):
@@ -178,7 +177,7 @@ def process_figure(figure_block, imagepath, output, page_figures):
         figure_image_path = crop_image(figure_block,imagepath, figureId)
         output += f"{{{{figure:{figureId}}}}}"
 
-    # figure_url=upload_to_aws_s3(figure_image_path, figureId)
+       # figure_url=upload_to_aws_s3(figure_image_path, figureId)
         page_figures.append({
             "id":figureId,
             "url":"figure_url",

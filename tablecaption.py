@@ -77,7 +77,7 @@ def find_closest_results_for_table_caption(data):
     return closest_values
 # Example data
 
-def process_book_page(image_path, page_tables, output):
+def process_book_page(image_path, tableId):
     files = {
         'file': (image_path, open(image_path, 'rb'))
     }
@@ -92,21 +92,21 @@ def process_book_page(image_path, page_tables, output):
             caption = caption[idx] if idx < len(caption) else ""
             if should_skip_table(table_data):
                 continue
-            table_id = uuid.uuid4().hex
             rows = [row for row in table_data]
             if not re.match(r'^Table\s+\d+', caption):
                 caption = ""
-            page_tables.append({
-                "id": table_id,
+            table_data={
+                "id": tableId,
                 "caption": caption,
                 "data": {
                     "rows": rows
                     }
-            })
-            output+=f"{{{{table:{table_id}}}}}"
+            }
+            return table_data
     else:
         print('API request failed with status code:', response.status_code)
-    return output
+        return None
+
       
 
 def should_skip_table(table):

@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import pymongo
 import sys
 import traceback
+import shutil
 sys.path.append("pdf_extraction_pipeline")
 from utils import timeit
 load_dotenv()
@@ -81,6 +82,14 @@ def book_complete(ch, method, properties, body):
                 {"bookId": bookId},
                 {"$set": {"status": "extracted", "end_time": current_time}},
             )
+            book_folder=bookname.split(".")[0]
+            book_folder_path = os.path.abspath(book_folder)
+            if os.path.exists(book_folder_path):
+                shutil.rmtree(book_folder)
+            book_path = os.path.join(folder_name, bookname)
+            book_path = os.path.abspath(book_path)
+            if os.path.exists(book_path):
+                os.remove(book_path)      
         else:
             print("Not yet completed")
     except Exception as e:

@@ -82,6 +82,7 @@ def upload_to_s3(filepath):
 def extract_pages(ch, method, properties, body):
     try:
         message = json.loads(body)
+        print(message)
         page_results=message['book_pages']
         bookname = message["bookname"]
         bookId = message["bookId"]
@@ -103,18 +104,18 @@ def extract_pages(ch, method, properties, body):
             book_other_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"latex pages Done"})
 
         # send latex_ocr_pages to latex_ocr_queue
-        # total_latex_pages=len(latex_ocr_pages)
-        # if total_latex_pages>0:
-        #     for page_num, page_result in enumerate(latex_ocr_pages):
-        #         # upload page_result images to s3
-        #         # replace in image_path in page_result with s3 url
-        #         image_path = page_result['image_path']
-        #         new_image_path = upload_to_s3(image_path)
-        #         page_result['image_path'] = new_image_path
-        #         latex_ocr_queue('latex_ocr_queue',page_result,total_latex_pages,page_num, bookname, bookId)
-        #     print("latex_ocr pages sent, sending nougat pages .....")
-        # else:
-        latex_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"latex pages Done"})
+        total_latex_pages=len(latex_ocr_pages)
+        if total_latex_pages>0:
+            for page_num, page_result in enumerate(latex_ocr_pages):
+                # upload page_result images to s3
+                # replace in image_path in page_result with s3 url
+                image_path = page_result['image_path']
+                new_image_path = upload_to_s3(image_path)
+                page_result['image_path'] = new_image_path
+                latex_ocr_queue('latex_ocr_queue',page_result,total_latex_pages,page_num, bookname, bookId)
+            print("latex_ocr pages sent, sending nougat pages .....")
+        else:
+            latex_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"latex pages Done"})
 
         # send nougat_pages to nougat_queue   
         total_nougat_pages = len(nougat_pages)
@@ -124,7 +125,6 @@ def extract_pages(ch, method, properties, body):
             print('nougat pages sent')
         else:
             nougat_done.insert_one({"bookId":bookId,"book":bookname,"status":"nougat pages Done"})
-
     except Exception as e:
         error={"consumer":"page_extraction","error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
         print(error)
