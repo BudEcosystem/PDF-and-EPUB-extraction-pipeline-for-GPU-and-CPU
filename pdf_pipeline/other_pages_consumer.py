@@ -66,9 +66,9 @@ def extract_other_pages(ch, method, properties, body):
             book_other_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"other pages Done"})
             book_completion_queue("book_completion_queue",bookname, bookId)
     except Exception as e:
-        error = {"page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        error = {"consumer":"other_pages","page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
-        error_queue('error_queue','other_page_extraction_consumer',bookname, bookId,error)    
+        error_queue('error_queue',bookname, bookId,error)    
     finally:
         print("ack received")
         ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -123,7 +123,8 @@ def sort_text_blocks_and_extract_data(blocks, imagepath, page_tables, page_figur
 
 @timeit
 def process_table(imagepath, output, page_tables):
-    output=process_book_page(imagepath,page_tables, output)
+    # output=process_book_page(imagepath,page_tables, output)
+    output+=""
     return output
 
 @timeit

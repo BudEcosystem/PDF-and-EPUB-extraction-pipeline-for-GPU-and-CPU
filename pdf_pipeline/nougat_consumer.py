@@ -86,9 +86,9 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
             nougat_done.insert_one({"bookId":bookId,"book":bookname,"status":"nougat pages Done"})
             book_completion_queue("book_completion_queue",bookname, bookId)
     except Exception as e:
-        error = {"page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        error = {"consumer":"nougat_consumer","page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
-        error_queue('error_queue','nougat_consumer',bookname, bookId, error)
+        error_queue('error_queue',bookname, bookId, error)
     finally:
         print("message ack")
         ch.basic_ack(delivery_tag=method.delivery_tag)

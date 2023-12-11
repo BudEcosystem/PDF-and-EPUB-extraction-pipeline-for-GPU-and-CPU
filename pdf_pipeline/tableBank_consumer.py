@@ -80,9 +80,9 @@ def tableBank_layout(ch, method, properties, body):
             check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
 
     except Exception as e:
-        error = {"page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        error = {'consumer':'tableBank_consumer', "page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
-        error_queue('error_queue','tableBank_consumer',bookname, bookId, error)
+        error_queue('error_queue',bookname, bookId, error)
 
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)

@@ -7,7 +7,7 @@ import traceback
 import os
 sys.path.append("pdf_extraction_pipeline")
 import pymongo
-from pdf_producer import check_ptm_completion_queue, error_queue
+from pdf_producer import check_ptm_completion_queue,error_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 import layoutparser as lp
 
@@ -78,10 +78,11 @@ def mathformuladetection_layout(ch, method, properties, body):
             }
             mfd_done.insert_one(new_ptm_book_document)
             check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
+            print("hello world ")
     except Exception as e:
-        error = {"page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        error = {"consumer":"mfd_consumer","page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
-        error_queue('error_queue','mfd_consumer',bookname, bookId, error)
+        error_queue('error_queue',bookname, bookId, error)
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 

@@ -84,9 +84,9 @@ def book_complete(ch, method, properties, body):
         else:
             print("Not yet completed")
     except Exception as e:
-        error = {"error": str(e), "line_number": traceback.extract_tb(e.__traceback__)[-1].lineno}
+        error = {"consumer":"book_completion_consumer","error": str(e), "line_number": traceback.extract_tb(e.__traceback__)[-1].lineno}
         print(error)
-        error_queue('error_queue', 'book_completion_consumer', bookname, bookId, error)
+        error_queue('error_queue', bookname, bookId, error)
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 

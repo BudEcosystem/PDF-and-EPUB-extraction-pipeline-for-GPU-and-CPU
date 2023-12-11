@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 sys.path.append("pdf_extraction_pipeline")
 from utils import timeit
 import pymongo
-from pdf_producer import table_bank_queue, publeynet_queue, mfd_queue, pdfigcap_queue, error_queue
+from pdf_producer import table_bank_queue, pdfigcap_queue, mfd_queue, publeynet_queue, error_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
 connection = get_rabbitmq_connection()
@@ -56,8 +56,8 @@ def download_book_from_aws(bookname, bookId):
     return local_path   
   except Exception as e:
     print("An error occurred:", e)
-    error = {"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
-    error_queue('error_queue','pdfconsumer', bookname, bookId, error)
+    error = {"consumer":"pdf_consumer","error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
+    error_queue('error_queue',bookname, bookId, error)
 
 @timeit
 def process_book(ch, method, properties, body): 
@@ -83,14 +83,14 @@ def process_book(ch, method, properties, body):
         print(f"{bookname} has total {num_pages} page")  
         if num_pages>15:
             pdfigcap_queue('pdfigcap_queue',book_path,bookname, bookId)
-        elif num_pages<15:
+        else:
             figure_caption.insert_one({"bookId": bookId, "book": bookname, "pages": [], "status":"failed"})   
         for page_num in range(0,num_pages):
             process_page(page_num, book_path, book_folder, bookname, bookId,num_pages)
     except Exception as e:
-        error = {"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
+        error = {"consumer":"pdf_consumer","error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
         print(error) 
-        error_queue('error_queue','pdfconsumer', bookname, bookId, error)   
+        error_queue('error_queue', bookname, bookId, error)   
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -120,9 +120,6 @@ def consume_pdf_processing_queue():
 
     except KeyboardInterrupt:
         pass
-    finally:
-        channel.close()
-        connection.close()
 
 
 

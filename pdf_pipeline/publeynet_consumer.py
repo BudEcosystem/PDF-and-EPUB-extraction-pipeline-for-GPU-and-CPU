@@ -82,13 +82,14 @@ def publaynet_layout(ch, method, properties, body):
                 "ptm": "PubLaynet done"
             }
             publaynet_done.insert_one(new_ptm_book_document)
+            print("hello world ")
             check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
+            print("hello world ")
 
     except Exception as e:
-        error = {"page_num":page_num,"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        error = {'consumer':"publaynet","page_num":page_num,"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
-        error_queue('error_queue','publeynet_consumer',bookname, bookId, error)
-
+        error_queue('error_queue',bookname, bookId, error)
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -107,10 +108,6 @@ def consume_publaynet_queue():
 
     except KeyboardInterrupt:
         pass
-    finally:
-        channel.close()
-        connection.close()
-
 
 if __name__ == "__main__":
     try:

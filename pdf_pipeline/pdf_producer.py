@@ -74,7 +74,6 @@ def publeynet_queue(queue_name,image_path,page_num,bookname,bookId,num_pages):
     channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(table_bank_message))
     print(f" [x] Sent {bookname} ({bookId}), Page {page_num} to {queue_name}")
 
-# Update your existing producer file to include a new function for downloading PDFs
 def table_bank_queue(queue_name,image_path,page_num,bookname,bookId,num_pages ):
     table_bank_message = {
         "job":'table_bank',
@@ -117,7 +116,6 @@ def pdfigcap_queue(queue_name,pdf_path,bookname,bookId):
     channel.queue_declare(queue=queue_name)
     channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(pdfigcapx_message))
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
-
 
 def check_ptm_completion_queue(queue_name,bookname,bookId):
     pdfigcapx_message = {
@@ -201,10 +199,9 @@ def latex_ocr_queue(queue_name, page_result, total_latex_pages, page_num, bookna
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
 
 
-def error_queue(queue_name,consumer_name,bookname, bookId,error):
+def error_queue(queue_name, bookname, bookId,error):
     error_queue = {
         "queue": queue_name,
-        'consumer_name':consumer_name,
         "bookname":bookname,
         "bookId":bookId,
         "error": error
@@ -213,8 +210,6 @@ def error_queue(queue_name,consumer_name,bookname, bookId,error):
     channel.queue_declare(queue=queue_name)
     channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(error_queue))
     print(f" [x] Sent {error} sent to {queue_name}")
-
-
 
 # def store_book_details():
 #     books= get_all_books_names(bucket_name, folder_name + '/')

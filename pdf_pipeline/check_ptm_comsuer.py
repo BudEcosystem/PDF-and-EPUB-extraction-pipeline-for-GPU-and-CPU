@@ -28,6 +28,7 @@ mfd_book_job_details=db.mfd_book_job_details
 
 def check_ptm_status(ch, method, properties, body):
     try:
+        print("hello pmt called")
         message = json.loads(body)
         bookname = message["bookname"]
         bookId = message["bookId"]
@@ -69,10 +70,9 @@ def check_ptm_status(ch, method, properties, body):
         else:
             print("not yet completed")
     except Exception as e:
-        error = {"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        error = {"consumer":"check_ptm_consumer","error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
-        error_queue('error_queue','check_ptm_consumer',bookname, bookId,error)
-        
+        error_queue('error_queue',bookname, bookId,error)      
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 

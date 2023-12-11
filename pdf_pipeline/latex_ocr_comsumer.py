@@ -91,9 +91,9 @@ def extract_latex_pages(ch, method, properties, body):
             latex_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"latex pages Done"})
             book_completion_queue("book_completion_queue",bookname, bookId)
     except Exception as e:
-        error = {"page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        error = {"consumer":"latex_ocr_consumer","page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
-        error_queue('error_queue','latex_ocr_consumer',bookname, bookId, error)
+        error_queue('error_queue',bookname, bookId, error)
     finally:
         print("ack received")
         ch.basic_ack(delivery_tag=method.delivery_tag)

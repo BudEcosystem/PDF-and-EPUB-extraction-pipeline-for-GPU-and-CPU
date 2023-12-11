@@ -73,22 +73,25 @@ def get_figure_and_captions(ch, method, properties, body):
             figure_caption.insert_one({"bookId": bookId, "book": bookname, "pages": book_data,'status':"success"})
             print("Book's figure and figure caption saved in the database")
             check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
+            print("hello jghfgfg")
         else:
             print(f"no figure detected by pdfigcapx for this book {bookname}")
             figure_caption.insert_one({"bookId": bookId, "book": bookname, "pages": [], "status":"failed"})
             check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
-        ch.basic_ack(delivery_tag=method.delivery_tag)
+        print("hello world ")
     except Exception as e:
+        figure_caption.insert_one({"bookId": bookId, "book": bookname, "pages": [], "status":"failed"})
+        error ={"consumer":"pdfigcap","error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        print(print(error))
+        check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
+        error_queue('error_queue',bookname, bookId, error)
+    finally:
         if os.path.exists(output_directory):
             shutil.rmtree(output_directory)   
         if os.path.exists(book_output):
             shutil.rmtree(book_output)
-        figure_caption.insert_one({"bookId": bookId, "book": bookname, "pages": [], "status":"failed"})
-        error ={"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
-        print(print(error))
-        error_queue('error_queue','pdfigcap_consumer',bookname, bookId, error)
-        check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
         ch.basic_ack(delivery_tag=method.delivery_tag)
+        
 
 
 
@@ -105,16 +108,12 @@ def consume_pdfigcap_queue():
 
     except KeyboardInterrupt:
         pass
-    finally:
-        channel.close()
-        connection.close()
 
 
 
 
 if __name__ == "__main__":
     try:
-        consume_pdfigcap_queue()
-        
+        consume_pdfigcap_queue()     
     except KeyboardInterrupt:
         pass
