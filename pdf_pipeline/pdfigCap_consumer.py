@@ -26,6 +26,9 @@ client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.bookssssss
 figure_caption = db.figure_caption
 
+class DocumentFound(Exception):
+    pass
+
 @timeit
 def get_figure_and_captions(ch, method, properties, body):
     message = json.loads(body)
@@ -35,7 +38,7 @@ def get_figure_and_captions(ch, method, properties, body):
     bookId = message["bookId"]
     document = figure_caption.find_one({"bookId":bookId})
     if document:
-        return
+        raise DocumentFound("Figure Caption Book already exist in the database"")
     someId=uuid.uuid4().hex
     name1='pdffiles'+someId
     name2='output'+someId
@@ -49,26 +52,18 @@ def get_figure_and_captions(ch, method, properties, body):
         pages_per_split = 15
         for i in range(0, num_pages, pages_per_split):
             pdf_writer = PyPDF2.PdfWriter()
+            count = i
             for page_num in range(i, min(i + pages_per_split, num_pages)):
                  page = pdf_reader.pages[page_num]
                  pdf_writer.add_page(page)
+                 count += 1
 
             # Save the smaller PDF to the output directory
-            output_filename = os.path.join(output_directory, f'output_{i // pages_per_split + 1}.pdf')
+            output_filename = os.path.join(output_directory, f'output_{i+1}-{count}_{i // pages_per_split + 1}.pdf')
             with open(output_filename, 'wb') as output_file:
-                pdf_writer.write(output_file)   
+                pdf_writer.write(output_file) 
     try:
         book_data=extract_figure_and_caption(output_directory, book_output)
-        process = psutil.Process(os.getpid())
-        print(f"Memory Usage for figure caption function: {process.memory_info().rss / (1024 ** 2):.2f} MB")
-        gpus = GPUtil.getGPUs()
-        for i, gpu in enumerate(gpus):
-            print(f"GPU {i + 1} - GPU Name: {gpu.name}")
-            print(f"  GPU Utilization: {gpu.load * 100:.2f}%")
-        if os.path.exists(output_directory):
-            shutil.rmtree(output_directory)   
-        if os.path.exists(book_output):
-            shutil.rmtree(book_output)
         if book_data:
             figure_caption.insert_one({"bookId": bookId, "book": bookname, "pages": book_data,'status':"success"})
             print("Book's figure and figure caption saved in the database")
@@ -79,6 +74,9 @@ def get_figure_and_captions(ch, method, properties, body):
             figure_caption.insert_one({"bookId": bookId, "book": bookname, "pages": [], "status":"failed"})
             check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
         print("hello world ")
+    except DocumentFound as e:
+        print(e)
+        check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
     except Exception as e:
         figure_caption.insert_one({"bookId": bookId, "book": bookname, "pages": [], "status":"failed"})
         error ={"consumer":"pdfigcap","error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
@@ -91,8 +89,6 @@ def get_figure_and_captions(ch, method, properties, body):
         if os.path.exists(book_output):
             shutil.rmtree(book_output)
         ch.basic_ack(delivery_tag=method.delivery_tag)
-        
-
 
 
 def consume_pdfigcap_queue():
