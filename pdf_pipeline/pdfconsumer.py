@@ -75,7 +75,7 @@ def process_book(ch, method, properties, body):
         book_folder = bookname.replace('.pdf', '')
         book_path = download_book_from_aws(bookname, bookId)
         if not book_path:
-            return 
+            raise Exception("Book not found") 
         os.makedirs(book_folder, exist_ok=True)
         book = PdfReader(book_path)  
         print(bookname)
