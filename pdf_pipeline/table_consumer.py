@@ -32,12 +32,16 @@ def extract_page_table(ch, method, properties, body):
     try:
         message = json.loads(body)
         tableId=message['tableId']
-        image_path=message['image_path']
+        data=message['data']
+        image_data_base64 = data['img'].decode('utf-8')
         bookname = message["bookname"]
         bookId = message["bookId"]
         page_num=message['page_num']
-        # table_data=process_book_page(image_path, tableId)
-        table_data="dd"
+        # Decode base64 and save the image
+        image_data = base64.b64decode(image_data_base64)
+        with open('received_image.jpg', 'wb') as received_image:
+            received_image.write(image_data)
+        table_data=process_book_page('received_image.jpg', tableId)
         if table_data:
             page_details={
                 "page_num":page_num,
@@ -60,6 +64,9 @@ def extract_page_table(ch, method, properties, body):
                     "pages": [page_details]
                 }
                 table_collection.insert_one(table_doc)
+
+        if os.path.exists(image_path):
+            os.remove(image_path)
     except Exception as e:
         error = {"consumer":"table_consumer","page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
