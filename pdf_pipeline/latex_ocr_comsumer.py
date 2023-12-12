@@ -12,6 +12,7 @@ import boto3
 import re
 import pymongo
 import uuid
+import cv2
 from latext import latex_to_text
 from pix2tex.cli import LatexOCR
 from utils import timeit, crop_image
@@ -141,7 +142,7 @@ def sort_text_blocks_and_extract_data(blocks, imagepath, page_tables, page_figur
             if i < len(sorted_blocks) - 1:
                 next_block = sorted_blocks[i + 1]  
             if block['type'] == "Table":
-                output = process_table(imagepath, output, bookname,bookId, page_num)
+                output = process_table(block,imagepath, output, bookname,bookId, page_num)
             elif block['type'] == "Figure":
                 if pdFigCap:
                     output = process_figure(block, imagepath, output, page_figures)
@@ -163,10 +164,29 @@ def sort_text_blocks_and_extract_data(blocks, imagepath, page_tables, page_figur
 
 
 @timeit
-def process_table(imagepath, output, bookname, bookId, page_num):
-    tableId = uuid.uuid4().hex
+def process_table(table_block,imagepath, output, bookname, bookId, page_num):
+    x1, y1, x2, y2 = table_block['x_1'], table_block['y_1'], table_block['x_2'], table_block['y_2']
+    img = cv2.imread(imagepath)
+    y1 -= 70
+    if y1 < 0:
+        y1 = 0
+    x1 = 0
+    x2 += 20
+    if x2 > img.shape[1]:
+        x2 = img.shape[1]
+    y2 += 20
+    if y2 > img.shape[0]:
+        y2 = img.shape[0]
+    cropped_image = img[int(y1):int(y2), int(x1):int(x2)] 
+    tableId = uuid.uuid4().hex 
+    table_image_path =os.path.abspath(f"cropeed{tableId}.png")
+    cv2.imwrite(table_image_path, cropped_image)
     output += f"{{{{table:{tableId}}}}}"
-    table_queue('table_queue',tableId,imagepath,page_num,bookname,bookId)
+    with open(table_image_path, 'rb') as img:
+        img_data = img.read()
+    image_data_base64 = base64.b64encode(img_data).decode('utf-8')
+    data = {'img': image_data_base64}
+    table_queue('table_queue',tableId,data,page_num,bookname,bookId)
     return output
 
 
@@ -177,10 +197,10 @@ def process_figure(figure_block, imagepath, output, page_figures):
         figure_image_path = crop_image(figure_block,imagepath, figureId)
         output += f"{{{{figure:{figureId}}}}}"
 
-       # figure_url=upload_to_aws_s3(figure_image_path, figureId)
+        figure_url=upload_to_aws_s3(figure_image_path, figureId)
         page_figures.append({
             "id":figureId,
-            "url":"figure_url",
+            "url":figure_url,
             "caption": figure_block['caption']
         })
         if os.path.exists(figure_image_path):
@@ -226,10 +246,10 @@ def process_publeynet_figure(figure_block, imagepath, prev_block, next_block, ou
         if os.path.exists(next_image_path):
             os.remove(next_image_path)
 
-    # figure_url=upload_to_aws_s3(figure_image_path, figureId)
+    figure_url=upload_to_aws_s3(figure_image_path, figureId)
     page_figures.append({
         "id":figureId,
-        "url":'figure_url',
+        "url":figure_url,
         "caption":caption
     })
     if os.path.exists(figure_image_path):
@@ -302,6 +322,16 @@ def process_equation(equation_block, imagepath, output, page_equations):
     except Exception as e:
         print("error while equation",e)  
  
+@timeit
+def upload_to_aws_s3(figure_image_path, figureId): 
+    folderName=os.environ['AWS_PDF_IMAGE_UPLOAD_FOLDER']
+    s3_key = f"{folderName}/{figureId}.png"
+    # Upload the image to the specified S3 bucket
+    s3.upload_file(figure_image_path, bucket_name, s3_key)
+    # Get the URL of the uploaded image
+    figure_url = f"https://{bucket_name}.s3.amazonaws.com/{s3_key}"
+
+    return figure_url
 
 @timeit
 def latext_to_text_to_speech(text):

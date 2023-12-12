@@ -109,9 +109,9 @@ def extract_pages(ch, method, properties, body):
             for page_num, page_result in enumerate(latex_ocr_pages):
                 # upload page_result images to s3
                 # replace in image_path in page_result with s3 url
-                image_path = page_result['image_path']
-                new_image_path = upload_to_s3(image_path)
-                page_result['image_path'] = new_image_path
+                # image_path = page_result['image_path']
+                # new_image_path = upload_to_s3(image_path)
+                # page_result['image_path'] = new_image_path
                 latex_ocr_queue('latex_ocr_queue',page_result,total_latex_pages,page_num, bookname, bookId)
             print("latex_ocr pages sent, sending nougat pages .....")
         else:

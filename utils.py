@@ -30,7 +30,7 @@ def crop_image(block, imagepath, id):
 
     #crop the expanded bounding box
     bbox = img[int(y1):int(y2), int(x1):int(x2)]
-    cropped_image_path = f"cropeed{id}.png"
+    cropped_image_path = f"cropeed{id}.jpg"
     cv2.imwrite(cropped_image_path,bbox) 
 
     return cropped_image_path 
