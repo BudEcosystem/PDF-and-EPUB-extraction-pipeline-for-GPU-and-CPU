@@ -1,34 +1,17 @@
 # pylint: disable=all
 # type: ignore
-import numpy as np
 from dotenv import load_dotenv
-import subprocess
-import pytesseract
 import traceback
 import sys
 sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
-from PIL import Image
 import os
-import PyPDF2
-import img2pdf
-import fitz
-import shutil
-import boto3
-import re
-import cv2
 import pymongo
-from urllib.parse import urlparse
-import urllib
 import uuid
-from latext import latex_to_text
-from pix2tex.cli import LatexOCR
-from PyPDF2 import PdfReader
-from tablecaption import process_book_page
-from utils import timeit, crop_image
-import pika
+import boto3
 import json
-from pdf_producer import nougat_queue, book_completion_queue, other_pages_queue, latex_ocr_queue
+import traceback
+from pdf_producer import other_pages_queue, latex_ocr_queue, error_queue, nougat_pdf_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
 connection = get_rabbitmq_connection()
@@ -38,7 +21,7 @@ load_dotenv()
 
 
 
-latex_ocr_model = LatexOCR()
+# latex_ocr_model = LatexOCR()
 # Configure AWS credentials
 aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
 aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
@@ -53,23 +36,53 @@ s3 = boto3.client('s3',
 bucket_name = os.environ['AWS_BUCKET_NAME']
 folder_name=os.environ['BOOK_FOLDER_NAME']
 
+s3_base_url = os.getenv("S3_BASE_URL")
+s3_folder_path_latex = os.getenv("S3_FOLDER_PATH_LATEX")
+
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.bookssssss
-bookdata = db.book_set_2_new
-error_collection = db.error_collection
 figure_caption = db.figure_caption
-table_bank_done=db.table_bank_done
-publaynet_done=db.publaynet_done
-mfd_done=db.mfd_done
-publaynet_book_job_details=db.publaynet_book_job_details
-table_bank_book_job_details=db.table_bank_book_job_details
-mfd_book_job_details=db.mfd_book_job_details
+nougat_done=db.nougat_done
+book_other_pages_done=db.book_other_pages_done
+latex_pages_done=db.latex_pages_done
+
+def upload_to_s3(filepath):
+    """
+    Uploads a file to S3
+    Args:
+        filepath (str): The path to the file to upload.
+        bookname (str): The name of the book.
+        bookId (str): The ID of the book.
+        page_num (int): The page number of the page to upload.
+    Returns:
+        str: The URL of the uploaded file.
+    """
+    try:
+        # Generate a random filename
+        filename = uuid.uuid4().hex
+        # Get the file extension
+        extension = filepath.split('.')[-1]
+        # Create the new filename
+        key = f"{s3_folder_path_latex}/{filename}.{extension}"
+        # Upload the file to S3
+        s3.upload_file(
+            Filename=filepath, 
+            Bucket=bucket_name, 
+            Key=key
+        )
+        # Get the URL of the uploaded file
+        url = f"{s3_base_url}/{key}"
+        return url
+    except Exception as e:
+        print(e)
+        return None
 
 
 def extract_pages(ch, method, properties, body):
     try:
         message = json.loads(body)
+        print(message)
         page_results=message['book_pages']
         bookname = message["bookname"]
         bookId = message["bookId"]
@@ -82,19 +95,38 @@ def extract_pages(ch, method, properties, body):
             process_page_result(results, page_num, bookId, bookname, nougat_pages, other_pages,latex_ocr_pages) 
         
         # //send other page to other_pages_queue
-        other_pages_queue('other_pages_queue', other_pages, bookname, bookId)   
+        total_other_pages=len(other_pages)
+        if total_other_pages>0:
+            for page_num, page_result in enumerate(other_pages):
+                other_pages_queue('other_pages_queue',page_result, total_other_pages,page_num, bookname, bookId)
+            print("other pages sent, sending latex_ocr pages...")
+        else:
+            book_other_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"latex pages Done"})
 
         # send latex_ocr_pages to latex_ocr_queue
-        # latex_ocr_queue('latex_ocr_queue',latex_ocr_pages,bookname,bookId)
+        total_latex_pages=len(latex_ocr_pages)
+        if total_latex_pages>0:
+            for page_num, page_result in enumerate(latex_ocr_pages):
+                # upload page_result images to s3
+                # replace in image_path in page_result with s3 url
+                image_path = page_result['image_path']
+                new_image_path = upload_to_s3(image_path)
+                page_result['image_path'] = new_image_path
+                latex_ocr_queue('latex_ocr_queue',page_result,total_latex_pages,page_num, bookname, bookId)
+            print("latex_ocr pages sent, sending nougat pages .....")
+        else:
+            latex_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"latex pages Done"})
 
         # send nougat_pages to nougat_queue   
-        # total_nougat_pages = len(nougat_pages)
-        # for page_num, page in enumerate(nougat_pages):
-            # nougat_queue('nougat_queue', page['image_path'], total_nougat_pages, page['page_num'], page_num,page['bookname'], page['bookId'])
-
+        total_nougat_pages = len(nougat_pages)
+        if total_nougat_pages>0:
+            nougat_pdf_queue('nougat_pdf_queue',nougat_pages,bookname, bookId)
+        else:
+            nougat_done.insert_one({"bookId":bookId,"book":bookname,"status":"nougat pages Done"})
     except Exception as e:
-        error={"bookId":{bookId},"book":{bookname},"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
-        print(error)    
+        error={"consumer":"page_extraction","error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
+        print(error)
+        error_queue('error_queue',bookname, bookId, error)    
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -175,11 +207,15 @@ def process_page(results, image_path, page_num, bookId,bookname,nougat_pages,oth
                 "pdFigCap":pdFigCap
             })     
     except Exception as e:
-        print(f"An error occurred while processing {bookname}, page {page_num}: {str(e)}, line_numbe {traceback.extract_tb(e.__traceback__)[-1].lineno}")
+        error={"page":{page_num}, "error":{str(e)}, "line_number": {traceback.extract_tb(e.__traceback__)[-1].lineno}}
+        print(error)
+        error_queue('error_queue','page_extraction_consumer',bookname, bookId, error)
 
 
 def consume_page_extraction_queue():
     try:    
+        channel_number = channel.channel_number
+        print(f"Channel number: {channel_number}")
         # Declare the queue
         channel.queue_declare(queue='page_extraction_queue')
 
@@ -191,11 +227,12 @@ def consume_page_extraction_queue():
 
     except KeyboardInterrupt:
         pass
+
    
-
-
 if __name__ == "__main__":
     try:
         consume_page_extraction_queue()
+        # s3_url = upload_to_s3("../flowChart.png")
+        # print(s3_url)
     except KeyboardInterrupt:
         pass

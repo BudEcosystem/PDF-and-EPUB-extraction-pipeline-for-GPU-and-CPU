@@ -1,35 +1,14 @@
 # pylint: disable=all
 # type: ignore
-import numpy as np
 from dotenv import load_dotenv
-import subprocess
-import pytesseract
 import traceback
-import pytz
 import sys
 sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
-from PIL import Image
 import os
-import PyPDF2
-import img2pdf
-import fitz
-import shutil
-import boto3
-import re
-import cv2
 import pymongo
-from urllib.parse import urlparse
-import urllib
-import uuid
-from latext import latex_to_text
-from pix2tex.cli import LatexOCR
-from PyPDF2 import PdfReader
-from tablecaption import process_book_page
-from utils import timeit, crop_image
-import pika
 import json
-from pdf_producer import page_extraction_queue, book_completion_queue
+from pdf_producer import page_extraction_queue, error_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
 connection = get_rabbitmq_connection()
@@ -37,28 +16,8 @@ channel = get_channel(connection)
 
 load_dotenv()
 
-
-
-latex_ocr_model = LatexOCR()
-# Configure AWS credentials
-aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
-aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
-aws_region = os.environ['AWS_REGION']
-
-# Create an S3 client
-s3 = boto3.client('s3',
-                   aws_access_key_id=aws_access_key_id,
-                   aws_secret_access_key=aws_secret_access_key,
-                   region_name=aws_region)
-
-bucket_name = os.environ['AWS_BUCKET_NAME']
-folder_name=os.environ['BOOK_FOLDER_NAME']
-
-
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.bookssssss
-bookdata = db.book_set_2_new
-error_collection = db.error_collection
 figure_caption = db.figure_caption
 table_bank_done=db.table_bank_done
 publaynet_done=db.publaynet_done
@@ -69,8 +28,8 @@ mfd_book_job_details=db.mfd_book_job_details
 
 def check_ptm_status(ch, method, properties, body):
     try:
+        print("hello pmt called")
         message = json.loads(body)
-        job = message['job']
         bookname = message["bookname"]
         bookId = message["bookId"]
 
@@ -107,11 +66,13 @@ def check_ptm_status(ch, method, properties, body):
                             image_path=page['image_path']
                             page_results[page_num].append({"image_path": image_path})
 
-            page_extraction_queue('page_extraction_queue', page_results, bookname, bookId)          
+            page_extraction_queue('page_extraction_queue', page_results, bookname,bookId)
         else:
             print("not yet completed")
     except Exception as e:
-        print(e)
+        error = {"consumer":"check_ptm_consumer","error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        print(print(error))
+        error_queue('error_queue',bookname, bookId,error)      
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -129,6 +90,9 @@ def consume_ptm_completion_queue():
 
     except KeyboardInterrupt:
         pass
+    finally:
+        channel.close()
+        connection.close()
    
 
 

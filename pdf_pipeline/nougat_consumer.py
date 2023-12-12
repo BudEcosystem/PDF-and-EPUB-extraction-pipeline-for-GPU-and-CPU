@@ -5,33 +5,23 @@ import subprocess
 import sys
 sys.path.append("pdf_extraction_pipeline")
 from utils import timeit
-from PIL import Image
 import os
-import PyPDF2
-import shutil
 import GPUtil
 import psutil
-
 import img2pdf
-import fitz
 import traceback
 import re
 import pymongo
 import uuid
-from PyPDF2 import PdfReader
 from latext import latex_to_text
-import pika
 import json
 
-from pdf_producer import book_completion_queue
-from nougat.utils.checkpoint import get_checkpoint
 
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
+from pdf_producer import book_completion_queue, error_queue
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
-
-# CHECKPOINT = get_checkpoint('nougat')
 
 load_dotenv()
 
@@ -51,7 +41,6 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
         page_num=message['page_num']
         bookname= message['bookname']
         bookId=message['bookId']
-        job = message['job']
     
         page_equations=[]
         pdf_file_name ="page.pdf"
@@ -94,11 +83,17 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
         if os.path.exists(pdf_path):
             os.remove(pdf_path)
         if total_nougat_pages==page_num+1:
+            print("hello workd")
             nougat_done.insert_one({"bookId":bookId,"book":bookname,"status":"nougat pages Done"})
-            book_completion_queue("book_completion_queue",bookname, bookId)
+            print("dsdsd")
+            book_completion_queue('book_completion_queue', bookname, bookId)
+            print("after finish")
     except Exception as e:
-        print(f'error occured while processing  of book {bookname} though nougat {str(e)}') 
+        error = {"consumer":"nougat_consumer","page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        print(print(error))
+        error_queue('error_queue',bookname, bookId, error)
     finally:
+        print("message ack")
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
@@ -124,6 +119,7 @@ def get_latext_text(pdf_path, bookname, bookId):
         for i, gpu in enumerate(gpus):
             print(f"GPU {i + 1} - GPU Name: {gpu.name}")
             print(f"  GPU Utilization: {gpu.load * 100:.2f}%")
+            print(result.stderr)
         return result.stdout
     except Exception as e:
         print(f"An error occurred while processing {bookname}, page {page_num} with nougat: {str(e)}")
@@ -141,7 +137,6 @@ def consume_nougat_queue():
     try:
          # Declare the queue
         channel.queue_declare(queue='nougat_queue')
-
         # Set up the callback function for handling messages from the queue
         channel.basic_consume(queue='nougat_queue', on_message_callback=extract_text_equation_with_nougat)
 
@@ -150,12 +145,16 @@ def consume_nougat_queue():
 
     except KeyboardInterrupt:
         pass
+    finally:
+        channel.close()
+        connection.close()
+
 
 if __name__ == "__main__":
     try:
         consume_nougat_queue()     
     except KeyboardInterrupt:
-        pass
+        passs
   
 
 

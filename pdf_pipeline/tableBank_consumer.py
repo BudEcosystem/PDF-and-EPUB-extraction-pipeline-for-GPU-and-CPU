@@ -1,24 +1,18 @@
 # pylint: disable=all
 # type: ignore
-import pika
 import json
 import sys
 import cv2
 import os
+import traceback
 sys.path.append("pdf_extraction_pipeline")
-from utils import timeit
-from PIL import Image
 import pymongo
-from pdf_producer import check_ptm_completion_queue
-from model_loader import ModelLoader 
+from pdf_producer import check_ptm_completion_queue, error_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
-aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
-aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
-aws_region = os.environ['AWS_REGION']
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.bookssssss
@@ -33,7 +27,6 @@ tablebank_model = lp.Detectron2LayoutModel('lp://TableBank/faster_rcnn_R_50_FPN_
 
 def tableBank_layout(ch, method, properties, body):
     try:
-        print("hello")
         message = json.loads(body)
         print(message)
         job = message['job']
@@ -87,7 +80,9 @@ def tableBank_layout(ch, method, properties, body):
             check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
 
     except Exception as e:
-        print(f"An error occurred: {str(e)}")
+        error = {'consumer':'tableBank_consumer', "page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        print(print(error))
+        error_queue('error_queue',bookname, bookId, error)
 
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -107,6 +102,10 @@ def consume_table_bank_queue():
 
     except KeyboardInterrupt:
         pass
+    finally:
+        channel.close()
+        connection.close()
+
 
 if __name__ == "__main__":
     try:

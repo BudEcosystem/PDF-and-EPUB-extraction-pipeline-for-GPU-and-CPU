@@ -1,25 +1,20 @@
 # pylint: disable=all
 # type: ignore
-import pika
 import json
 import sys
 sys.path.append("pdf_extraction_pipeline")
 import cv2
 import os
+import traceback
 from utils import timeit
-from PIL import Image
 import pymongo
-from pdf_producer import check_ptm_completion_queue
-from model_loader import ModelLoader 
+from pdf_producer import check_ptm_completion_queue, error_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 import layoutparser as lp
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
-aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
-aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
-aws_region = os.environ['AWS_REGION']
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.bookssssss
@@ -33,10 +28,9 @@ publaynet_model = lp.Detectron2LayoutModel('lp://PubLayNet/mask_rcnn_X_101_32x8d
                                  extra_config=["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],
                                  label_map= {0: "Text", 1: "Title", 2: "List", 3: "Table", 4: "Figure"})
 
-
+@timeit
 def publaynet_layout(ch, method, properties, body):
     try:
-        print("hello")
         message = json.loads(body)
         print(message)
         job = message['job']
@@ -88,12 +82,14 @@ def publaynet_layout(ch, method, properties, body):
                 "ptm": "PubLaynet done"
             }
             publaynet_done.insert_one(new_ptm_book_document)
+            print("hello world ")
             check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
+            print("hello world ")
 
     except Exception as e:
-        print(f"An error occurred: {str(e)}")
-        # Log the error or perform any necessary actions
-
+        error = {'consumer':"publaynet","page_num":page_num,"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        print(print(error))
+        error_queue('error_queue',bookname, bookId, error)
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 

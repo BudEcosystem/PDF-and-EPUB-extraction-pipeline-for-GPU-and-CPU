@@ -1,15 +1,13 @@
 # pylint: disable=all
 # type: ignore
-import pika
 import json
 import sys
 import cv2
+import traceback
 import os
 sys.path.append("pdf_extraction_pipeline")
-from PIL import Image
 import pymongo
-from pdf_producer import check_ptm_completion_queue
-from model_loader import ModelLoader
+from pdf_producer import check_ptm_completion_queue,error_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 import layoutparser as lp
 
@@ -18,16 +16,14 @@ channel = get_channel(connection)
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
 db = client.bookssssss
-error_collection = db.error_collection
-figure_caption = db.figure_caption
 mfd_book_job_details=db.mfd_book_job_details
 mfd_done=db.mfd_done
 
 
-mathformuladetection_model = lp.Detectron2LayoutModel('lp://MFD/faster_rcnn_R_50_FPN_3x/config',
-                                 extra_config=["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],
-                                 label_map={1: "Equation"})
-
+mathformuladetection_model= lp.Detectron2LayoutModel(
+                            config_path ="lp://MFD/faster_rcnn_R_50_FPN_3x/config",
+                            label_map={1: "Equation"},
+                            extra_config=["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8] )
 
 
 def mathformuladetection_layout(ch, method, properties, body):
@@ -82,8 +78,11 @@ def mathformuladetection_layout(ch, method, properties, body):
             }
             mfd_done.insert_one(new_ptm_book_document)
             check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
+            print("hello world ")
     except Exception as e:
-        print(f"An error occurred: {str(e)}")
+        error = {"consumer":"mfd_consumer","page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        print(print(error))
+        error_queue('error_queue',bookname, bookId, error)
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -99,6 +98,10 @@ def consume_mfd_queue():
 
     except KeyboardInterrupt:
         pass
+    finally:
+        channel.close()
+        connection.close()
+
    
 
 if __name__ == "__main__":

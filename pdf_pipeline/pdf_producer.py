@@ -1,7 +1,6 @@
 # pylint: disable=all
 # type: ignore
 import json
-import pika
 from dotenv import load_dotenv
 import pymongo
 import os
@@ -75,7 +74,6 @@ def publeynet_queue(queue_name,image_path,page_num,bookname,bookId,num_pages):
     channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(table_bank_message))
     print(f" [x] Sent {bookname} ({bookId}), Page {page_num} to {queue_name}")
 
-# Update your existing producer file to include a new function for downloading PDFs
 def table_bank_queue(queue_name,image_path,page_num,bookname,bookId,num_pages ):
     table_bank_message = {
         "job":'table_bank',
@@ -119,7 +117,6 @@ def pdfigcap_queue(queue_name,pdf_path,bookname,bookId):
     channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(pdfigcapx_message))
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
 
-
 def check_ptm_completion_queue(queue_name,bookname,bookId):
     pdfigcapx_message = {
         "job":'check_ptm_completion',
@@ -159,6 +156,20 @@ def nougat_queue(queue_name,image_path,total_nougat_pages,book_page_num, page_nu
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
 
 
+
+def nougat_pdf_queue(queue_name,results,bookname,bookId):
+    nougat_pdf_queue_message = {
+        "queue": queue_name,
+        "results":results,
+        "bookname": bookname,
+        "bookId": bookId
+    }
+
+    channel.queue_declare(queue=queue_name)
+    channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(nougat_pdf_queue_message))
+    print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
+
+
 def page_extraction_queue(queue_name,book_pages,bookname,bookId):
     page_extraction_queue = {
         "queue": queue_name,
@@ -172,10 +183,12 @@ def page_extraction_queue(queue_name,book_pages,bookname,bookId):
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
 
 
-def other_pages_queue(queue_name,others_pages,bookname,bookId):
+def other_pages_queue(queue_name,page_result, total_other_pages,page_num, bookname, bookId):
     other_pages_queue = {
         "queue": queue_name,
-        "other_pages":others_pages,
+        "page_result":page_result,
+        "total_other_pages":total_other_pages,
+        "page_num":page_num,
         "bookname": bookname,
         "bookId": bookId
     }
@@ -185,10 +198,12 @@ def other_pages_queue(queue_name,others_pages,bookname,bookId):
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
 
 
-def latex_ocr_queue(queue_name,latex_pages,bookname,bookId):
+def latex_ocr_queue(queue_name, page_result, total_latex_pages, page_num, bookname, bookId):
     latex_ocr_queue = {
         "queue": queue_name,
-        "latex_pages":latex_pages,
+        "page_result":page_result,
+        "total_latex_pages":total_latex_pages,
+        "page_num":page_num,
         "bookname": bookname,
         "bookId": bookId
     }
@@ -197,19 +212,32 @@ def latex_ocr_queue(queue_name,latex_pages,bookname,bookId):
     channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(latex_ocr_queue))
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
 
-# def nougat_pdf_queue(queue_name,pdf_path,bookname,bookId):
-#     nougat_pdf_queue = {
-#         "queue": queue_name,
-#         "pdf_path":pdf_path,
-#         "bookname": bookname,
-#         "bookId": bookId
-#     }
 
-#     channel.queue_declare(queue=queue_name)
-#     channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(nougat_pdf_queue))
-#     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
+def table_queue(queue_name, tableId, image_path, page_num, bookname, bookId):
+    table_queue = {
+        "queue": queue_name,
+        "tableId":tableId,
+        "image_path":image_path,
+        "page_num":page_num,
+        "bookname": bookname,
+        "bookId": bookId
+    }
+    channel.queue_declare(queue=queue_name)
+    channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(table_queue))
+    print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
 
 
+def error_queue(queue_name, bookname, bookId,error):
+    error_queue = {
+        "queue": queue_name,
+        "bookname":bookname,
+        "bookId":bookId,
+        "error": error
+    }
+
+    channel.queue_declare(queue=queue_name)
+    channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(error_queue))
+    print(f" [x] Sent {error} sent to {queue_name}")
 
 # def store_book_details():
 #     books= get_all_books_names(bucket_name, folder_name + '/')

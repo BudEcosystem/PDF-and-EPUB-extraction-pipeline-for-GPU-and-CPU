@@ -1,11 +1,16 @@
 
 import os
+from dotenv import load_dotenv
 import json
 import requests
 import math
 import uuid
 import re
 from bs4 import BeautifulSoup
+import uuid
+
+
+load_dotenv()
 
 def parse_html_table(html):
     data = []
@@ -72,36 +77,37 @@ def find_closest_results_for_table_caption(data):
     return closest_values
 # Example data
 
-def process_book_page(image_path, page_tables, output):
-
+def process_book_page(image_path, tableId):
     files = {
         'file': (image_path, open(image_path, 'rb'))
     }
+    print(files)
     response = requests.post(os.environ['BUD_OCR'], files=files)
-
+    print(response)
     if response.status_code == 200:
         data = response.json()
+        tables = extract_table_results(data)
+        caption = find_closest_results_for_table_caption(data)
+        for idx, table_data in enumerate(tables):
+            caption = caption[idx] if idx < len(caption) else ""
+            if should_skip_table(table_data):
+                continue
+            rows = [row for row in table_data]
+            if not re.match(r'^Table\s+\d+', caption):
+                caption = ""
+            table_data={
+                "id": tableId,
+                "caption": caption,
+                "data": {
+                    "rows": rows
+                    }
+            }
+            return table_data
     else:
         print('API request failed with status code:', response.status_code)
-    tables = extract_table_results(data)
-    caption = find_closest_results_for_table_caption(data)
-    for idx, table_data in enumerate(tables):
-        caption = caption[idx] if idx < len(caption) else ""
-        if should_skip_table(table_data):
-            continue
-        table_id = uuid.uuid4().hex
-        rows = [row for row in table_data]
-        if not re.match(r'^Table\s+\d+', caption):
-            caption = ""
-        page_tables.append({
-            "id": table_id,
-            "caption": caption,
-            "data": {
-                "rows": rows
-                }
-            })
-        output+= f"{{{{table:{table_id}}}}}"
-    return output  
+        return None
+
+      
 
 def should_skip_table(table):
     if len(table) <= 1 or all(len(row) == 1 for row in table):

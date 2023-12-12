@@ -1,24 +1,21 @@
 # pylint: disable=all
 # type: ignore
-import pika
 import json
 from dotenv import load_dotenv
 import sys
 import os
 import shutil
+import traceback
 import GPUtil
 import psutil
-
 sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
-
 from FigCap import extract_figure_and_caption
 from utils import timeit
 import pymongo
 import PyPDF2
 import uuid
-from pdf_producer import check_ptm_completion_queue
-from PyPDF2 import PdfReader
+from pdf_producer import check_ptm_completion_queue, error_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
@@ -33,11 +30,9 @@ figure_caption = db.figure_caption
 def get_figure_and_captions(ch, method, properties, body):
     message = json.loads(body)
     print(message)
-    job = message['job']
     book_path = message["pdf_path"]
     bookname = message["bookname"]
     bookId = message["bookId"]
-
     document = figure_caption.find_one({"bookId":bookId})
     if document:
         return
@@ -78,21 +73,25 @@ def get_figure_and_captions(ch, method, properties, body):
             figure_caption.insert_one({"bookId": bookId, "book": bookname, "pages": book_data,'status':"success"})
             print("Book's figure and figure caption saved in the database")
             check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
+            print("hello jghfgfg")
         else:
             print(f"no figure detected by pdfigcapx for this book {bookname}")
             figure_caption.insert_one({"bookId": bookId, "book": bookname, "pages": [], "status":"failed"})
             check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
-        ch.basic_ack(delivery_tag=method.delivery_tag)
-
+        print("hello world ")
     except Exception as e:
+        figure_caption.insert_one({"bookId": bookId, "book": bookname, "pages": [], "status":"failed"})
+        error ={"consumer":"pdfigcap","error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        print(print(error))
+        check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
+        error_queue('error_queue',bookname, bookId, error)
+    finally:
         if os.path.exists(output_directory):
             shutil.rmtree(output_directory)   
         if os.path.exists(book_output):
             shutil.rmtree(book_output)
-        figure_caption.insert_one({"bookId": bookId, "book": bookname, "pages": [], "status":"failed"})
-        check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
         ch.basic_ack(delivery_tag=method.delivery_tag)
-        print(f"Unable to get figure and figure caption for this {bookname}, {str(e)}, line_number {traceback.extract_tb(e.__traceback__)[-1].lineno}")
+        
 
 
 
@@ -112,9 +111,9 @@ def consume_pdfigcap_queue():
 
 
 
+
 if __name__ == "__main__":
     try:
-        consume_pdfigcap_queue()
-        
+        consume_pdfigcap_queue()     
     except KeyboardInterrupt:
         pass
