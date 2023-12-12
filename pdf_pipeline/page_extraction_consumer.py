@@ -11,7 +11,7 @@ import uuid
 import boto3
 import json
 import traceback
-from pdf_producer import nougat_queue,other_pages_queue, latex_ocr_queue, error_queue
+from pdf_producer import other_pages_queue, latex_ocr_queue, error_queue, nougat_pdf_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
 connection = get_rabbitmq_connection()
@@ -120,9 +120,7 @@ def extract_pages(ch, method, properties, body):
         # send nougat_pages to nougat_queue   
         total_nougat_pages = len(nougat_pages)
         if total_nougat_pages>0:
-            for page_num, page in enumerate(nougat_pages):
-                nougat_queue('nougat_queue', page['image_path'], total_nougat_pages, page['page_num'], page_num,page['bookname'], page['bookId'])
-            print('nougat pages sent')
+            nougat_pdf_queue('nougat_pdf_queue',nougat_pages,bookname, bookId)
         else:
             nougat_done.insert_one({"bookId":bookId,"book":bookname,"status":"nougat pages Done"})
     except Exception as e:

@@ -156,6 +156,20 @@ def nougat_queue(queue_name,image_path,total_nougat_pages,book_page_num, page_nu
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
 
 
+
+def nougat_pdf_queue(queue_name,results,bookname,bookId):
+    nougat_pdf_queue_message = {
+        "queue": queue_name,
+        "results":results,
+        "bookname": bookname,
+        "bookId": bookId
+    }
+
+    channel.queue_declare(queue=queue_name)
+    channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(nougat_pdf_queue_message))
+    print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
+
+
 def page_extraction_queue(queue_name,book_pages,bookname,bookId):
     page_extraction_queue = {
         "queue": queue_name,
