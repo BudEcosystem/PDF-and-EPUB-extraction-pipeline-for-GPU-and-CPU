@@ -16,10 +16,11 @@ import uuid
 import cv2
 from latext import latex_to_text
 from pix2tex.cli import LatexOCR
-from utils import timeit, crop_image
+from utils import timeit, crop_image, generate_unique_id
 import json
 from pdf_producer import book_completion_queue, error_queue, table_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
+
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
@@ -73,10 +74,11 @@ def extract_latex_pages(ch, method, properties, body):
         message = json.loads(body)
         total_latex_pages=message['total_latex_pages']
         pages_result=message['page_result']
+        image_str=message['image_str']
         bookname = message["bookname"]
         bookId = message["bookId"]
         page_num=message['page_num']
-        page_obj= process_pages(pages_result, bookname, bookId, page_num)
+        page_obj= process_pages(pages_result, bookname, bookId, page_num, image_str)
         document=latex_pages.find_one({'bookId':bookId})
         if document:
             latex_pages.update_one({"_id":document["_id"]}, {"$push": {"pages": page_obj}})
@@ -100,23 +102,28 @@ def extract_latex_pages(ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
-def process_pages(page, bookname, bookId, page_num):
+def process_pages(page, bookname, bookId, page_num, image_str):
     try:
         page_tables = []
         page_figures = []
         page_equations = []
         results = page.get("results", [])
+        image_data = base64.b64decode(image_str)
+        new_image_path=f"{generate_unique_id()}.jpg"
+        with open(new_image_path, 'wb') as received_image:
+            received_image.write(image_data)
         # now this is s3 url
-        image_path = page.get("image_path", "")
-        key = image_path.replace(s3_base_url + "/", "")
-        filename = key.replace(s3_folder_path_latex + "/", "")
-        # download image from s3
-        local_file_path = download_from_s3(bucket_name, key, filename)
-        page["image_path"] = local_file_path
+        # image_path = page.get("image_path", "")
+        # key = image_path.replace(s3_base_url + "/", "")
+        # filename = key.replace(s3_folder_path_latex + "/", "")
+        # # download image from s3
+        # local_file_path = download_from_s3(bucket_name, key, filename)
+        # page["image_path"] = local_file_path
+        page['image_path']=new_image_path
         pdFigCap = page.get("pdFigCap", False)
         page_num = page.get("page_num", "")
-        new_image_path=page["image_path"]
-        page_content = sort_text_blocks_and_extract_data(results, new_image_path, page_tables, page_figures, page_equations, pdFigCap, bookname,bookId,page_num)
+        # new_image_path=page["image_path"]
+        page_content = sort_text_blocks_and_extract_data(results, new_image_path, page_figures, page_equations, pdFigCap, bookname,bookId,page_num)
         page_obj={
             "page_num": page_num,
             "content": page_content,
@@ -124,12 +131,12 @@ def process_pages(page, bookname, bookId, page_num):
             "figures": page_figures,
             "equations": page_equations
         }
-        os.remove(local_file_path)
+        os.remove(new_image_path)
         return page_obj
     except Exception as e:
         print("error while page",e)
 
-def sort_text_blocks_and_extract_data(blocks, imagepath, page_tables, page_figures, page_equations, pdFigCap, bookname, bookId, page_num):
+def sort_text_blocks_and_extract_data(blocks, imagepath, page_figures, page_equations, pdFigCap, bookname, bookId, page_num):
     try:
         print("hello")
         sorted_blocks = sorted(blocks, key=lambda block: (block['y_1'] + block['y_2']) / 2)

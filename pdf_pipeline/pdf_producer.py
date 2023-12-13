@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import pymongo
 import os
 import boto3
+import base64
 import uuid
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
@@ -231,9 +232,15 @@ def other_pages_queue(queue_name,page_result, total_other_pages,page_num, bookna
 def latex_ocr_queue(queue_name, page_result, total_latex_pages, page_num, bookname, bookId):
     connection = get_rabbitmq_connection()
     channel = get_channel(connection)
+    image_path=page_result['image_path']
+    with open(image_path, 'rb') as img:
+        img_data = img.read()
+    image_data_base64 = base64.b64encode(img_data).decode('utf-8')
+
     latex_ocr_queue = {
         "queue": queue_name,
         "page_result":page_result,
+        "image_str":image_data_base64,
         "total_latex_pages":total_latex_pages,
         "page_num":page_num,
         "bookname": bookname,

@@ -161,9 +161,9 @@ def check_ptm_status(ch, method, properties, body):
             else:
                 if total_latex_pages>0:
                     for page_num, page_result in enumerate(latex_ocr_pages):
-                        image_path = page_result['image_path']
-                        new_image_path = upload_to_s3(image_path)
-                        page_result['image_path'] = new_image_path
+                        # image_path = page_result['image_path']
+                        # new_image_path = upload_to_s3(image_path)
+                        # page_result['image_path'] = new_image_path
                         latex_ocr_queue('latex_ocr_queue',page_result,total_latex_pages,page_num, bookname, bookId)
                     print("latex_ocr pages sent, sending nougat pages .....")
                 else:

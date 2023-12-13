@@ -41,7 +41,10 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
         results=message['results']
         bookname= message['bookname']
         bookId=message['bookId']
-    
+        nougat_pages_doc = nougat_done.find_one({"bookId": bookId})
+        if nougat_pages_doc:
+            book_completion_queue('book_completion_queue', bookname, bookId)
+            return
         pdf_file_name = f"{bookId}.pdf"
         pdf_path = os.path.abspath(pdf_file_name)
 
