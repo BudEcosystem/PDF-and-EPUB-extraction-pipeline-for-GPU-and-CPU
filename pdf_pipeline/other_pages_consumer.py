@@ -13,6 +13,7 @@ import re
 import pymongo
 import cv2
 import uuid
+import base64
 from tablecaption import process_book_page
 from utils import timeit, crop_image
 import json
@@ -144,6 +145,8 @@ def process_table(table_block,imagepath, output,bookname, bookId, page_num):
     data = {'img': image_data_base64}
     output += f"{{{{table:{tableId}}}}}"
     table_queue('table_queue',tableId,data,page_num,bookname,bookId)
+    if os.path.exists(table_image_path):
+        os.remove(table_image_path)
     return output
 
 @timeit

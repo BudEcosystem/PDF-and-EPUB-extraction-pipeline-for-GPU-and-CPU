@@ -59,8 +59,10 @@ def check_ptm_status(ch, method, properties, body):
 
             for page_num, result_array in page_results.items():
                 if not result_array:
+                    print(page_num)
+                    print(bookId)
                     # Fetch image_path from publeynet_collection for the given page_num
-                    publeynet_document = publaynet_book_job_details.find_one({"bookId": bookId, "pages.page_num": page_num})
+                    publeynet_document = publaynet_book_job_details.find_one({"bookId": bookId})
                     for page in publeynet_document['pages']:
                         if page['page_num']==page_num:
                             image_path=page['image_path']

@@ -122,8 +122,6 @@ def consume_pdf_processing_queue():
         pass
 
 
-
-
 if __name__ == "__main__":
     try:
         consume_pdf_processing_queue()

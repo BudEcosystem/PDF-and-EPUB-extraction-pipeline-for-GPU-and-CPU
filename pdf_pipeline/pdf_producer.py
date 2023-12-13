@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import pymongo
 import os
 import boto3
+import uuid
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
 
@@ -277,22 +278,24 @@ def error_queue(queue_name, bookname, bookId,error):
     connection.close()
 
 # def store_book_details():
-#     books= get_all_books_names(bucket_name, folder_name + '/')
-#     books=books[127:]
+#     # books= get_all_books_names(bucket_name, folder_name + '/')
+#     # books=books[127:]
+#     books=['Evidence-Based Critical Care - Robert C Hyzy.pdf','Evidence-Based Interventions for Children with Challenging Behavior - Kathleen Hague Armstrong- Julia A Ogg- Ashley N Sundman-Wheat- Audra St John Walsh.pdf','Evidence-Based Practice in Clinical Social Work - James W Drisko- Melissa D Grady.pdf','Evolutionary Thinking in Medicine - Alexandra Alvergne- Crispin Jenkinson- Charlotte Faurie.pdf','Exam Survival Guide: Physical Chemistry - Jochen Vogt.pdf']
 #     print(books)
-#     # for book in books:
-#     #     book_data={
-#     #         "bookId":uuid.uuid4().hex,
-#     #         "book":book,
-#     #         "status":"not_extracted"
-#     #     }
-#     #     book_details.insert_one(book_data)
+#     for book in books:
+#         book_data={
+#             "bookId":uuid.uuid4().hex,
+#             "book":book,
+#             "status":"not_extracted"
+#         }
+#         book_details.insert_one(book_data)
 
-# # store all books from aws to book_details collection before running
+# # # store all books from aws to book_details collection before running
 # store_book_details()
 
 if __name__ == "__main__":
     try:
+
         books=book_details.find({})
         for book in books:
             if book['status']=='not_extracted':

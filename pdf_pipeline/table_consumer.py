@@ -9,6 +9,7 @@ from PIL import Image
 import os
 import boto3
 import re
+import base64
 import pymongo
 import uuid
 from tablecaption import process_book_page
@@ -33,7 +34,9 @@ def extract_page_table(ch, method, properties, body):
         message = json.loads(body)
         tableId=message['tableId']
         data=message['data']
-        image_data_base64 = data['img'].decode('utf-8')
+        print(data)
+        print(data['img'])
+        image_data_base64 = data['img']
         bookname = message["bookname"]
         bookId = message["bookId"]
         page_num=message['page_num']
@@ -64,13 +67,13 @@ def extract_page_table(ch, method, properties, body):
                     "pages": [page_details]
                 }
                 table_collection.insert_one(table_doc)
-
+        image_path='received_image.jpg'
         if os.path.exists(image_path):
             os.remove(image_path)
     except Exception as e:
-        error = {"consumer":"table_consumer","page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        error = {"consumer":"table_consumer", "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
-        error_queue('error_queue',bookname, bookId,error)    
+        error_queue('error_queue','bookname', 'bookId',error)    
     finally:
         print("ack received")
         ch.basic_ack(delivery_tag=method.delivery_tag)

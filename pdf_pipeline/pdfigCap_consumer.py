@@ -36,9 +36,15 @@ def get_figure_and_captions(ch, method, properties, body):
     book_path = message["pdf_path"]
     bookname = message["bookname"]
     bookId = message["bookId"]
-    document = figure_caption.find_one({"bookId":bookId})
-    if document:
-        raise DocumentFound("Figure Caption Book already exist in the database"")
+    try:
+        document = figure_caption.find_one({"bookId":bookId})
+        if document:
+            raise DocumentFound("Figure Caption Book already exist in the database")
+    except DocumentFound as e:
+        print(e)
+        check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+        return
     someId=uuid.uuid4().hex
     name1='pdffiles'+someId
     name2='output'+someId
@@ -74,9 +80,6 @@ def get_figure_and_captions(ch, method, properties, body):
             figure_caption.insert_one({"bookId": bookId, "book": bookname, "pages": [], "status":"failed"})
             check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
         print("hello world ")
-    except DocumentFound as e:
-        print(e)
-        check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
     except Exception as e:
         figure_caption.insert_one({"bookId": bookId, "book": bookname, "pages": [], "status":"failed"})
         error ={"consumer":"pdfigcap","error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 

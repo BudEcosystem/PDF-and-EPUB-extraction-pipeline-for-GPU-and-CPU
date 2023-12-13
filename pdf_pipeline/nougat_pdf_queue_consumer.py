@@ -87,7 +87,7 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
                 else:
                     new_book_document = {
                         "bookId": bookId,
-                        "book": 'bookname',
+                        "book": bookname,
                         "pages": [page_object]
                     }
                     nougat_pages.insert_one(new_book_document)
@@ -147,7 +147,7 @@ if __name__ == "__main__":
     try:
         consume_nougat_pdf_queue()    
     except KeyboardInterrupt:
-        passs
+        pass
   
 
 

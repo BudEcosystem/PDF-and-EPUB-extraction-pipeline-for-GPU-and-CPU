@@ -3,6 +3,7 @@
 from dotenv import load_dotenv
 import pytesseract
 import traceback
+import base64
 import sys
 sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")

@@ -6,7 +6,7 @@
 # import psutil
 # from PIL import Image
 # from pix2tex.cli import LatexOCR
-from utils import timeit
+# from utils import timeit
 # import requests
 # @timeit
 # def gettext(pdf_path):

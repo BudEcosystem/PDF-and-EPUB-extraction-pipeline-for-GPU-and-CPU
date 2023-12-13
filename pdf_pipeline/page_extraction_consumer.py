@@ -82,17 +82,23 @@ def upload_to_s3(filepath):
 def extract_pages(ch, method, properties, body):
     try:
         message = json.loads(body)
-        print(message)
+        # print(message)
         page_results=message['book_pages']
         bookname = message["bookname"]
         bookId = message["bookId"]
+        print("BookID : ", bookId)
         nougat_pages = []
         other_pages=[]
         latex_ocr_pages=[]
 
         for page_num_str, results in page_results.items():
             page_num=int(page_num_str)
-            process_page_result(results, page_num, bookId, bookname, nougat_pages, other_pages,latex_ocr_pages) 
+            image_path = results[0]['image_path']
+            # process_page_result(results, page_num, bookId, bookname, nougat_pages, other_pages,latex_ocr_pages) 
+            np, op, lp = process_page(results,image_path, page_num, bookId, bookname)
+            nougat_pages.extend(np)
+            other_pages.extend(op)
+            latex_ocr_pages.extend(lp)
         
         # //send other page to other_pages_queue
         total_other_pages=len(other_pages)
@@ -109,9 +115,9 @@ def extract_pages(ch, method, properties, body):
             for page_num, page_result in enumerate(latex_ocr_pages):
                 # upload page_result images to s3
                 # replace in image_path in page_result with s3 url
-                # image_path = page_result['image_path']
-                # new_image_path = upload_to_s3(image_path)
-                # page_result['image_path'] = new_image_path
+                image_path = page_result['image_path']
+                new_image_path = upload_to_s3(image_path)
+                page_result['image_path'] = new_image_path
                 latex_ocr_queue('latex_ocr_queue',page_result,total_latex_pages,page_num, bookname, bookId)
             print("latex_ocr pages sent, sending nougat pages .....")
         else:
@@ -130,19 +136,22 @@ def extract_pages(ch, method, properties, body):
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-def process_page_result(results, page_num, bookId,bookname,nougat_pages,other_pages,latex_ocr_pages):
-    image_path=results[0]['image_path']
-    process_page(results,image_path, page_num, bookId,bookname, nougat_pages, other_pages,latex_ocr_pages)
+# def process_page_result(results, page_num, bookId,bookname,nougat_pages,other_pages,latex_ocr_pages):
+#     image_path=results[0]['image_path']
+#     process_page(results,image_path, page_num, bookId,bookname, nougat_pages, other_pages,latex_ocr_pages)
 
-def process_page(results, image_path, page_num, bookId,bookname,nougat_pages,other_pages,latex_ocr_pages):
+def process_page(results, image_path, page_num, bookId, bookname):
+    nougat_pages = []
+    other_pages = []
+    latex_ocr_pages = []
     try:
-        print(results)
+        print(type(results))
         pdFigCap = False
        # Check the status in the figure_caption collection
         document_status = figure_caption.find_one({"bookId": bookId, "status": "success"})
         if document_status:
             pdFigCap = True
-            results = [block for block in results if block['type'] != 'Figure']
+            results = [block for block in results if "type" in block and block['type'] != 'Figure']
             figures_block = []
             for page in document_status.get("pages", []):
                 if page.get("page_num") == page_num + 1:
@@ -205,11 +214,12 @@ def process_page(results, image_path, page_num, bookId,bookname,nougat_pages,oth
                 "bookId":bookId,
                 "page_num":page_num,
                 "pdFigCap":pdFigCap
-            })     
+            })   
     except Exception as e:
         error={"page":{page_num}, "error":{str(e)}, "line_number": {traceback.extract_tb(e.__traceback__)[-1].lineno}}
         print(error)
-        error_queue('error_queue','page_extraction_consumer',bookname, bookId, error)
+        error_queue('error_queue',bookname, bookId, error)
+    return nougat_pages, other_pages, latex_ocr_pages
 
 
 def consume_page_extraction_queue():
