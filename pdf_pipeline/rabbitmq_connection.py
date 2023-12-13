@@ -20,7 +20,8 @@ def get_rabbitmq_connection():
         port=RABBITMQ_PORT,
         # Replace with the appropriate port
         heartbeat=0,
-        credentials=credentials
+        credentials=credentials,
+        connection_attempts=3
     )
     return pika.BlockingConnection(connection_params)
 

@@ -106,8 +106,7 @@ def consume_pdfigcap_queue():
 
     except KeyboardInterrupt:
         pass
-    except pika.exceptions.AMQPConnectionError as connection_error:
-        print(connection_error)
+
 
 
 
