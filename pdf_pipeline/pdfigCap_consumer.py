@@ -1,13 +1,12 @@
 # pylint: disable=all
 # type: ignore
+import pika.exceptions
 import json
 from dotenv import load_dotenv
 import sys
 import os
 import shutil
 import traceback
-import GPUtil
-import psutil
 sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
 from FigCap import extract_figure_and_caption
@@ -82,7 +81,7 @@ def get_figure_and_captions(ch, method, properties, body):
         print("hello world ")
     except Exception as e:
         figure_caption.insert_one({"bookId": bookId, "book": bookname, "pages": [], "status":"failed"})
-        error ={"consumer":"pdfigcap","error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        error ={"consumer":"pdfigcap","consumer_message":message, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
         check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
         error_queue('error_queue',bookname, bookId, error)
@@ -107,6 +106,8 @@ def consume_pdfigcap_queue():
 
     except KeyboardInterrupt:
         pass
+    except pika.exceptions.AMQPConnectionError as connection_error:
+        print(connection_error)
 
 
 

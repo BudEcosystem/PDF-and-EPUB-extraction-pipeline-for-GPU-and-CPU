@@ -64,7 +64,7 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
                     with open(file_path, 'r', encoding='utf-8') as file:
                         latex_text = file.read()
 
-                latex_text = latex_text.replace("[MISSING_PAGE_EMPTY:1]", "")
+                latex_text = latex_text.replace("[MISSING_PAGE_POST]", "")
                 if latex_text == "":
                     latex_text = ""
                 pattern = r'(\\\(.*?\\\)|\\\[.*?\\\])'
@@ -99,7 +99,7 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
             
             print("after finish")
     except Exception as e:
-        error = {"consumer":"nougat_consumer", "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        error = {"consumer":"nougat_consumer","consumer_message":message, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
         error_queue('error_queue',bookname, bookId, error)
     finally:

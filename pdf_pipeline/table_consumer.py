@@ -70,7 +70,7 @@ def extract_page_table(ch, method, properties, body):
         if os.path.exists(image_path):
             os.remove(image_path)
     except Exception as e:
-        error = {"consumer":"table_consumer", "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        error = {"consumer":"table_consumer","consumer_message":message, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
         error_queue('error_queue',bookname, bookId,error)    
     finally:

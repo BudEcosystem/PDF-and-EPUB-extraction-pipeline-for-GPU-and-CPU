@@ -75,8 +75,9 @@ def book_complete(ch, method, properties, body):
                     "book": bookname,
                     "pages": pages_to_add,
                 }
-
-            bookdata.insert_one(new_document)
+            book_already_completed=bookdata.find_one({"bookId":bookId})
+            if not book_already_completed:
+                bookdata.insert_one(new_document)     
             current_time = datetime.now().strftime("%H:%M:%S")
             book_details.update_one(
                 {"bookId": bookId},
@@ -93,7 +94,7 @@ def book_complete(ch, method, properties, body):
         else:
             print("Not yet completed")
     except Exception as e:
-        error = {"consumer":"book_completion_consumer","error": str(e), "line_number": traceback.extract_tb(e.__traceback__)[-1].lineno}
+        error = {"consumer":"book_completion_consumer","consumer_message":message,"error": str(e), "line_number": traceback.extract_tb(e.__traceback__)[-1].lineno}
         print(error)
         error_queue('error_queue', bookname, bookId, error)
     finally:

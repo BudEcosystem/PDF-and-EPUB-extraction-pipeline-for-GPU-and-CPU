@@ -10,7 +10,7 @@ import pymongo
 import json
 import uuid
 import boto3
-from pdf_producer import error_queue, other_pages_queue, latex_ocr_queue, nougat_pdf_queue
+from pdf_producer import error_queue, other_pages_queue, latex_ocr_queue, nougat_pdf_queue, book_completion_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
 connection = get_rabbitmq_connection()
@@ -139,37 +139,54 @@ def check_ptm_status(ch, method, properties, body):
 
             # //send other page to other_pages_queue
             total_other_pages=len(other_pages)
-            if total_other_pages>0:
-                for page_num, page_result in enumerate(other_pages):
-                    other_pages_queue('other_pages_queue',page_result, total_other_pages,page_num, bookname, bookId)
-                print("other pages sent, sending latex_ocr pages...")
+            other_pages_doc = book_other_pages_done.find_one({"bookId": bookId})
+            if other_pages_doc:
+                print("other_pages already exist for this book")
+                book_completion_queue('book_completion_queue', bookname, bookId)
             else:
-                book_other_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"latex pages Done"})
+                if total_other_pages>0:
+                    for page_num, page_result in enumerate(other_pages):
+                        other_pages_queue('other_pages_queue',page_result, total_other_pages,page_num, bookname, bookId)
+                    print("other pages sent, sending latex_ocr pages...")
+                else:
+                    book_other_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"latex pages Done"})
+                    book_completion_queue('book_completion_queue', bookname, bookId)
 
             # # send latex_ocr_pages to latex_ocr_queue
             total_latex_pages=len(latex_ocr_pages)
-            if total_latex_pages>0:
-                for page_num, page_result in enumerate(latex_ocr_pages):
-                    # upload page_result images to s3
-                    # replace in image_path in page_result with s3 url
-                    image_path = page_result['image_path']
-                    new_image_path = upload_to_s3(image_path)
-                    page_result['image_path'] = new_image_path
-                    latex_ocr_queue('latex_ocr_queue',page_result,total_latex_pages,page_num, bookname, bookId)
-                print("latex_ocr pages sent, sending nougat pages .....")
+            latex_pages_doc = latex_pages_done.find_one({"bookId": bookId})
+            if latex_pages_doc:
+                print("latex pages already exist for this book")
+                book_completion_queue('book_completion_queue', bookname, bookId)
             else:
-                latex_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"latex pages Done"})
+                if total_latex_pages>0:
+                    for page_num, page_result in enumerate(latex_ocr_pages):
+                        image_path = page_result['image_path']
+                        new_image_path = upload_to_s3(image_path)
+                        page_result['image_path'] = new_image_path
+                        latex_ocr_queue('latex_ocr_queue',page_result,total_latex_pages,page_num, bookname, bookId)
+                    print("latex_ocr pages sent, sending nougat pages .....")
+                else:
+                    latex_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"latex pages Done"})
+                    book_completion_queue('book_completion_queue', bookname, bookId)
+
             # send nougat_pages to nougat_queue   
             total_nougat_pages = len(nougat_pages)
-            if total_nougat_pages>0:
-                nougat_pdf_queue('nougat_pdf_queue',nougat_pages,bookname, bookId)
+            nougat_pages_doc = nougat_done.find_one({"bookId": bookId})
+            if nougat_pages_doc:
+                print("nougat pages already exist for this book")
+                book_completion_queue('book_completion_queue', bookname, bookId)
             else:
-                nougat_done.insert_one({"bookId":bookId,"book":bookname,"status":"nougat pages Done"})
+                if total_nougat_pages>0:
+                    nougat_pdf_queue('nougat_pdf_queue',nougat_pages,bookname, bookId)
+                else:
+                    nougat_done.insert_one({"bookId":bookId,"book":bookname,"status":"nougat pages Done"})
+                    book_completion_queue('book_completion_queue', bookname, bookId)
 
         else:
             print("not yet completed")
     except Exception as e:
-        error = {"consumer":"check_ptm_consumer","error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        error = {"consumer":"check_ptm_consumer","consumer_message":message,"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
         error_queue('error_queue',bookname, bookId,error)      
     finally:

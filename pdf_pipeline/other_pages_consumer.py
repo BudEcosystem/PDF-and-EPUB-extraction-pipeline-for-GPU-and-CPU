@@ -68,7 +68,7 @@ def extract_other_pages(ch, method, properties, body):
             book_other_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"other pages Done"})
             book_completion_queue("book_completion_queue",bookname, bookId)
     except Exception as e:
-        error = {"consumer":"other_pages","page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        error = {"consumer":"other_pages","consumer_message":message,"page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
         error_queue('error_queue',bookname, bookId,error)    
     finally:

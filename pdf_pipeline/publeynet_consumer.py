@@ -87,7 +87,7 @@ def publaynet_layout(ch, method, properties, body):
             print("hello world ")
 
     except Exception as e:
-        error = {'consumer':"publaynet","page_num":page_num,"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        error = {'consumer':"publaynet","consumer_message":message,"page_num":page_num,"error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
         error_queue('error_queue',bookname, bookId, error)
     finally:

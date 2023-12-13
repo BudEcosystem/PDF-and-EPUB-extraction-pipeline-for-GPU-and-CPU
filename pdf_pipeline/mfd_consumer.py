@@ -80,7 +80,7 @@ def mathformuladetection_layout(ch, method, properties, body):
             check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
             print("hello world ")
     except Exception as e:
-        error = {"consumer":"mfd_consumer","page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        error = {"consumer":"mfd_consumer","consumer_message":message,"page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
         error_queue('error_queue',bookname, bookId, error)
     finally:
