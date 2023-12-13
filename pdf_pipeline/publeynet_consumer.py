@@ -98,6 +98,7 @@ def publaynet_layout(ch, method, properties, body):
 
 def consume_publaynet_queue():
     try:
+        channel.basic_qos(prefetch_count=1, global_qos=False)
         # Declare the queue
         channel.queue_declare(queue='publeynet_queue')
 

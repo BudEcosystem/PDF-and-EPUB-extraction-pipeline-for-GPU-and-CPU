@@ -43,7 +43,7 @@ def get_figure_and_captions(ch, method, properties, body):
     except DocumentFound as e:
         print(e)
         check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
-        ch.basic_ack(delivery_tag=method.delivery_tag)
+        # ch.basic_ack(delivery_tag=method.delivery_tag)
         return
     someId=uuid.uuid4().hex
     name1='pdffiles'+someId
@@ -91,11 +91,12 @@ def get_figure_and_captions(ch, method, properties, body):
             shutil.rmtree(output_directory)   
         if os.path.exists(book_output):
             shutil.rmtree(book_output)
-        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
 def consume_pdfigcap_queue():
     try: 
+
+        channel.basic_qos(prefetch_count=1, global_qos=False)
         # Declare the queue
         channel.queue_declare(queue='pdfigcap_queue')
 

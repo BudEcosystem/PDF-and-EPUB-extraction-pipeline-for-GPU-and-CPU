@@ -91,6 +91,7 @@ def tableBank_layout(ch, method, properties, body):
 
 def consume_table_bank_queue():
     try:
+        channel.basic_qos(prefetch_count=1, global_qos=False)
         # Declare the queue
         channel.queue_declare(queue='table_bank_queue')
 

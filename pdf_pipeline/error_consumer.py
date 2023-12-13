@@ -49,6 +49,8 @@ def store_errors(ch, method, properties, body):
 
 def consume_error_queue():
     try:
+        channel.basic_qos(prefetch_count=1, global_qos=False)
+
         # Declare the queue
         channel.queue_declare(queue='error_queue')
 

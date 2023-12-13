@@ -89,6 +89,8 @@ def mathformuladetection_layout(ch, method, properties, body):
 
 def consume_mfd_queue():
     try:
+        channel.basic_qos(prefetch_count=1, global_qos=False)
+
         channel.queue_declare(queue='mfd_queue')
         # Set up the callback function for handling messages from the queue
         channel.basic_consume(queue='mfd_queue', on_message_callback=mathformuladetection_layout)

@@ -103,9 +103,8 @@ def book_complete(ch, method, properties, body):
 
 def consume_book_completion_queue():
     try:
-        channel_number = channel.channel_number
-        print(f"Channel number: {channel_number}")
-        # Declare the queue
+        channel.basic_qos(prefetch_count=1, global_qos=False)
+
         channel.queue_declare(queue='book_completion_queue')
 
         # Set up the callback function for handling messages from the queue

@@ -224,9 +224,8 @@ def process_page(results, image_path, page_num, bookId, bookname):
 
 def consume_page_extraction_queue():
     try:    
-        channel_number = channel.channel_number
-        print(f"Channel number: {channel_number}")
         # Declare the queue
+        channel.basic_qos(prefetch_count=1, global_qos=False)
         channel.queue_declare(queue='page_extraction_queue')
 
         # Set up the callback function for handling messages from the queue

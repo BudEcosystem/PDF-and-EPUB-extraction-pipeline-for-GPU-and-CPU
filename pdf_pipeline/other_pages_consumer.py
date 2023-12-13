@@ -274,6 +274,7 @@ def upload_to_aws_s3(figure_image_path, figureId):
 
 def consume_other_pages_queue():
     try:
+        channel.basic_qos(prefetch_count=1, global_qos=False)
         # Declare the queue
         channel.queue_declare(queue='other_pages_queue')
 

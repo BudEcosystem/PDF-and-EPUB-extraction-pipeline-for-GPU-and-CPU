@@ -348,6 +348,8 @@ def latext_to_text_to_speech(text):
 
 def consume_latex_ocr_queue():
     try:
+        channel.basic_qos(prefetch_count=1, global_qos=False)
+
         # Declare the queue
         channel.queue_declare(queue='latex_ocr_queue')
 

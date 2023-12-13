@@ -130,6 +130,8 @@ def latext_to_text_to_speech(text):
 
 def consume_nougat_pdf_queue():
     try:
+        channel.basic_qos(prefetch_count=1, global_qos=False)
+
          # Declare the queue
         channel.queue_declare(queue='nougat_pdf_queue')
         # Set up the callback function for handling messages from the queue

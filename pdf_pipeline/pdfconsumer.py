@@ -101,15 +101,12 @@ def process_book(ch, method, properties, body):
         if publeynet_done_document:
             publaynet=True
             print("Publaynet extraction already exist for this book")
-            check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
         if table_done_document:
             tableBank=True
             print("tablebank extraction already exist for this book")
-            check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId) 
         if mfd_done_document:
             mfd=True
             print("mfd extraction already exist for this book")
-            check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId) 
         for page_num in range(0,num_pages):
             process_page(page_num, book_path, book_folder, bookname, bookId,num_pages,publaynet,mfd,tableBank)
     except Exception as e:
@@ -138,6 +135,7 @@ def process_page(page_num, book_path, book_folder, bookname, bookId,num_pages, p
 
 def consume_pdf_processing_queue():
     try:
+        channel.basic_qos(prefetch_count=1, global_qos=False)
         # Declare the queue
         channel.queue_declare(queue='pdf_processing_queue')
         # Set up the callback function for handling messages from the queue

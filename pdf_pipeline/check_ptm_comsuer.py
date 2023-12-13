@@ -287,6 +287,8 @@ def process_page(results, image_path, page_num, bookId, bookname):
 
 def consume_ptm_completion_queue():
     try:
+        channel.basic_qos(prefetch_count=1, global_qos=False)
+
         # Declare the queue
         channel.queue_declare(queue='check_ptm_completion_queue')
 
