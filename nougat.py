@@ -49,9 +49,10 @@
 #     print(latex_text)
 
 # getLatex()
-# # image_path="/home/azureuser/prakash/cropeedfb46a046c29f4270b441b895dc73c24f.png"
-# files = {
-#         'file': (image_path, open(image_path, 'rb'))
-#     }
-# response = requests.post('http://localhost:8000/process_image', files=files)
-# print(response)
+import requests
+image_path="/home/azureuser/prakash2/90c0db0c91cb492e87f8b2903b610eb4.pdf"
+files = {
+        'file': (image_path, open(image_path, 'rb'))
+    }
+response = requests.post('http://127.0.0.1:8503/predict', files=files)
+print(response)

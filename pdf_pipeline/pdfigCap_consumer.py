@@ -100,7 +100,7 @@ def consume_pdfigcap_queue():
         channel.queue_declare(queue='pdfigcap_queue')
 
         # Set up the callback function for handling messages from the queue
-        channel.basic_consume(queue='pdfigcap_queue', on_message_callback=get_figure_and_captions)
+        channel.basic_consume(queue='pdfigcap_queue', on_message_callback=get_figure_and_captions, auto_ack=True)
 
         print(' [*] Waiting for messages on pdfigcap_queue. To exit, press CTRL+C')
         channel.start_consuming()

@@ -94,7 +94,7 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
                         "pages": [page_object]
                     }
                     nougat_pages.insert_one(new_book_document)
-            nougat_done.insert_one({"bookId": bookId, "book": 'bookname', "status": "nougat pages Done"})
+            nougat_done.insert_one({"bookId": bookId, "book": bookname, "status": "nougat pages Done"})
             shutil.rmtree(os.path.join(extrcated_pdf_directory, pdf_folder_id))
             book_completion_queue('book_completion_queue', bookname, bookId)
             
