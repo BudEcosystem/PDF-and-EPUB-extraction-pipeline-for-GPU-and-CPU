@@ -36,7 +36,7 @@ s3_folder_path_latex = os.getenv("S3_FOLDER_PATH_LATEX")
 
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.bookssssss
+db = client.book_set_2
 figure_caption = db.figure_caption
 table_bank_done=db.table_bank_done
 publaynet_done=db.publaynet_done

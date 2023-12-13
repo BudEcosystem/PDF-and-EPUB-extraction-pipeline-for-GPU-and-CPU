@@ -26,7 +26,8 @@ channel = get_channel(connection)
 load_dotenv()
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.bookssssss
+db = client.book_set_2
+
 error_collection = db.error_collection
 nougat_pages=db.nougat_pages
 nougat_done=db.nougat_done

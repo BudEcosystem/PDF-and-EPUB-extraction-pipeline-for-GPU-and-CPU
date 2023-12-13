@@ -46,7 +46,7 @@ s3_folder_path_latex = os.getenv("S3_FOLDER_PATH_LATEX")
 model = LatexOCR()
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.bookssssss
+db = client.book_set_2
 latex_pages=db.latex_pages
 latex_pages_done=db.latex_pages_done
 

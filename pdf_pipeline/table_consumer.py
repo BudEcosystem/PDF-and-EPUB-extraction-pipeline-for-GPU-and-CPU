@@ -24,7 +24,8 @@ load_dotenv()
 
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.bookssssss
+db = client.book_set_2
+
 book_other_pages=db.book_other_pages
 book_other_pages_done=db.book_other_pages_done
 table_collection=db.table_collection

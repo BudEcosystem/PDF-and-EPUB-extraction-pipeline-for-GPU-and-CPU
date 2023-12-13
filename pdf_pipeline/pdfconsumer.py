@@ -32,7 +32,8 @@ s3 = boto3.client('s3',
                    region_name=aws_region)
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.bookssssss
+db = client.book_set_2
+
 error_collection = db.error_collection
 book_details=db.book_details
 figure_caption = db.figure_caption

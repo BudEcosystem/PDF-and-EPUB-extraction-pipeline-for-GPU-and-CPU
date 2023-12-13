@@ -17,7 +17,8 @@ channel = get_channel(connection)
 
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.bookssssss
+db = client.book_set_2
+
 error_collection = db.error_collection
 publaynet_book_job_details=db.publaynet_book_job_details
 publaynet_done=db.publaynet_done

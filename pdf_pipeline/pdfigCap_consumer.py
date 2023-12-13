@@ -22,7 +22,8 @@ channel = get_channel(connection)
 load_dotenv()
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.bookssssss
+db = client.book_set_2
+
 figure_caption = db.figure_caption
 
 class DocumentFound(Exception):

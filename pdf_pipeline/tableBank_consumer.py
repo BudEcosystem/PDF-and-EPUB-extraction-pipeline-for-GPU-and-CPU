@@ -15,7 +15,7 @@ channel = get_channel(connection)
 
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.bookssssss
+db = client.book_set_2
 table_bank_book_job_details=db.table_bank_book_job_details
 table_bank_done=db.table_bank_done
 

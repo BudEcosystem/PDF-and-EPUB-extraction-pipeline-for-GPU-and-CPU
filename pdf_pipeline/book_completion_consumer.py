@@ -18,7 +18,7 @@ connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.bookssssss
+db = client.book_set_2
 bookdata = db.book_set_2_new
 book_details = db.book_details
 nougat_pages_db=db.nougat_pages

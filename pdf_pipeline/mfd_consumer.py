@@ -15,7 +15,7 @@ connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.bookssssss
+db = client.book_set_2
 mfd_book_job_details=db.mfd_book_job_details
 mfd_done=db.mfd_done
 

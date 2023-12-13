@@ -40,7 +40,8 @@ s3_folder_path_latex = os.getenv("S3_FOLDER_PATH_LATEX")
 
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.bookssssss
+db = client.book_set_2
+
 figure_caption = db.figure_caption
 nougat_done=db.nougat_done
 book_other_pages_done=db.book_other_pages_done
