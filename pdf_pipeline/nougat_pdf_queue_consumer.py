@@ -48,9 +48,11 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
         image_paths = [result['image_path'] for result in results]
         with open(pdf_path, "wb") as f_pdf:
             f_pdf.write(img2pdf.convert(image_paths))
-
+        
         page_nums = [result['page_num'] for result in results]
         pdf_folder_id = get_nougat_extraction(pdf_path)
+        if os.path.exists(pdf_path):
+                os.remove(pdf_path)
         extrcated_pdf_directory = 'pdfs'
         pdfId_path = os.path.join(extrcated_pdf_directory, pdf_folder_id, 'pages')
         if os.path.exists(pdfId_path):
@@ -94,8 +96,7 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
             nougat_done.insert_one({"bookId": bookId, "book": 'bookname', "status": "nougat pages Done"})
             shutil.rmtree(os.path.join(extrcated_pdf_directory, pdf_folder_id))
             book_completion_queue('book_completion_queue', bookname, bookId)
-            if os.path.exists(pdf_path):
-                os.remove(pdf_path)
+            
             print("after finish")
     except Exception as e:
         error = {"consumer":"nougat_consumer", "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
