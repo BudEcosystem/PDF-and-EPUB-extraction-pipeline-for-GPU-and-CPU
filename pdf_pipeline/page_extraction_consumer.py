@@ -10,7 +10,6 @@ import pymongo
 import uuid
 import boto3
 import json
-import traceback
 from pdf_producer import other_pages_queue, latex_ocr_queue, error_queue, nougat_pdf_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
@@ -130,7 +129,7 @@ def extract_pages(ch, method, properties, body):
         else:
             nougat_done.insert_one({"bookId":bookId,"book":bookname,"status":"nougat pages Done"})
     except Exception as e:
-        error={"consumer":"page_extraction","error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
+        error={"consumer":"page_extraction_consumer","error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno}
         print(error)
         error_queue('error_queue',bookname, bookId, error)    
     finally:
@@ -216,7 +215,7 @@ def process_page(results, image_path, page_num, bookId, bookname):
                 "pdFigCap":pdFigCap
             })   
     except Exception as e:
-        error={"page":{page_num}, "error":{str(e)}, "line_number": {traceback.extract_tb(e.__traceback__)[-1].lineno}}
+        error={"consumer":"page_extraction_consumer","page":{page_num}, "error":{str(e)}, "line_number": {traceback.extract_tb(e.__traceback__)[-1].lineno}}
         print(error)
         error_queue('error_queue',bookname, bookId, error)
     return nougat_pages, other_pages, latex_ocr_pages

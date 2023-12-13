@@ -34,12 +34,11 @@ def extract_page_table(ch, method, properties, body):
         message = json.loads(body)
         tableId=message['tableId']
         data=message['data']
-        print(data)
-        print(data['img'])
         image_data_base64 = data['img']
         bookname = message["bookname"]
         bookId = message["bookId"]
         page_num=message['page_num']
+        print(page_num)
         # Decode base64 and save the image
         image_data = base64.b64decode(image_data_base64)
         with open('received_image.jpg', 'wb') as received_image:
@@ -48,7 +47,7 @@ def extract_page_table(ch, method, properties, body):
         if table_data:
             page_details={
                 "page_num":page_num,
-                "page_tables":table_data
+                "page_tables":[table_data]
             }
             existing_doc = table_collection.find_one({"bookId": bookId})
             if existing_doc:
@@ -67,13 +66,13 @@ def extract_page_table(ch, method, properties, body):
                     "pages": [page_details]
                 }
                 table_collection.insert_one(table_doc)
-        image_path='received_image.jpg'
+        image_path=os.path.abspath('received_image.jpg')
         if os.path.exists(image_path):
             os.remove(image_path)
     except Exception as e:
         error = {"consumer":"table_consumer", "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
-        error_queue('error_queue','bookname', 'bookId',error)    
+        error_queue('error_queue',bookname, bookId,error)    
     finally:
         print("ack received")
         ch.basic_ack(delivery_tag=method.delivery_tag)

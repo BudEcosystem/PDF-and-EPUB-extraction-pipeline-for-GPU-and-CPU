@@ -188,6 +188,8 @@ def process_table(table_block,imagepath, output, bookname, bookId, page_num):
     image_data_base64 = base64.b64encode(img_data).decode('utf-8')
     data = {'img': image_data_base64}
     table_queue('table_queue',tableId,data,page_num,bookname,bookId)
+    if os.path.exists(table_image_path):
+        os.remove(table_image_path)
     return output
 
 
