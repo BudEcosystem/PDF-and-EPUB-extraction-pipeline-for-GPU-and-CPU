@@ -1,7 +1,6 @@
 # pylint: disable=all
 # type: ignore
 from dotenv import load_dotenv
-import pymongo
 import sys
 import traceback
 import shutil
@@ -13,22 +12,20 @@ import json
 from datetime import datetime
 from pdf_producer import error_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
+from utils import get_mongo_collection
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
-client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.book_set_2
-bookdata = db.book_set_2_new
-book_details = db.book_details
-nougat_pages_db=db.nougat_pages
-book_other_pages=db.book_other_pages
-nougat_done=db.nougat_done
-book_other_pages_done=db.book_other_pages_done
-latex_pages=db.latex_pages
-latex_pages_done=db.latex_pages_done
+bookdata = get_mongo_collection('book_set_2_new')
+book_details = get_mongo_collection('book_details')
+nougat_pages_db=get_mongo_collection('nougat_pages')
+book_other_pages=get_mongo_collection('book_other_pages')
+nougat_done=get_mongo_collection('nougat_done')
+book_other_pages_done=get_mongo_collection('book_other_pages_done')
+latex_pages=get_mongo_collection('latex_pages')
+latex_pages_done=get_mongo_collection('latex_pages_done')
 
-bucket_name = os.environ['AWS_BUCKET_NAME']
 folder_name=os.environ['BOOK_FOLDER_NAME']
 
 @timeit
