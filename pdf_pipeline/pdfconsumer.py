@@ -97,7 +97,7 @@ def process_book(ch, method, properties, body):
         publaynet=False
         mfd=False
         tableBank=False
-        #check if publaynet, tablebank and mfd extraction done for current book
+        # check if publaynet, tablebank and mfd extraction done for current book
         publeynet_done_document = publaynet_done.find_one({"bookId": bookId})
         table_done_document = table_bank_done.find_one({"bookId": bookId})
         mfd_done_document = mfd_done.find_one({"bookId": bookId})   
