@@ -41,9 +41,6 @@ s3 = boto3.client('s3',
 bucket_name = os.environ['AWS_BUCKET_NAME']
 folder_name=os.environ['BOOK_FOLDER_NAME']
 
-s3_base_url = os.getenv("S3_BASE_URL")
-s3_folder_path_latex = os.getenv("S3_FOLDER_PATH_LATEX")
-
 model = LatexOCR()
 
 client = pymongo.MongoClient(os.environ['DATABASE_URL'])
@@ -116,13 +113,6 @@ def process_pages(page, bookname, bookId, page_num, image_str):
         new_image_path=f"{generate_unique_id()}.jpg"
         with open(new_image_path, 'wb') as received_image:
             received_image.write(image_data)
-        # now this is s3 url
-        # image_path = page.get("image_path", "")
-        # key = image_path.replace(s3_base_url + "/", "")
-        # filename = key.replace(s3_folder_path_latex + "/", "")
-        # # download image from s3
-        # local_file_path = download_from_s3(bucket_name, key, filename)
-        # page["image_path"] = local_file_path
         page['image_path']=new_image_path
         pdFigCap = page.get("pdFigCap", False)
         page_num = page.get("page_num", "")
@@ -382,12 +372,5 @@ def consume_latex_ocr_queue():
 if __name__ == "__main__":
     try:
         consume_latex_ocr_queue()      
-        # extract_latex_pages()
-        # image_path = "https://bud-datalake.s3.ap-southeast-1.amazonaws.com/latex_ocr_images/9a5fbff763bb42c7802bb24a396fc4f3.png"
-        # key = image_path.replace(s3_base_url + "/", "")
-        # filename = key.replace(s3_folder_path_latex + "/", "")
-        # download image from s3
-        # local_file_path = download_from_s3(bucket_name, key, filename)
-        # print(local_file_path)
     except KeyboardInterrupt:
         pass

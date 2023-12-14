@@ -21,7 +21,8 @@ channel.basic_qos(prefetch_count=1, global_qos=False)
 
 load_dotenv()
 
-NOUGAT_API_URL=os.environ['NOUGAT_API_URL']
+# sonali: changed to system argument
+# NOUGAT_API_URL=os.environ['NOUGAT_API_URL']
 
 nougat_done=get_mongo_collection('book_set_2','nougat_done')
 
@@ -69,8 +70,9 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
 
 @timeit
 def get_nougat_extraction(pdf_path, data):
+    global nougat_api_url
     files = {'file': (pdf_path, open(pdf_path, 'rb'))}
-    response = requests.post(NOUGAT_API_URL, files=files, data=data, timeout=None)
+    response = requests.post(nougat_api_url, files=files, data=data, timeout=None)
 
     if response.status_code == 200:
         data = response.json()
@@ -99,6 +101,9 @@ def consume_nougat_pdf_queue():
 
 if __name__ == "__main__":
     try:
+        # sonali: changed to system argument
+        nougat_api_url = sys.argv[1]
+        print(f"Nougat consumer connected to {nougat_api_url}")
         consume_nougat_pdf_queue()    
     except KeyboardInterrupt:
         pass
