@@ -43,7 +43,6 @@ def get_figure_and_captions(ch, method, properties, body):
     except DocumentFound as e:
         print(e)
         check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
-        # ch.basic_ack(delivery_tag=method.delivery_tag)
         return
     someId=uuid.uuid4().hex
     name1='pdffiles'+someId
@@ -87,6 +86,7 @@ def get_figure_and_captions(ch, method, properties, body):
         check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
         error_queue('error_queue',bookname, bookId, error)
     finally:
+        ch.basic_ack(delivery_tag=method.delivery_tag)
         if os.path.exists(output_directory):
             shutil.rmtree(output_directory)   
         if os.path.exists(book_output):
@@ -101,7 +101,7 @@ def consume_pdfigcap_queue():
         channel.queue_declare(queue='pdfigcap_queue')
 
         # Set up the callback function for handling messages from the queue
-        channel.basic_consume(queue='pdfigcap_queue', on_message_callback=get_figure_and_captions, auto_ack=True)
+        channel.basic_consume(queue='pdfigcap_queue', on_message_callback=get_figure_and_captions)
 
         print(' [*] Waiting for messages on pdfigcap_queue. To exit, press CTRL+C')
         channel.start_consuming()
