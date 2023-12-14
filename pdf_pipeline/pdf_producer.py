@@ -1,11 +1,13 @@
 # pylint: disable=all
 # type: ignore
+import sys
+sys.path.append("pdf_extraction_pipeline")
 import json
 from dotenv import load_dotenv
 import os
 import boto3
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
-from utils import generate_image_str, get_mongo_collection
+from utils import generate_image_str, get_mongo_collection, generate_unique_id
 
 
 load_dotenv()
@@ -275,29 +277,31 @@ def error_queue(queue_name, bookname, bookId,error):
     print(f" [x] Sent {error} sent to {queue_name}")
     connection.close()
 
-# def store_book_details():
-    # books= get_all_books_names(bucket_name, folder_name + '/')
-    # books=books[127:]
+def store_book_details():
+#     books= get_all_books_names(bucket_name, folder_name + '/')
+#     books=books[127:]
 #     books=["Guide to Competitive Programming - Antti Laaksonen.pdf","Guide to Computer Network Security - Joseph Migga Kizza.pdf","Guide to Discrete Mathematics - Gerard O'Regan.pdf","Guide to Scientific Computing in C++ - Joe Pitt-Francis- Jonathan Whiteley.pdf","Handbook of Consumer Finance Research - Jing Jian Xiao.pdf","Handbook of Disaster Research - Havidan Rodriguez- Enrico L Quarantelli- Russell Dynes.pdf","Handbook of Evolutionary Research in Archaeology - Anna Marie Prentiss.pdf","Handbook of LGBT Elders - Debra A Harley- Pamela B Teaster.pdf","Handbook of Marriage and the Family - Gary W Peterson- Kevin R Bush.pdf","Handbook of Quantitative Criminology - Alex R Piquero- David Weisburd.pdf","Handbook of the Life Course - Jeylan T Mortimer- Michael J Shanahan.pdf","International Business Management - Kamal Fatehi- Jeongho Choi.pdf","International Humanitarian Action - Hans-Joachim Heintze- Pierre Thielbörger.pdf","International Perspectives on Psychotherapy - Stefan G Hofmann.pdf","International Trade Theory and Policy - Giancarlo Gandolfo.pdf","Internet of Things From Hype to Reality - Ammar Rayes- Samer Salam.pdf","Introduction to Data Science - Laura Igual- Santi Seguí.pdf","Introduction to Deep Learning - Sandro Skansi.pdf","Introduction to Electronic Commerce and Social Commerce - Efraim Turban- Judy Whiteside- David King- Jon Outland.pdf","Introduction to Evolutionary Computing - AE Eiben- JE Smith.pdf","Introduction to Formal Philosophy - Sven Ove Hansson- Vincent F Hendricks.pdf","Introduction to General Relativity - Cosimo Bambi.pdf","Introduction to Law - Jaap Hage- Antonia Waltermann- Bram Akkermans.pdf",
 # "Introduction to Mathematica® for Physicists - Andrey Grozin.pdf","Introduction to Parallel Computing - Roman Trobec- Boštjan Slivnik- Patricio Bulić- Borut Robič.pdf","Introduction to Partial Differential Equations - David Borthwick.pdf","Introduction to Programming with Fortran - Ian Chivers- Jane Sleightholme.pdf","Introduction to Smooth Manifolds - John Lee.pdf",
 # "Introduction to Statistics and Data Analysis  - Christian Heumann- Michael Schomaker-  Shalabh.pdf","Introduction to Time Series and Forecasting - Peter J Brockwell- Richard A Davis.pdf"
 # ,"Introductory Quantum Mechanics - Paul R Berman.pdf","Introductory Statistics with R - Peter Dalgaard.pdf","Introductory Time Series with R - Paul SP Cowpertwait- Andrew V Metcalfe.pdf",
 # "Knowledge Management - Klaus North- Gita Kumta.pdf","Language Across the Curriculum & CLIL in English as an Additional Language (EAL) Contexts - Angel MY Lin.pdf"]
-#     print(books)
-#     for book in books:
-#         book_data={
-#             "bookId":uuid.uuid4().hex,
-#             "book":book,
-#             "status":"yet_extracted"
-#         }
-#         book_details.insert_one(book_data)
+    books = ["A First Introduction to Quantum Physics - Pieter Kok.pdf"]
+    print(books)
+    for book in books:
+        doc = book_details.find_one({"book": book})
+        if not doc:
+            book_data={
+                "bookId": generate_unique_id(),
+                "book": book,
+                "status": "yet_extracted"
+            }
+            book_details.insert_one(book_data)
 
-# # # store all books from aws to book_details collection before running
-# store_book_details()
 
 if __name__ == "__main__":
     try:
-
+        # # # store all books from aws to book_details collection before running
+        # store_book_details()
         books=book_details.find({})
         for book in books:
             if book['status']=='not_extracted':
