@@ -43,6 +43,7 @@ def get_figure_and_captions(ch, method, properties, body):
     except DocumentFound as e:
         print(e)
         check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
         return
     someId=uuid.uuid4().hex
     name1='pdffiles'+someId
@@ -87,6 +88,7 @@ def get_figure_and_captions(ch, method, properties, body):
         error_queue('error_queue',bookname, bookId, error)
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
+        print("gfhdtg")
         if os.path.exists(output_directory):
             shutil.rmtree(output_directory)   
         if os.path.exists(book_output):
