@@ -164,10 +164,9 @@ def consume_pdf_processing_queue():
 
     except KeyboardInterrupt:
         pass
+    finally:
+        connection.close()
 
 
 if __name__ == "__main__":
-    try:
-        consume_pdf_processing_queue()
-    except KeyboardInterrupt:
-        pass
+    consume_pdf_processing_queue()
