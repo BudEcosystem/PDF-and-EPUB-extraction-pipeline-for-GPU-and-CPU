@@ -5,4 +5,5 @@
 /pdf_pipeline/__pycache__
 latex_images
 book-set-2
+*.pdf
 

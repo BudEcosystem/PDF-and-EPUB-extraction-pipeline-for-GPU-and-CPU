@@ -52,7 +52,8 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
             f_pdf.write(img2pdf.convert(image_paths))
         
         for img_path in image_paths:
-            os.remove(img_path)
+            abs_path = os.path.abspath(img_path)
+            os.remove(abs_path)
 
         page_nums = [result['page_num'] for result in results]
         api_data = {
