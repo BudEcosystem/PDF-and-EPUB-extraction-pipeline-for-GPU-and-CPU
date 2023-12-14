@@ -10,12 +10,15 @@ from PIL import Image
 import os
 import boto3
 import re
-import pymongo
 import cv2
 import uuid
-import base64
-from tablecaption import process_book_page
-from utils import timeit, crop_image
+from utils import (
+    timeit,
+    crop_image,
+    create_image_from_str,
+    generate_image_str,
+    get_mongo_collection
+)
 import json
 from pdf_producer import book_completion_queue, error_queue, table_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
@@ -39,26 +42,21 @@ s3 = boto3.client('s3',
 bucket_name = os.environ['AWS_BUCKET_NAME']
 folder_name=os.environ['BOOK_FOLDER_NAME']
 
-
-client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.book_set_2
-
-book_other_pages=db.book_other_pages
-book_other_pages_done=db.book_other_pages_done
+book_other_pages = get_mongo_collection('book_other_pages')
+book_other_pages_done = get_mongo_collection('book_other_pages_done')
 
 def extract_other_pages(ch, method, properties, body):
     try:
         message = json.loads(body)
         total_other_pages=message['total_other_pages']
-        pages_result=message['page_result']
+        pages_data=message['page_result']
         bookname = message["bookname"]
         bookId = message["bookId"]
-        page_num=message['page_num']
         other_pages_doc=book_other_pages_done.find_one({"bookId":bookId})
         if other_pages_doc:
             print("other pages already extracted")
             return 
-        page_obj= process_pages(pages_result, bookname, bookId)
+        page_obj= process_pages(pages_data, bookname, bookId)
         document=book_other_pages.find_one({'bookId':bookId})
         if document:
             book_other_pages.update_one({"_id":document["_id"]}, {"$push": {"pages": page_obj}})
@@ -69,9 +67,14 @@ def extract_other_pages(ch, method, properties, body):
                 "pages": [page_obj]
             }
             book_other_pages.insert_one(new_book_document)
-        if total_other_pages==page_num+1:
-            book_other_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"other pages Done"})
-            book_completion_queue("book_completion_queue",bookname, bookId)
+        other_page_extraction = book_other_pages.find_one({"bookId": bookId})
+        extracted_pages = len(other_page_extraction["pages"])
+        if total_other_pages == extracted_pages:
+            book_other_pages_done.insert_one({
+                "bookId": bookId,
+                "book": bookname,
+                "status": "other pages Done"})
+            book_completion_queue("book_completion_queue", bookname, bookId)
     except Exception as e:
         error = {"consumer":"other_pages","consumer_message":message,"page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
@@ -84,22 +87,32 @@ def extract_other_pages(ch, method, properties, body):
 def process_pages(page, bookname, bookId):
     page_tables=[]
     page_figures=[]
-    page_equations=[]
     results = page.get("results", [])
-    image_path = page.get("image_path", "")
+    image_str = page['image_str']
+    new_image_path = create_image_from_str(image_str)
+    page['image_path'] = new_image_path
     pdFigCap = page.get("pdFigCap", False)
     page_num = page.get("page_num", "")
-    page_content= sort_text_blocks_and_extract_data(results, image_path,page_figures,page_equations, pdFigCap, bookname, bookId, page_num)
-    page_obj={
+    page_content= sort_text_blocks_and_extract_data(
+        results,
+        new_image_path,
+        page_figures,
+        pdFigCap,
+        bookname,
+        bookId,
+        page_num
+    )
+    page_obj = {
         "page_num":page_num,
         "content":page_content,
         "tables":page_tables,
         "figures":page_figures,
-        "equations":page_equations
-        }
+        "equations":[]
+    }
+    os.remove(new_image_path)
     return page_obj
 
-def sort_text_blocks_and_extract_data(blocks, imagepath, page_figures, page_equations, pdFigCap, bookname, bookId, page_num):
+def sort_text_blocks_and_extract_data(blocks, imagepath, page_figures, pdFigCap, bookname, bookId, page_num):
     sorted_blocks = sorted(blocks, key=lambda block: (block['y_1'] + block['y_2']) / 2)
     output = ""
     prev_block = None
@@ -142,14 +155,11 @@ def process_table(table_block,imagepath, output,bookname, bookId, page_num):
         y2 = img.shape[0]
     cropped_image = img[int(y1):int(y2), int(x1):int(x2)]
     tableId = uuid.uuid4().hex
-    table_image_path =os.path.abspath(f"cropped_table{tableId}.png")
+    table_image_path = os.path.abspath(f"cropped_table{tableId}.png")
     cv2.imwrite(table_image_path, cropped_image)
-    with open(table_image_path, 'rb') as img:
-        img_data = img.read()
-    image_data_base64 = base64.b64encode(img_data).decode('utf-8')
-    data = {'img': image_data_base64}
+    data = {'img': generate_image_str(table_image_path)}
     output += f"{{{{table:{tableId}}}}}"
-    table_queue('table_queue',tableId,data,page_num,bookname,bookId)
+    table_queue('table_queue', tableId, data, page_num, bookname, bookId)
     if os.path.exists(table_image_path):
         os.remove(table_image_path)
     return output
@@ -293,8 +303,6 @@ def consume_other_pages_queue():
     finally:
         channel.close()
         connection.close()
-
-   
 
 
 if __name__ == "__main__":

@@ -3,7 +3,6 @@
 from dotenv import load_dotenv
 import pytesseract
 import traceback
-import base64
 import sys
 sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
@@ -11,12 +10,17 @@ from PIL import Image
 import os
 import boto3
 import re
-import pymongo
 import uuid
 import cv2
 from latext import latex_to_text
 from pix2tex.cli import LatexOCR
-from utils import timeit, crop_image, generate_unique_id
+from utils import (
+    timeit,
+    crop_image,
+    create_image_from_str,
+    generate_image_str,
+    get_mongo_collection
+)
 import json
 from pdf_producer import book_completion_queue, error_queue, table_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
@@ -43,43 +47,22 @@ folder_name=os.environ['BOOK_FOLDER_NAME']
 
 model = LatexOCR()
 
-client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.book_set_2
-latex_pages=db.latex_pages
-latex_pages_done=db.latex_pages_done
+latex_pages = get_mongo_collection('latex_pages')
+latex_pages_done = get_mongo_collection('latex_pages_done')
 
-def download_from_s3(bucket, key, filename):
-    """
-    Download file from s3
-    """
-    try:
-        directory = os.path.dirname(os.path.abspath(__file__))
-        img_directory = os.path.join(directory, "../latex_images")
-        os.makedirs(img_directory, exist_ok=True)
-        filepath = os.path.normpath(os.path.join(img_directory, filename))
-        s3.download_file(
-            Filename=filepath, 
-            Bucket=bucket, 
-            Key=key)
-        return filepath
-    except Exception as e:
-        print(e)
-        return None
 
 def extract_latex_pages(ch, method, properties, body):
     try:
         message = json.loads(body)
         total_latex_pages=message['total_latex_pages']
-        pages_result=message['page_result']
-        image_str=message['image_str']
+        page_data=message['page_result']
         bookname = message["bookname"]
         bookId = message["bookId"]
-        page_num=message['page_num']
         latex_pages_doc=latex_pages_done.find_one({"bookId":bookId})
         if latex_pages_doc:
             print("latex pages already extracted")
             return 
-        page_obj= process_pages(pages_result, bookname, bookId, page_num, image_str)
+        page_obj= process_pages(page_data, bookname, bookId)
         document=latex_pages.find_one({'bookId':bookId})
         if document:
             latex_pages.update_one({"_id":document["_id"]}, {"$push": {"pages": page_obj}})
@@ -90,10 +73,14 @@ def extract_latex_pages(ch, method, properties, body):
                 "pages": [page_obj]
             }
             latex_pages.insert_one(new_book_document)
-
-        if total_latex_pages==page_num+1:
-            latex_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"latex pages Done"})
-            book_completion_queue("book_completion_queue",bookname, bookId)
+        latex_page_extraction = latex_pages.find_one({"bookId": bookId})
+        extracted_pages = len(latex_page_extraction["pages"])
+        if total_latex_pages == extracted_pages:
+            latex_pages_done.insert_one({
+                "bookId": bookId,
+                "book": bookname,
+                "status": "latex pages Done"})
+            book_completion_queue("book_completion_queue", bookname, bookId)
     except Exception as e:
         error = {"consumer":"latex_ocr_consumer","consumer_message":message,"page_num":page_num, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(print(error))
@@ -103,20 +90,18 @@ def extract_latex_pages(ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
-def process_pages(page, bookname, bookId, page_num, image_str):
+def process_pages(page, bookname, bookId):
+    page_obj = {}
     try:
         page_tables = []
         page_figures = []
         page_equations = []
         results = page.get("results", [])
-        image_data = base64.b64decode(image_str)
-        new_image_path=f"{generate_unique_id()}.jpg"
-        with open(new_image_path, 'wb') as received_image:
-            received_image.write(image_data)
-        page['image_path']=new_image_path
+        image_str = page['image_str']
+        new_image_path = create_image_from_str(image_str)
+        page['image_path'] = new_image_path
         pdFigCap = page.get("pdFigCap", False)
         page_num = page.get("page_num", "")
-        # new_image_path=page["image_path"]
         page_content = sort_text_blocks_and_extract_data(results, new_image_path, page_figures, page_equations, pdFigCap, bookname,bookId,page_num)
         page_obj={
             "page_num": page_num,
@@ -126,9 +111,9 @@ def process_pages(page, bookname, bookId, page_num, image_str):
             "equations": page_equations
         }
         os.remove(new_image_path)
-        return page_obj
     except Exception as e:
-        print("error while page",e)
+        print("error while page in latex process_pages",e)
+    return page_obj
 
 def sort_text_blocks_and_extract_data(blocks, imagepath, page_figures, page_equations, pdFigCap, bookname, bookId, page_num):
     try:
@@ -184,10 +169,7 @@ def process_table(table_block,imagepath, output, bookname, bookId, page_num):
     table_image_path =os.path.abspath(f"cropeed{tableId}.png")
     cv2.imwrite(table_image_path, cropped_image)
     output += f"{{{{table:{tableId}}}}}"
-    with open(table_image_path, 'rb') as img:
-        img_data = img.read()
-    image_data_base64 = base64.b64encode(img_data).decode('utf-8')
-    data = {'img': image_data_base64}
+    data = {'img': generate_image_str(table_image_path)}
     table_queue('table_queue',tableId,data,page_num,bookname,bookId)
     if os.path.exists(table_image_path):
         os.remove(table_image_path)
@@ -371,6 +353,6 @@ def consume_latex_ocr_queue():
 
 if __name__ == "__main__":
     try:
-        consume_latex_ocr_queue()      
+        consume_latex_ocr_queue()
     except KeyboardInterrupt:
         pass

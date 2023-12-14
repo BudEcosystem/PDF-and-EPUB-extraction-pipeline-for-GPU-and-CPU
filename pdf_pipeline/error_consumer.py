@@ -1,22 +1,16 @@
 # pylint: disable=all
 # type: ignore
-from dotenv import load_dotenv
 import sys
 sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
-import os
-import pymongo
 import json
+from utils import get_mongo_collection
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
-load_dotenv()
-
-client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.book_set_2
-error_collection= db.error_collection
+error_collection = get_mongo_collection('error_collection')
 
 def store_errors(ch, method, properties, body):
     try:

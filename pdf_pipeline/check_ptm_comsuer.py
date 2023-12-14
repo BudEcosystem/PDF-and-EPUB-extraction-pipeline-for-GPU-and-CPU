@@ -8,78 +8,27 @@ sys.path.append("pdf_extraction_pipeline")
 import os
 import pymongo
 import json
-import uuid
-import boto3
 from pdf_producer import error_queue, other_pages_queue, latex_ocr_queue, nougat_pdf_queue, book_completion_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
+# sonali : added utility function
+from utils import create_image_str, get_mongo_collection
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
 load_dotenv()
 
-aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
-aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
-aws_region = os.environ['AWS_REGION']
-
-# Create an S3 client
-s3 = boto3.client('s3',
-                   aws_access_key_id=aws_access_key_id,
-                   aws_secret_access_key=aws_secret_access_key,
-                   region_name=aws_region)
-
-bucket_name = os.environ['AWS_BUCKET_NAME']
-folder_name=os.environ['BOOK_FOLDER_NAME']
-
-s3_base_url = os.getenv("S3_BASE_URL")
-s3_folder_path_latex = os.getenv("S3_FOLDER_PATH_LATEX")
-
-
-client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.book_set_2
-figure_caption = db.figure_caption
-table_bank_done=db.table_bank_done
-publaynet_done=db.publaynet_done
-mfd_done=db.mfd_done
-publaynet_book_job_details=db.publaynet_book_job_details
-table_bank_book_job_details=db.table_bank_book_job_details
-mfd_book_job_details=db.mfd_book_job_details
-figure_caption = db.figure_caption
-nougat_done=db.nougat_done
-book_other_pages_done=db.book_other_pages_done
-latex_pages_done=db.latex_pages_done
-
-
-def upload_to_s3(filepath):
-    """
-    Uploads a file to S3
-    Args:
-        filepath (str): The path to the file to upload.
-        bookname (str): The name of the book.
-        bookId (str): The ID of the book.
-        page_num (int): The page number of the page to upload.
-    Returns:
-        str: The URL of the uploaded file.
-    """
-    try:
-        # Generate a random filename
-        filename = uuid.uuid4().hex
-        # Get the file extension
-        extension = filepath.split('.')[-1]
-        # Create the new filename
-        key = f"{s3_folder_path_latex}/{filename}.{extension}"
-        # Upload the file to S3
-        s3.upload_file(
-            Filename=filepath, 
-            Bucket=bucket_name, 
-            Key=key
-        )
-        # Get the URL of the uploaded file
-        url = f"{s3_base_url}/{key}"
-        return url
-    except Exception as e:
-        print(e)
-        return None
+figure_caption = get_mongo_collection('figure_caption')
+table_bank_done = get_mongo_collection('table_bank_done')
+publaynet_done = get_mongo_collection('publaynet_done')
+mfd_done = get_mongo_collection('mfd_done')
+publaynet_book_job_details = get_mongo_collection('publaynet_book_job_details')
+table_bank_book_job_details = get_mongo_collection('table_bank_book_job_details')
+mfd_book_job_details = get_mongo_collection('mfd_book_job_details')
+figure_caption = get_mongo_collection('figure_caption')
+nougat_done = get_mongo_collection('nougat_done')
+book_other_pages_done = get_mongo_collection('book_other_pages_done')
+latex_pages_done = get_mongo_collection('latex_pages_done')
 
 
 def check_ptm_status(ch, method, properties, body):
@@ -97,12 +46,13 @@ def check_ptm_status(ch, method, properties, body):
         if publeynet_done_document and table_done_document and mfd_done_document and pdFigCap:
             collections = [publaynet_book_job_details, table_bank_book_job_details, mfd_book_job_details]
             page_results = {}
-
+            
             for collection in collections:
                 documents = collection.find({"bookId": bookId})  # Use find() to get multiple documents
                 for document in documents:
                     for page in document.get("pages", []):
-                        page_num = page["page_num"]
+                        # sonali: added int() to convert page_num to int
+                        page_num = int(page["page_num"])
                         result_array = page.get("result", [])
                         image_path = page.get("image_path", "")
                         for result in result_array:
@@ -113,6 +63,7 @@ def check_ptm_status(ch, method, properties, body):
                             page_results[page_num] = []
                         page_results[page_num].extend(result_array)
 
+            # sonali : are we doing this just to get image path of a particular page ?
             for page_num, result_array in page_results.items():
                 if not result_array:
                     print(page_num)
@@ -120,19 +71,36 @@ def check_ptm_status(ch, method, properties, body):
                     # Fetch image_path from publeynet_collection for the given page_num
                     publeynet_document = publaynet_book_job_details.find_one({"bookId": bookId})
                     for page in publeynet_document['pages']:
-                        if page['page_num']==page_num:
-                            image_path=page['image_path']
-                            page_results[page_num].append({"image_path": image_path})
+                        if page['page_num'] == page_num:
+                            image_path = page['image_path']
+                            result = {
+                                "image_path": image_path,
+                            }
+                            page_results[page_num].append(result)
             
             #divide pages into nougat_pages, other_pages and latex_ocr pages and send them into queues
+            # sonali : initialise image_str dict
+            image_str_dict = {}
             nougat_pages = []
             other_pages=[]
             latex_ocr_pages=[]
             for page_num_str, results in page_results.items():
                 page_num=int(page_num_str)
                 image_path = results[0]['image_path']
-                # process_page_result(results, page_num, bookId, bookname, nougat_pages, other_pages,latex_ocr_pages) 
-                np, op, lp = process_page(results,image_path, page_num, bookId, bookname)
+                # sonali : send image_str alongwith image_path
+                if page_num not in image_str_dict:
+                    image_str_dict[page_num] = create_image_str(image_path)
+                image_str = image_str_dict[page_num]
+                process_page_data = {
+                    "page_num": page_num,
+                    "results": results,
+                    "image_path": image_path,
+                    "image_str": image_str,
+                    "bookname": bookname,
+                    "bookId": bookId
+                }
+                np, op, lp = process_page(process_page_data)
+                # np, op, lp = process_page(results,image_path, page_num, bookId, bookname)
                 nougat_pages.extend(np)
                 other_pages.extend(op)
                 latex_ocr_pages.extend(lp)
@@ -145,8 +113,8 @@ def check_ptm_status(ch, method, properties, body):
                 book_completion_queue('book_completion_queue', bookname, bookId)
             else:
                 if total_other_pages>0:
-                    for page_num, page_result in enumerate(other_pages):
-                        other_pages_queue('other_pages_queue',page_result, total_other_pages,page_num, bookname, bookId)
+                    for page_data in other_pages:
+                        other_pages_queue('other_pages_queue', page_data, total_other_pages, bookname, bookId)
                     print("other pages sent, sending latex_ocr pages...")
                 else:
                     book_other_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"latex pages Done"})
@@ -160,11 +128,8 @@ def check_ptm_status(ch, method, properties, body):
                 book_completion_queue('book_completion_queue', bookname, bookId)
             else:
                 if total_latex_pages>0:
-                    for page_num, page_result in enumerate(latex_ocr_pages):
-                        # image_path = page_result['image_path']
-                        # new_image_path = upload_to_s3(image_path)
-                        # page_result['image_path'] = new_image_path
-                        latex_ocr_queue('latex_ocr_queue',page_result,total_latex_pages,page_num, bookname, bookId)
+                    for page in latex_ocr_pages:
+                        latex_ocr_queue('latex_ocr_queue', page, total_latex_pages, bookname, bookId)
                     print("latex_ocr pages sent, sending nougat pages .....")
                 else:
                     latex_pages_done.insert_one({"bookId":bookId,"book":bookname,"status":"latex pages Done"})
@@ -178,7 +143,7 @@ def check_ptm_status(ch, method, properties, body):
                 book_completion_queue('book_completion_queue', bookname, bookId)
             else:
                 if total_nougat_pages>0:
-                    nougat_pdf_queue('nougat_pdf_queue',nougat_pages,bookname, bookId)
+                    nougat_pdf_queue('nougat_pdf_queue', nougat_pages, bookname, bookId)
                 else:
                     nougat_done.insert_one({"bookId":bookId,"book":bookname,"status":"nougat pages Done"})
                     book_completion_queue('book_completion_queue', bookname, bookId)
@@ -193,18 +158,30 @@ def check_ptm_status(ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
-def process_page(results, image_path, page_num, bookId, bookname):
+# def process_page(results, image_path, page_num, bookId, bookname):
+def process_page(process_page_data):
+    page_num = process_page_data["page_num"]
+    results = process_page_data["results"]
+    image_path = process_page_data["image_path"]
+    image_str = process_page_data["image_str"]
+    bookname = process_page_data["bookname"]
+    bookId = process_page_data["bookId"]
+
     nougat_pages = []
     other_pages = []
     latex_ocr_pages = []
     try:
-        print(type(results))
+        # sonali : how does this condition identify nougat pages ?
+        # if page has text or title but no table and figure still we will get x_1 and y_1 -- isn't it ?
+        # block = {'x_1': 218.2264862060547, 'y_1': 246.16607666015625, 'x_2': 1293.7288818359375, 'y_2': 395.0075988769531, 'type': 'Title'}
+        # is it for pages where no results are found ?
         if not any('x_1' in block and 'y_1' in block for block in results):
             nougat_pages.append({
                 "image_path": image_path,
                 "page_num": page_num,
                 "bookname": bookname,
-                "bookId": bookId
+                "bookId": bookId,
+                "image_str": image_str
             })
             return nougat_pages, other_pages, latex_ocr_pages
 
@@ -221,6 +198,8 @@ def process_page(results, image_path, page_num, bookId, bookname):
                     caption_text = page.get('caption_text')
                     caption = ''.join(caption_text)
 
+                    # sonali : how did we decide on these values ?
+                    # and if constant value then move to .env or global variable
                     old_page_width = 439
                     old_page_height = 666
                     new_page_width = 1831
@@ -257,7 +236,8 @@ def process_page(results, image_path, page_num, bookId, bookname):
                 "image_path":image_path,
                 "page_num": page_num,
                 "bookname": bookname, 
-                "bookId": bookId
+                "bookId": bookId,
+                "image_str": image_str
             })
         elif any(block['type'] == "Equation" for block in results):
             latex_ocr_pages.append({
@@ -266,7 +246,8 @@ def process_page(results, image_path, page_num, bookId, bookname):
                 "bookname": bookname,
                 "bookId": bookId,
                 "page_num": page_num,
-                "pdFigCap": pdFigCap
+                "pdFigCap": pdFigCap,
+                "image_str": image_str
             })
         else:
             other_pages.append({
@@ -275,7 +256,8 @@ def process_page(results, image_path, page_num, bookId, bookname):
                 "bookname":bookname,
                 "bookId":bookId,
                 "page_num":page_num,
-                "pdFigCap":pdFigCap
+                "pdFigCap":pdFigCap,
+                "image_str": image_str
             })   
     except Exception as e:
         error={"consumer":"ptm_consumer","page":{page_num}, "error":{str(e)}, "line_number": {traceback.extract_tb(e.__traceback__)[-1].lineno}}

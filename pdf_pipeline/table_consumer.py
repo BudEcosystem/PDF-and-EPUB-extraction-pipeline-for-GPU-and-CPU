@@ -5,50 +5,38 @@ import traceback
 import sys
 sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
-from PIL import Image
 import os
-import boto3
-import re
-import base64
-import pymongo
-import uuid
 from tablecaption import process_book_page
 from pdf_producer import error_queue
 import json
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
-from utils import generate_unique_id
+from utils import get_mongo_collection, create_image_from_str
+
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
 load_dotenv()
 
+book_other_pages= get_mongo_collection('book_other_pages')
+book_other_pages_done= get_mongo_collection('book_other_pages_done')
+table_collection= get_mongo_collection('table_collection')
 
-client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.book_set_2
-
-book_other_pages=db.book_other_pages
-book_other_pages_done=db.book_other_pages_done
-table_collection=db.table_collection
 
 def extract_page_table(ch, method, properties, body):
     try:
         message = json.loads(body)
-        tableId=message['tableId']
-        data=message['data']
+        tableId = message['tableId']
+        data = message['data']
         image_data_base64 = data['img']
         bookname = message["bookname"]
         bookId = message["bookId"]
-        page_num=message['page_num']
+        page_num = message['page_num']
         existing_page = table_collection.find_one({"bookId": bookId, "pages.page_num": page_num})
         if existing_page:
             return
         print(page_num)
-        # Decode base64 and save the image
-        new_image_path=f"{generate_unique_id()}.jpg"
-        image_data = base64.b64decode(image_data_base64)
-        with open(new_image_path, 'wb') as received_image:
-            received_image.write(image_data)
-        table_data=process_book_page(new_image_path, tableId)
+        image_path = create_image_from_str(image_data_base64)
+        table_data = process_book_page(image_path, tableId)
         if table_data:
             page_details={
                 "page_num":page_num,
@@ -71,7 +59,7 @@ def extract_page_table(ch, method, properties, body):
                     "pages": [page_details]
                 }
                 table_collection.insert_one(table_doc)
-        image_path=os.path.abspath(new_image_path)
+        image_path = os.path.abspath(image_path)
         if os.path.exists(image_path):
             os.remove(image_path)
     except Exception as e:

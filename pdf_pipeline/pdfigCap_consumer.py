@@ -10,21 +10,18 @@ import traceback
 sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
 from FigCap import extract_figure_and_caption
-from utils import timeit
-import pymongo
+from utils import timeit, get_mongo_collection
 import PyPDF2
 import uuid
 from pdf_producer import check_ptm_completion_queue, error_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
+
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
 load_dotenv()
 
-client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.book_set_2
-
-figure_caption = db.figure_caption
+figure_caption = get_mongo_collection('figure_caption')
 
 class DocumentFound(Exception):
     pass

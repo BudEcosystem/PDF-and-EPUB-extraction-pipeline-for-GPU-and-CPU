@@ -2,12 +2,10 @@
 # type: ignore
 import json
 from dotenv import load_dotenv
-import pymongo
 import os
 import boto3
-import base64
-import uuid
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
+from utils import generate_image_str, get_mongo_collection
 
 
 load_dotenv()
@@ -26,12 +24,8 @@ s3 = boto3.client('s3',
 bucket_name = os.environ['AWS_BUCKET_NAME']
 folder_name=os.environ['BOOK_FOLDER_NAME']
 
-client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.book_set_2
-
-book_details = db.book_details
+book_details = get_mongo_collection('book_details')
  
-
 
 def get_all_books_names(bucket_name, folder_name):
   '''
@@ -67,17 +61,18 @@ def send_pdf_to_queue(book):
 def publeynet_queue(queue_name,image_path,page_num,bookname,bookId,num_pages):
     connection = get_rabbitmq_connection()
     channel = get_channel(connection)
-    table_bank_message = {
+    publeynet_queue_message = {
         "job":'publeynet',
         "queue": queue_name,
         "image_path": image_path,
         "page_num": page_num,
         "bookname": bookname,
         "bookId": bookId,
-        "total_pages":num_pages
+        "total_pages":num_pages,
+        "image_str": generate_image_str(image_path)
     }
     channel.queue_declare(queue=queue_name)
-    channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(table_bank_message))
+    channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(publeynet_queue_message))
     print(f" [x] Sent {bookname} ({bookId}), Page {page_num} to {queue_name}")
     connection.close()
 
@@ -91,7 +86,8 @@ def table_bank_queue(queue_name,image_path,page_num,bookname,bookId,num_pages ):
         "page_num": page_num,
         "bookname": bookname,
         "bookId": bookId,
-        "total_pages":num_pages 
+        "total_pages":num_pages,
+        "image_str": generate_image_str(image_path)
     }
     channel.queue_declare(queue=queue_name)
     channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(table_bank_message))
@@ -108,7 +104,8 @@ def mfd_queue(queue_name,image_path,page_num,bookname,bookId,num_pages):
         "page_num": page_num,
         "bookname": bookname,
         "bookId": bookId,
-        "total_pages":num_pages
+        "total_pages":num_pages,
+        "image_str": generate_image_str(image_path)
     }
 
     channel.queue_declare(queue=queue_name)
@@ -159,6 +156,7 @@ def book_completion_queue(queue_name,bookname,bookId):
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
     connection.close()
 
+
 def nougat_queue(queue_name,image_path,total_nougat_pages,book_page_num, page_num,bookname,bookId):
     connection = get_rabbitmq_connection()
     channel = get_channel(connection)
@@ -184,7 +182,7 @@ def nougat_pdf_queue(queue_name,results,bookname,bookId):
     channel = get_channel(connection)
     nougat_pdf_queue_message = {
         "queue": queue_name,
-        "results":results,
+        "results": results,
         "bookname": bookname,
         "bookId": bookId
     }
@@ -211,44 +209,36 @@ def page_extraction_queue(queue_name,book_pages,bookname,bookId):
     connection.close()
 
 
-def other_pages_queue(queue_name,page_result, total_other_pages,page_num, bookname, bookId):
+def other_pages_queue(queue_name, page_data, total_other_pages, bookname, bookId):
     connection = get_rabbitmq_connection()
     channel = get_channel(connection)
-    other_pages_queue = {
+    other_pages_queue_data = {
         "queue": queue_name,
-        "page_result":page_result,
+        "page_result":page_data,
         "total_other_pages":total_other_pages,
-        "page_num":page_num,
         "bookname": bookname,
         "bookId": bookId
     }
 
     channel.queue_declare(queue=queue_name)
-    channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(other_pages_queue))
+    channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(other_pages_queue_data))
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
     connection.close()
 
 
-def latex_ocr_queue(queue_name, page_result, total_latex_pages, page_num, bookname, bookId):
+def latex_ocr_queue(queue_name, page_result, total_latex_pages, bookname, bookId):
     connection = get_rabbitmq_connection()
     channel = get_channel(connection)
-    image_path=page_result['image_path']
-    with open(image_path, 'rb') as img:
-        img_data = img.read()
-    image_data_base64 = base64.b64encode(img_data).decode('utf-8')
-
-    latex_ocr_queue = {
+    latex_ocr_queue_data = {
         "queue": queue_name,
         "page_result":page_result,
-        "image_str":image_data_base64,
         "total_latex_pages":total_latex_pages,
-        "page_num":page_num,
         "bookname": bookname,
         "bookId": bookId
     }
 
     channel.queue_declare(queue=queue_name)
-    channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(latex_ocr_queue))
+    channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(latex_ocr_queue_data))
     print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
     connection.close()
 

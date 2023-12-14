@@ -6,18 +6,16 @@ import cv2
 import os
 import traceback
 sys.path.append("pdf_extraction_pipeline")
-import pymongo
 from pdf_producer import check_ptm_completion_queue, error_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
+# sonali: added
+from utils import read_image_from_str, get_mongo_collection
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
-
-client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.book_set_2
-table_bank_book_job_details=db.table_bank_book_job_details
-table_bank_done=db.table_bank_done
+table_bank_book_job_details=get_mongo_collection('table_bank_book_job_details')
+table_bank_done=get_mongo_collection('table_bank_done')
 
 import layoutparser as lp
 
@@ -41,8 +39,11 @@ def tableBank_layout(ch, method, properties, body):
                 check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
             else:
                 return
-        image = cv2.imread(image_path)
-        image = image[..., ::-1] 
+        # image = cv2.imread(image_path)
+        # sonali : read image from base64 encoded string to remove dependency from image path
+        image_str = message["image_str"]
+        image = read_image_from_str(image_str)
+        image = image[..., ::-1]
         tablebank_layouts = tablebank_model.detect(image)
         layout_blocks = []
         for item in tablebank_layouts:  
@@ -74,8 +75,12 @@ def tableBank_layout(ch, method, properties, body):
                 "pages": [book_page_data]
             }
             table_bank_book_job_details.insert_one(new_book_document)
-
-        if total_pages == (page_num + 1):
+        
+        # sonali: added
+        job_details = table_bank_book_job_details.find_one({"bookId": bookId})
+        extracted_pages = len(job_details['pages'])
+        if total_pages == extracted_pages:
+        # if total_pages == (page_num + 1):
             new_ptm_book_document = {
                 "bookId": bookId,
                 "bookname": bookname,
