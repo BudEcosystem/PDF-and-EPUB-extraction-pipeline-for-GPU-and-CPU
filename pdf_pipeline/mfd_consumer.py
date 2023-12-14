@@ -36,7 +36,12 @@ def mathformuladetection_layout(ch, method, properties, body):
         page_num = message["page_num"]
         bookname = message["bookname"]
         bookId = message["bookId"]
-
+        existing_page = mfd_book_job_details.find_one({"bookId": bookId, "pages.page_num": page_num})
+        if existing_page:
+            if total_pages == (page_num + 1):
+                check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
+            else:
+                return
         image = cv2.imread(image_path)
         image = image[..., ::-1] 
         mathformuladetection_layoutds = mathformuladetection_model.detect(image)

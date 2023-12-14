@@ -38,6 +38,10 @@ def book_complete(ch, method, properties, body):
         bookname = message["bookname"]
         bookId = message["bookId"]
         print(bookId)
+        book_already_completed=bookdata.find_one({"bookId":bookId})
+        if book_already_completed:
+            print("book already extracted")
+            return
         other_pages = book_other_pages_done.find_one({"bookId": bookId})
         nougat_pages_done = nougat_done.find_one({"bookId": bookId})
         latex_ocr_pages = latex_pages_done.find_one({"bookId": bookId})
@@ -61,7 +65,7 @@ def book_complete(ch, method, properties, body):
             if present_documents_count >= 2:
                 # If two or more documents are present, sort the pages
                 all_pages =  book_pages_result + nougat_pages_result +  latex_pages_result
-                sorted_pages = sorted(all_pages, key=lambda x: x.get("page_num", 0))
+                sorted_pages = sorted(all_pages, key=lambda x: int(x.get("page_num", 0)))
                 new_document = {
                     "bookId": bookId,
                     "book": bookname,
@@ -75,9 +79,7 @@ def book_complete(ch, method, properties, body):
                     "book": bookname,
                     "pages": pages_to_add,
                 }
-            book_already_completed=bookdata.find_one({"bookId":bookId})
-            if not book_already_completed:
-                bookdata.insert_one(new_document)     
+            bookdata.insert_one(new_document)     
             current_time = datetime.now().strftime("%H:%M:%S")
             book_details.update_one(
                 {"bookId": bookId},

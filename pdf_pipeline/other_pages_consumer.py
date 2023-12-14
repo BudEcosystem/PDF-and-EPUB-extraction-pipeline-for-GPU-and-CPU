@@ -54,6 +54,10 @@ def extract_other_pages(ch, method, properties, body):
         bookname = message["bookname"]
         bookId = message["bookId"]
         page_num=message['page_num']
+        other_pages_doc=book_other_pages_done.find_one({"bookId":bookId})
+        if other_pages_doc:
+            print("other pages already extracted")
+            return 
         page_obj= process_pages(pages_result, bookname, bookId)
         document=book_other_pages.find_one({'bookId':bookId})
         if document:

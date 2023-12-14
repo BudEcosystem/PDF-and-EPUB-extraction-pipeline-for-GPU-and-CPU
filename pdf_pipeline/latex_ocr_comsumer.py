@@ -78,6 +78,10 @@ def extract_latex_pages(ch, method, properties, body):
         bookname = message["bookname"]
         bookId = message["bookId"]
         page_num=message['page_num']
+        latex_pages_doc=latex_pages_done.find_one({"bookId":bookId})
+        if latex_pages_doc:
+            print("latex pages already extracted")
+            return 
         page_obj= process_pages(pages_result, bookname, bookId, page_num, image_str)
         document=latex_pages.find_one({'bookId':bookId})
         if document:

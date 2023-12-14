@@ -39,6 +39,9 @@ def extract_page_table(ch, method, properties, body):
         bookname = message["bookname"]
         bookId = message["bookId"]
         page_num=message['page_num']
+        existing_page = table_collection.find_one({"bookId": bookId, "pages.page_num": page_num})
+        if existing_page:
+            return
         print(page_num)
         # Decode base64 and save the image
         image_data = base64.b64decode(image_data_base64)

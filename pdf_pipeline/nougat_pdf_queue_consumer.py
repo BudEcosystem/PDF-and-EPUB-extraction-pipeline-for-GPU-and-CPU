@@ -56,7 +56,7 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
         page_nums = [result['page_num'] for result in results]
         pdf_folder_id = get_nougat_extraction(pdf_path)
         if os.path.exists(pdf_path):
-                os.remove(pdf_path)
+            os.remove(pdf_path)
         extrcated_pdf_directory = 'pdfs'
         pdfId_path = os.path.join(extrcated_pdf_directory, pdf_folder_id, 'pages')
         if os.path.exists(pdfId_path):
