@@ -301,12 +301,8 @@ def consume_other_pages_queue():
     except KeyboardInterrupt:
         pass
     finally:
-        channel.close()
         connection.close()
 
 
 if __name__ == "__main__":
-    try:
-        consume_other_pages_queue()      
-    except KeyboardInterrupt:
-        pass
+    consume_other_pages_queue()

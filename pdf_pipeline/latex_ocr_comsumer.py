@@ -54,11 +54,11 @@ latex_pages_done = get_mongo_collection('latex_pages_done')
 def extract_latex_pages(ch, method, properties, body):
     try:
         message = json.loads(body)
-        print(f"latex received {message}")
         total_latex_pages=message['total_latex_pages']
         page_data=message['page_result']
         bookname = message["bookname"]
         bookId = message["bookId"]
+        print(f"latex received {bookname} : {bookId} : {total_latex_pages}")
         latex_pages_doc=latex_pages_done.find_one({"bookId":bookId})
         if latex_pages_doc:
             print("latex pages already extracted")
@@ -346,14 +346,10 @@ def consume_latex_ocr_queue():
     except KeyboardInterrupt:
         pass
     finally:
-        channel.close()
         connection.close()
 
    
 
 
 if __name__ == "__main__":
-    try:
-        consume_latex_ocr_queue()
-    except KeyboardInterrupt:
-        pass
+    consume_latex_ocr_queue()
