@@ -54,6 +54,7 @@ latex_pages_done = get_mongo_collection('latex_pages_done')
 def extract_latex_pages(ch, method, properties, body):
     try:
         message = json.loads(body)
+        print(f"latex received {message}")
         total_latex_pages=message['total_latex_pages']
         page_data=message['page_result']
         bookname = message["bookname"]
@@ -119,7 +120,7 @@ def sort_text_blocks_and_extract_data(blocks, imagepath, page_figures, page_equa
     try:
         print("hello")
         sorted_blocks = sorted(blocks, key=lambda block: (block['y_1'] + block['y_2']) / 2)
-        print(sorted_blocks)
+        # print(sorted_blocks)
         output = ""
         prev_block = None
         next_block = None
@@ -201,7 +202,7 @@ def process_publeynet_figure(figure_block, imagepath, prev_block, next_block, ou
     caption=""
     figureId = uuid.uuid4().hex
     figure_image_path =crop_image(figure_block,imagepath, figureId)
-    print(figure_image_path)
+    # print(figure_image_path)
     output += f"{{{{figure:{figureId}}}}}"
 
     if prev_block:
@@ -293,10 +294,10 @@ def process_equation(equation_block, imagepath, output, page_equations):
         print("hello")
         equationId=uuid.uuid4().hex
         equation_image_path = crop_image(equation_block,imagepath, equationId)
-        print(equation_image_path)
+        # print(equation_image_path)
         output += f"{{{{equation:{equationId}}}}}"
         img = Image.open(equation_image_path)
-        print(img)
+        # print(img)
         latex_text= model(img)
         text_to_speech=latext_to_text_to_speech(latex_text)
         page_equations.append(
