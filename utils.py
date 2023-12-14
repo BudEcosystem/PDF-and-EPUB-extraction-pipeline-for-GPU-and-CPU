@@ -8,6 +8,9 @@ import pymongo
 from PyPDF2 import PdfWriter, PdfReader
 from uuid import uuid4
 from dotenv import load_dotenv
+# sonali: depenedncy for utils currently commented out
+import base64
+import numpy as np
 
 load_dotenv()
 
@@ -18,6 +21,7 @@ bucket_name = os.environ['AWS_BUCKET_NAME']
 folder_name=os.environ['BOOK_FOLDER_NAME']
 
 mongo_connection_string = os.environ['DATABASE_URL']
+mongo_db_name = os.environ['MONGO_DB']
 
 pdf_batch_size = int(os.environ['PDF_BATCH_SIZE'])
 
@@ -136,14 +140,34 @@ def get_mongo_client():
     mongo_client = pymongo.MongoClient(mongo_connection_string)
     return mongo_client
 
-def get_mongo_collection(mongo_db, collection_name):
+def get_mongo_collection(collection_name):
     """
     Function to get the mongo collection.
     """
     mongo_client = get_mongo_client()
-    db = mongo_client[mongo_db]
+    db = mongo_client[mongo_db_name]
     collection = db[collection_name]
     return collection
+
+# sonali
+def read_image_from_str(image_str):
+    image_bytes = base64.b64decode(image_str)
+    image_np_array = np.frombuffer(image_bytes, np.uint8)
+    image = cv2.imdecode(image_np_array, cv2.IMREAD_COLOR)
+    return image
+
+def generate_image_str(image_path):
+    with open(image_path, 'rb') as img:
+        img_data = img.read()
+    image_data_base64 = base64.b64encode(img_data).decode('utf-8')
+    return image_data_base64
+
+def create_image_from_str(image_str):
+    image_data = base64.b64decode(image_str)
+    image_path=f"{generate_unique_id()}.jpg"
+    with open(image_path, 'wb') as img:
+        img.write(image_data)
+    return image_path
 
 if __name__ == '__main__':
     BOOK_ID = '456'
