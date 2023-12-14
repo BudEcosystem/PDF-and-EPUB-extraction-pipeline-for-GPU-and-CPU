@@ -4,24 +4,21 @@ import json
 import sys
 sys.path.append("pdf_extraction_pipeline")
 import cv2
-import os
 import traceback
 from utils import timeit
-import pymongo
 from pdf_producer import check_ptm_completion_queue, error_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 import layoutparser as lp
+# sonali: added
+from utils import read_image_from_str, get_mongo_collection
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
 
-client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db = client.book_set_2
-
-error_collection = db.error_collection
-publaynet_book_job_details=db.publaynet_book_job_details
-publaynet_done=db.publaynet_done
+error_collection = get_mongo_collection('error_collection')
+publaynet_book_job_details = get_mongo_collection('publaynet_book_job_details')
+publaynet_done = get_mongo_collection('publaynet_done')
 
 
 
@@ -46,7 +43,10 @@ def publaynet_layout(ch, method, properties, body):
                 check_ptm_completion_queue('check_ptm_completion_queue', bookname, bookId)
             else:
                 return
-        image = cv2.imread(image_path)
+        # image = cv2.imread(image_path)
+        # sonali : read image from base64 encoded string to remove dependency from image path
+        image_str = message["image_str"]
+        image = read_image_from_str(image_str)
         image = image[..., ::-1] 
         publaynet_layouts = publaynet_model.detect(image)
         layout_blocks = []
@@ -80,8 +80,14 @@ def publaynet_layout(ch, method, properties, body):
                 "pages": [book_page_data]
             }
             publaynet_book_job_details.insert_one(new_book_document)
-
-        if total_pages == (page_num + 1):
+        
+        # sonali: we should get page count from publaynet_book_job_details pages
+        # because if we have multiple publaynet consumers then 5th page can come
+        # for extraction before 2nd page
+        job_details = publaynet_book_job_details.find_one({"bookId": bookId})
+        extracted_pages = len(job_details['pages'])
+        if total_pages == extracted_pages:
+        # if total_pages == (page_num + 1):
             new_ptm_book_document = {
                 "bookId": bookId,
                 "bookname": bookname,
