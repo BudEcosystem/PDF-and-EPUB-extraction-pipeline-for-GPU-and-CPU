@@ -11,7 +11,7 @@ import json
 from pdf_producer import error_queue, other_pages_queue, latex_ocr_queue, nougat_pdf_queue, book_completion_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 # sonali : added utility function
-from utils import create_image_str, get_mongo_collection
+from utils import create_image_from_str, get_mongo_collection
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
@@ -89,7 +89,7 @@ def check_ptm_status(ch, method, properties, body):
                 image_path = results[0]['image_path']
                 # sonali : send image_str alongwith image_path
                 if page_num not in image_str_dict:
-                    image_str_dict[page_num] = create_image_str(image_path)
+                    image_str_dict[page_num] = create_image_from_str(image_path)
                 image_str = image_str_dict[page_num]
                 process_page_data = {
                     "page_num": page_num,
