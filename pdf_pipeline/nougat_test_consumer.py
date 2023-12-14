@@ -13,7 +13,7 @@ import json
 
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
 from pdf_producer import book_completion_queue, error_queue
-from utils import get_mongo_collection
+from utils import get_mongo_collection, create_image_from_str
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
@@ -23,29 +23,37 @@ load_dotenv()
 
 NOUGAT_API_URL=os.environ['NOUGAT_API_URL']
 
-nougat_done=get_mongo_collection('book_set_2','nougat_done')
+nougat_done=get_mongo_collection('nougat_done')
 
 @timeit
 def extract_text_equation_with_nougat(ch, method, properties, body):
     try:
         message = json.loads(body)
-        results=message['results']
-        bookname= message['bookname']
-        bookId=message['bookId']
+        results = message['results']
+        bookname = message['bookname']
+        bookId = message['bookId']
         print(f"nougat received message for {bookname} ({bookId})")
         nougat_pages_doc = nougat_done.find_one({"bookId": bookId})
         if nougat_pages_doc:
             book_completion_queue('book_completion_queue', bookname, bookId)
-            # ch.basic_ack(delivery_tag=method.delivery_tag)
             return
         pdf_file_name = f"{bookId}.pdf"
         pdf_path = os.path.abspath(pdf_file_name)
 
+        # sonali: create pdf from image strings
+        image_strs = [result['image_str'] for result in results]
+        image_paths = []
+        for image_str in image_strs:
+            image_paths.append(create_image_from_str(image_str))
+
         # Iterate over results and create PDF
-        image_paths = [result['image_path'] for result in results]
+        # image_paths = [result['image_path'] for result in results]
         with open(pdf_path, "wb") as f_pdf:
             f_pdf.write(img2pdf.convert(image_paths))
         
+        for img_path in image_paths:
+            os.remove(img_path)
+
         page_nums = [result['page_num'] for result in results]
         api_data = {
             "bookId": bookId,
@@ -58,7 +66,12 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
         book_completion_queue('book_completion_queue', bookname, bookId)
         print("after finish")
     except Exception as e:
-        error = {"consumer":"nougat_consumer","consumer_message":message, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
+        error = {
+            "consumer":"nougat_consumer",
+            "consumer_message":message,
+            "error":str(e),
+            "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno
+        } 
         print(error)
         error_queue('error_queue', bookname, bookId, error)
     finally:
