@@ -85,6 +85,11 @@ def process_book(ch, method, properties, body):
         print(bookname)
        
         num_pages = len(book.pages)
+        # sonali : update book details with no of pages to check later
+        book_details.update_one(
+            {'bookId': bookId},
+            {'$set': {'num_pages': num_pages}}
+        )
         print(f"{bookname} has total {num_pages} page")  
         if num_pages>15:
             pdfigcap_queue('pdfigcap_queue',book_path,bookname, bookId)
@@ -94,7 +99,7 @@ def process_book(ch, method, properties, body):
         publaynet=False
         mfd=False
         tableBank=False
-        #check if publaynet, tablebank and mfd extraction done for current book
+        # check if publaynet, tablebank and mfd extraction done for current book
         publeynet_done_document = publaynet_done.find_one({"bookId": bookId})
         table_done_document = table_bank_done.find_one({"bookId": bookId})
         mfd_done_document = mfd_done.find_one({"bookId": bookId})   
@@ -119,6 +124,7 @@ def process_book(ch, method, properties, body):
   
 @timeit
 def process_page(page_num, book_path, book_folder, bookname, bookId,num_pages, publaynet,mfd, tableBank):
+    # sonali : reading the book via fitz should happen only once
     pdf_book = fitz.open(book_path)
     page_image = pdf_book[page_num]
     book_image = page_image.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
