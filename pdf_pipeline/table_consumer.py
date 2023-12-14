@@ -16,7 +16,7 @@ from tablecaption import process_book_page
 from pdf_producer import error_queue
 import json
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
-
+from utils import generate_unique_id
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
@@ -44,10 +44,11 @@ def extract_page_table(ch, method, properties, body):
             return
         print(page_num)
         # Decode base64 and save the image
+        new_image_path=f"{generate_unique_id()}.jpg"
         image_data = base64.b64decode(image_data_base64)
-        with open('received_image.jpg', 'wb') as received_image:
+        with open(new_image_path, 'wb') as received_image:
             received_image.write(image_data)
-        table_data=process_book_page('received_image.jpg', tableId)
+        table_data=process_book_page(new_image_path, tableId)
         if table_data:
             page_details={
                 "page_num":page_num,
@@ -70,7 +71,7 @@ def extract_page_table(ch, method, properties, body):
                     "pages": [page_details]
                 }
                 table_collection.insert_one(table_doc)
-        image_path=os.path.abspath('received_image.jpg')
+        image_path=os.path.abspath(new_image_path)
         if os.path.exists(image_path):
             os.remove(image_path)
     except Exception as e:
