@@ -68,39 +68,41 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
                     with open(file_path, 'r', encoding='utf-8') as file:
                         latex_text = file.read()
 
-                latex_text = latex_text.replace("[MISSING_PAGE_POST]", "")
-                if latex_text == "":
-                    latex_text = ""
-                pattern = r'(\\\(.*?\\\)|\\\[.*?\\\])'
-                def replace_with_uuid(match):
-                    equationId = uuid.uuid4().hex
-                    match_text = match.group()
-                    text_to_speech = latext_to_text_to_speech(match_text)
-                    page_equations.append({'id': equationId, 'text': match_text, 'text_to_speech': text_to_speech})
-                    return f'{{{{equation:{equationId}}}}}'
-                page_content = re.sub(pattern, replace_with_uuid, latex_text)
-                page_content = re.sub(r'\s+', ' ', page_content).strip()
-                page_object = {
-                    "page_num": page_num,
-                    "text": page_content,
-                    "tables": [],
-                    "figures": [],
-                    "page_equations": page_equations
-                }
-                book_document = nougat_pages.find_one({"bookId":  bookId})
-                if book_document:
-                    nougat_pages.update_one({"_id": book_document["_id"]}, {"$push": {"pages": page_object}})
-                else:
-                    new_book_document = {
-                        "bookId": bookId,
-                        "book": bookname,
-                        "pages": [page_object]
+                    latex_text = latex_text.replace("[MISSING_PAGE_POST]", "")
+                    page_object = {
+                        "page_num": page_num,
+                        "text": "",
+                        "tables": [],
+                        "figures": [],
+                        "page_equations": []
                     }
-                    nougat_pages.insert_one(new_book_document)
+                    if latex_text != "":
+                        pattern = r'(\\\(.*?\\\)|\\\[.*?\\\])'
+                        def replace_with_uuid(match):
+                            equationId = uuid.uuid4().hex
+                            match_text = match.group()
+                            text_to_speech = latext_to_text_to_speech(match_text)
+                            page_equations.append({'id': equationId, 'text': match_text, 'text_to_speech': text_to_speech})
+                            return f'{{{{equation:{equationId}}}}}'
+                        page_content = re.sub(pattern, replace_with_uuid, latex_text)
+                        page_content = re.sub(r'\s+', ' ', page_content).strip()
+                        page_object["text"] = page_content
+                        page_object["page_equations"] = page_equations
+                        
+                    book_document = nougat_pages.find_one({"bookId":  bookId})
+                    if book_document:
+                        nougat_pages.update_one({"_id": book_document["_id"]}, {"$push": {"pages": page_object}})
+                    else:
+                        new_book_document = {
+                            "bookId": bookId,
+                            "book": bookname,
+                            "pages": [page_object]
+                        }
+                        nougat_pages.insert_one(new_book_document)
+
             nougat_done.insert_one({"bookId": bookId, "book": bookname, "status": "nougat pages Done"})
             shutil.rmtree(os.path.join(extrcated_pdf_directory, pdf_folder_id))
             book_completion_queue('book_completion_queue', bookname, bookId)
-            
             print("after finish")
     except Exception as e:
         error = {"consumer":"nougat_consumer","consumer_message":message, "error":str(e), "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno} 
