@@ -29,9 +29,11 @@ nougat_done=get_mongo_collection('nougat_done')
 def extract_text_equation_with_nougat(ch, method, properties, body):
     try:
         message = json.loads(body)
-        results = message['results']
         bookname = message['bookname']
         bookId = message['bookId']
+        nougat_pages_data = get_mongo_collection('nougat_pages_data')
+        nougat_pages = nougat_pages_data.find({"bookId": bookId})
+        results = [each["page"] for each in nougat_pages]
         print(f"nougat received message for {bookname} ({bookId})")
         nougat_pages_doc = nougat_done.find_one({"bookId": bookId})
         if nougat_pages_doc:
@@ -39,6 +41,7 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
             return
         pdf_file_name = f"{bookId}.pdf"
         pdf_path = os.path.abspath(pdf_file_name)
+        print(f"nougat pdf path {pdf_path}")
 
         # sonali: create pdf from image strings
         image_strs = [result['image_str'] for result in results]

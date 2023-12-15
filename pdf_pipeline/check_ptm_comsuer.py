@@ -142,7 +142,15 @@ def check_ptm_status(ch, method, properties, body):
                 book_completion_queue('book_completion_queue', bookname, bookId)
             else:
                 if total_nougat_pages>0:
-                    nougat_pdf_queue('nougat_pdf_queue', nougat_pages, bookname, bookId)
+                    nougat_pages_data = get_mongo_collection('nougat_pages_data')
+                    for page in nougat_pages:
+                        tmp = {
+                            "bookId": bookId,
+                            "bookname": bookname,
+                            "page": page
+                        }
+                        nougat_pages_data.insert_one(tmp)
+                    nougat_pdf_queue('nougat_pdf_queue', bookname, bookId)
                 else:
                     nougat_done.insert_one({"bookId":bookId,"book":bookname,"status":"nougat pages Done"})
                     book_completion_queue('book_completion_queue', bookname, bookId)

@@ -179,12 +179,11 @@ def nougat_queue(queue_name,image_path,total_nougat_pages,book_page_num, page_nu
     connection.close()
 
 
-def nougat_pdf_queue(queue_name,results,bookname,bookId):
+def nougat_pdf_queue(queue_name,bookname,bookId):
     connection = get_rabbitmq_connection()
     channel = get_channel(connection)
     nougat_pdf_queue_message = {
         "queue": queue_name,
-        "results": results,
         "bookname": bookname,
         "bookId": bookId
     }
@@ -286,6 +285,8 @@ def store_book_details():
 # ,"Introductory Quantum Mechanics - Paul R Berman.pdf","Introductory Statistics with R - Peter Dalgaard.pdf","Introductory Time Series with R - Paul SP Cowpertwait- Andrew V Metcalfe.pdf",
 # "Knowledge Management - Klaus North- Gita Kumta.pdf","Language Across the Curriculum & CLIL in English as an Additional Language (EAL) Contexts - Angel MY Lin.pdf"]
     books = ["A First Introduction to Quantum Physics - Pieter Kok.pdf"]
+    books = ["Understanding Cryptography - Christof Paar- Jan Pelzl.pdf"]
+    books = ["Taxation in European Union - Pietro Boria.pdf"]
     print(books)
     for book in books:
         doc = book_details.find_one({"book": book})
@@ -293,7 +294,7 @@ def store_book_details():
             book_data={
                 "bookId": generate_unique_id(),
                 "book": book,
-                "status": "yet_extracted"
+                "status": "not_extracted"
             }
             book_details.insert_one(book_data)
 
@@ -301,7 +302,7 @@ def store_book_details():
 if __name__ == "__main__":
     try:
         # # # store all books from aws to book_details collection before running
-        # store_book_details()
+        store_book_details()
         books=book_details.find({})
         for book in books:
             if book['status']=='not_extracted':
