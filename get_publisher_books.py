@@ -77,7 +77,6 @@ def get_books_by_publisher(publisher: str):
         books.append(document)
     print(len(books))
 
-
 def get_s3_url(next_token: str = ""):
     """Get S3 URL for book
 
@@ -230,39 +229,12 @@ def list_objects(bucket_name, prefix=''):
             params['ContinuationToken'] = response['NextContinuationToken']
         else:
             break 
-          
 
 if __name__ == '__main__':
     # Specify the folder path
-    # folder_path = 'ebook_jsons'
+    # folder_path = '../bud-datalake/ebook_jsons'
     # save_books_to_mongodb(folder_path)
     # publisher_name = "O'Reilly Media"
     # get_books_by_publisher(publisher_name)
-    # next_token = get_s3_url(next_token)
-    # print(f"NEXT TOKEN : {next_token}")
-    # next_token = "19vkZUyoKo4hBAn6k8jm7hhR7miyiBQGFdczscM/AWoOv1af50lYOcouV/I6Pwqyp2+nR8lP9x7kbiyeXWUxSQF3MpytWiHp5lUeTvJ3djW5nw1W9iZ5a6sT2Ga+0PWrYGmNpaIR8QROc+HkV9i/E6CiP+svBytB24S3lG4kaegM="
-    # while next_token:
-    #     next_token = get_s3_url(next_token)
-    #     print(f"NEXT TOKEN : {next_token}")
-    # handle_errors()
-    results = collection.find({"s3_key": {"$exists": False}})
-    # print(len(list(results)))
-    for result in results:
-        # print(result['book_id'])
-        response = s3.list_objects_v2(
-            Bucket=aws_bucket_name,
-            Prefix=f"{aws_book_folder}/{result['book_id']}"
-        )
-        if response['KeyCount'] > 0:
-            obj = response['Contents']
-            epub_obj = list(filter(lambda x: x['Key'].endswith('.epub'), obj))
-            print(epub_obj)
-            print("======================================")
-            s3_key = epub_obj[0]['Key']
-            error_collection.insert_one({
-                "book_id": result['book_id'],
-                "title": result['title'],
-                "s3_key": s3_key
-            })
     # list_objects(aws_bucket_name, aws_book_folder)
-
+    pass
