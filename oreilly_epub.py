@@ -4,25 +4,25 @@ import html
 from PIL import Image
 from urllib.parse import urlparse
 import urllib
-from latext import latex_to_text
 import boto3
-from botocore.exceptions import ClientError
+from dotenv import load_dotenv
+from latext import latex_to_text
 from pymongo import MongoClient
 import uuid
-from latext import latex_to_text
-from pix2tex.cli import LatexOCR
 import json
 import xml.etree.ElementTree as ET
 from lxml import etree
 from bs4 import BeautifulSoup, NavigableString
 from utils import timeit
+load_dotenv()
+
 
 # Configure AWS credentials
-aws_access_key_id = 'AKIA4CKBAUILYLX23AO7'
-aws_secret_access_key = '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'
-aws_region = 'ap-southeast-1'
+aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
+aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
+aws_region = os.environ['AWS_REGION']
 
-mongo_connection_string = ""
+mongo_connection_string = os.environ['DATABASE_URL']
 
 # Create an S3 client
 s3 = boto3.client('s3',
@@ -34,8 +34,6 @@ bucket_name = 'bud-datalake'
 folder_name = 'Books/Oct29-1/'
 s3_base_url = "https://bud-datalake.s3.ap-southeast-1.amazonaws.com"
 # print(aws_access_key_id)
-
-latex_ocr=LatexOCR()
 
 def mongo_init(connection_string=None):
     """
@@ -58,6 +56,13 @@ def mongo_init(connection_string=None):
         db = client['epubstesting']
     return db
 
+@timeit
+def latext_to_text_to_speech(text):
+    # Remove leading backslashes and add dollar signs at the beginning and end of the text
+    text = "${}$".format(text)
+    # Convert the LaTeX text to text to speech
+    text_to_speech = latex_to_text(text)
+    return text_to_speech
 
 def get_aws_s3_contents(bucket_name, folder_name):
     """
@@ -95,7 +100,6 @@ def get_aws_s3_contents(bucket_name, folder_name):
     print(len(contents))
     return contents
 
-
 def download_aws_image(key):
     try:
         os.makedirs(folder_name, exist_ok=True)
@@ -104,7 +108,6 @@ def download_aws_image(key):
         return os.path.abspath(local_path)
     except Exception as e:
         print(e)
-
 
 def get_file_object_aws(book, filename):
     '''
@@ -131,7 +134,6 @@ def get_file_object_aws(book, filename):
         return None
     return response['Body'].read().decode('utf-8')
 
-
 def get_all_books_names(bucket_name, folder_name):
     '''
       Get all books names from aws s3 bucket
@@ -151,7 +153,6 @@ def get_all_books_names(bucket_name, folder_name):
     contents = s3.list_objects_v2(
         Bucket=bucket_name, Prefix=folder_name, Delimiter='/')
     return [each['Prefix'].split('/')[-2] for each in contents['CommonPrefixes']]
-
 
 def get_book_info(book_content):
     '''
@@ -197,7 +198,6 @@ def get_book_info(book_content):
 
     return details
 
-
 def get_toc_from_xhtml(toc_contents):
     """
       Extracts the table of contents (TOC) from XHTML content.
@@ -223,7 +223,6 @@ def get_toc_from_xhtml(toc_contents):
                 content = a_tag['href']
                 toc.append([label, content])
     return toc
-
 
 def get_toc_from_ncx(toc_contents):
     '''
@@ -269,7 +268,6 @@ def get_toc_from_ncx(toc_contents):
         toc = process_navpoint(navpoint, toc=toc)
     return toc
 
-
 def parse_table(table):
     """
       Parses an HTML table and extracts its headers and rows.
@@ -295,7 +293,6 @@ def parse_table(table):
             rows.append(row)
     return {'headers': headers, 'rows': rows}
 
-
 def parse_html_to_json(html_content, book, filename, db):
     # html_content = get_file_object_aws(book, filename)
     soup = BeautifulSoup(html_content, 'html.parser')
@@ -303,16 +300,6 @@ def parse_html_to_json(html_content, book, filename, db):
     section_data = extract_data(
         soup.find('body'), book, filename, db, section_data=[])
     return section_data
-
-
-@timeit
-def latext_to_text_to_speech(text):
-    # Remove leading backslashes and add dollar signs at the beginning and end of the text
-    text = "${}$".format(text.lstrip('\\'))
-    # Convert the LaTeX text to text to speech
-    text_to_speech = latex_to_text(text)
-    return text_to_speech
-
 
 def extract_data(elem, book, filename, db, section_data=[]):
     for child in elem.children:
@@ -346,56 +333,13 @@ def extract_data(elem, book, filename, db, section_data=[]):
                 print("figure here from img")
                 img = {}
                 img['id'] = uuid.uuid4().hex
-                parent2 = child.find_parent('div')
-                print(parent2.get('class', []))
-
-                #aws_path = f'https://{bucket_name}.s3.{
-                #aws_region}.amazonaws.com/{folder_name}{book}/OEBPS/'
-                #img['url'] = aws_path+child['src']
-                img['caption'] = ''
-                caption_element = child.find_previous_sibling(
-                    'p', class_='caption')
-                caption_element2 = child.find_previous_sibling(
-                    'h5', class_='notetitle')
-                p_parent = child.find_parent('p', class_=re.compile(
-                    'fimage|fm-figure', re.I))
-                if caption_element:
-                    img['caption'] = caption_element.get_text(strip=True)
-                elif caption_element2:
-                    img['caption'] = caption_element.get_text(strip=True)
-                elif p_parent:
-                    figcap = p_parent.find_next_sibling(
-                        'p', class_=re.compile('figcap|fm-figure-caption', re.I))
-                    img['caption'] = figcap.get_text(
-                        strip=True) if figcap else ''
+                aws_path = f'https://{bucket_name}.s3.{aws_region}.amazonaws.com/{folder_name}{book}/OEBPS/'
+                img['url'] = aws_path+child['src']
                 parent = child.find_parent('figure')
-                imagewrap_parent = child.find_parent('div', class_='imagewrap')
-                if imagewrap_parent:
-                    p = imagewrap_parent.find('p')
-                    if p:
-                        img['caption'] = p.get_text(strip=True)
-                elif parent:
-                    figcaption_tag = parent.find('figcaption')
+                if parent:
                     h6_tag = parent.find('h6')
-                    captag1 = parent.find('p', class_='figurecaption')
-                    if figcaption_tag:
-                        img['caption'] = figcaption_tag.get_text(strip=True)
-                    elif h6_tag:
+                    if h6_tag:
                         img['caption'] = h6_tag.get_text(strip=True)
-                    elif captag1:
-                        img['caption'] = captag1.get_text(strip=True)
-                else:
-                    sibling_paragraph = child.find_next(
-                        'p', class_='figcaption')
-                    caption_p = child.find_parent('p', class_='center')
-                    if sibling_paragraph:
-                        img['caption'] = sibling_paragraph.get_text(strip=True)
-                    if caption_p:
-                        next_p = caption_p.find_next_sibling(
-                            'p', class_='caption')
-                        if next_p and 'caption' in next_p.get('class', []):
-                            img['caption'] = next_p.get_text(strip=True)
-
                 if section_data:
                     section_data[-1]['content'] += '{{figure:' + img['id'] + '}} '
                     if 'figures' in section_data[-1]:
@@ -410,58 +354,17 @@ def extract_data(elem, book, filename, db, section_data=[]):
                     temp['tables'] = []
                     temp['code_snippet'] = []
                     temp['equations'] = []
-                if not img['caption']:
-                    existing_document = db['image_with_no_caption'].find_one(
-                        {'book': book, 'filename': filename})
-                    if existing_document:
-                        db['image_with_no_caption'].update_one(
-                            {'book': book, 'filename': filename}, {'$push': {'images': img}})
-                    else:
-                        db['image_with_no_caption'].insert_one(
-                            {'book': book, 'filename': filename, 'images': [img]})
 
             elif child.name == 'table':
-                print("table here")
-                caption = ''
-                caption_element = child.find_previous_sibling(
-                    'p', class_='tabcaption')
-                caption = caption_element.text.strip() if caption_element else ''
-                # Look for the parent div with class 'Table'
-                parent_div = child.find_parent(
-                    'div', class_=re.compile('Table|group|table-contents', re.I))
-                if parent_div:
-                    second_parent = parent_div.find_parent('table')
-                    if second_parent:
-                        tabcap = second_parent.find('p', class_='title')
-                        caption = tabcap.get_text(strip=True) if tabcap else ''
-                    # Look for a div with class 'Caption' within the parent div
-                    caption_div = parent_div.find('div', class_='Caption')
-                    captag1 = parent_div.find('p')
-                    caption_element = parent_div.find_previous_sibling(
-                        'p', class_='title')
-                    if caption_div:
-                        # Look for 'captionContent' div within 'Caption' div
-                        caption_content_div = caption_div.find(
-                            'div', class_='CaptionContent')
-
-                        # Extract text from both the <span> and <p> tags within 'captionContent' div
-                        if caption_content_div:
-                            span_element = caption_content_div.find('span')
-                            span_text = span_element.text.strip() if span_element else ''
-                            p_element = caption_content_div.find('p')
-                            p_text = p_element.text.strip() if p_element else ''
-
-                            # Combine span and p text if both are present
-                            caption = f"{span_text} {p_text}".strip()
-                    elif captag1:
-                        caption = captag1.get_text(strip=True)
-                    elif caption_element:
-                        caption = caption_element.text.strip() if caption_element else ''
-
+                print('table here')
+                caption_text=''
+                caption=child.find('caption')
+                if caption:
+                    caption_text=caption.get_text(strip=True)
                 table_id = uuid.uuid4().hex
                 table_data = parse_table(child)
                 table = {'id': table_id,
-                         'data': table_data, 'caption': caption}
+                         'data': table_data, 'caption': caption_text}
                 if section_data:
                     section_data[-1]['content'] += '{{table:' + \
                         table['id'] + '}} '
@@ -477,143 +380,13 @@ def extract_data(elem, book, filename, db, section_data=[]):
                     temp['figures'] = []
                     temp['code_snippet'] = []
                     temp['equations'] = []
-                if not caption:
-                    existing_document = db['table_with_no_caption'].find_one(
-                        {'book': book, 'filename': filename})
-                    if existing_document:
-                        db['table_with_no_caption'].update_one(
-                            {'book': book, 'filename': filename}, {'$push': {'tables': table}})
-                    else:
-                        db['table_with_no_caption'].insert_one(
-                            {'book': book, 'filename': filename, 'tables': [table]})
-
-            elif child.name == 'p' and 'center1' in child.get('class', []) and not child.find('img'):
-                equation_Id = uuid.uuid4().hex
-                equation_text = child.get_text(strip=True)
-                if equation_text.startswith('Figure'):
-                    # Skip processing if it starts with "Figure"
-                    continue
-                eqaution_data = {'id': equation_Id,
-                                 'text': equation_text}
-                if section_data:
-                    section_data[-1]['content'] += '{{equation:' + \
-                        equation_Id + '}} '
-                    if 'equations' in section_data[-1]:
-                        section_data[-1]['equations'].append(eqaution_data)
-                    else:
-                        section_data[-1]['equations'] = [eqaution_data]
-                else:
-                    temp['title'] = ''
-                    temp['content'] = '{{equation:' + equation_Id + '}} '
-                    temp['tables'] = []
-                    temp['figures'] = []
-                    temp['code_snippet'] = []
-                    temp['equations'] = [eqaution_data]
-
-            # equation as text
-            elif child.name == 'div' and 'Kindlecenter' in child.get('class', []):
-                equation_Id = uuid.uuid4().hex
-                equation_text = child.get_text(strip=True)
-                eqaution_data = {'id': equation_Id,
-                                 'text': equation_text}
-                if section_data:
-                    section_data[-1]['content'] += '{{equation:' + \
-                        equation_Id + '}} '
-                    if 'equations' in section_data[-1]:
-                        section_data[-1]['equations'].append(eqaution_data)
-                    else:
-                        section_data[-1]['equations'] = [eqaution_data]
-                else:
-                    temp['title'] = ''
-                    temp['content'] = '{{equation:' + equation_Id + '}} '
-                    temp['tables'] = []
-                    temp['figures'] = []
-                    temp['code_snippet'] = []
-                    temp['equations'] = [eqaution_data]
-
-             # 100%  equation image
-           
-            elif child.name == 'div' and ('equationNumbered' in child.get('class', []) or 'informalEquation' in child.get('class', [])):
-                equation_image = child.find('img')
-                equation_Id = uuid.uuid4().hex
-                if equation_image:
-                    aws_path = f'https://{bucket_name}.s3.{ aws_region}.amazonaws.com/{folder_name}{book}/OEBPS/'
-                    img_url = aws_path + equation_image['src']
-                    print("This is equation image")
-                    img_key = img_url.replace(s3_base_url + "/", "")
-                    equation_image_path = download_aws_image(img_key)
-                    img = Image.open(equation_image_path)
-                    latex_text= latex_ocr(img)
-                    text_to_speech=latext_to_text_to_speech(latex_text)
-                    eqaution_data={'id': equation_Id, 'text':latex_text, 'text_to_speech':text_to_speech}
-                    print("this is equation image")
-                else:
-                    equation_text = child.get_text(strip=True)
-                    eqaution_data = {'id': equation_Id,
-                                     'text': equation_text}
-                if section_data:
-                    section_data[-1]['content'] += '{{equation:' + \
-                        equation_Id + '}} '
-                    if 'equations' in section_data[-1]:
-                        section_data[-1]['equations'].append(eqaution_data)
-                    else:
-                        section_data[-1]['equations'] = [eqaution_data]
-                else:
-                    temp['title'] = ''
-                    temp['content'] = '{{equation:' + equation_Id + '}} '
-                    temp['tables'] = []
-                    temp['figures'] = []
-                    temp['code_snippet'] = []
-                    temp['equations'] = [eqaution_data]
-
-            # 100% equation image
-            elif child.name == 'div' and 'imagewrap' in child.get('class', []) and not child.find('p'):
-                equation_Id = uuid.uuid4().hex
-                equation_image = child.find('img')
-                if book == "Basic Electrical and Electronics Engineering (9789332579170)" and equation_image and equation_image.get('id', '').startswith('eq'):
-                    aws_path = f'https://{bucket_name}.s3.{aws_region}.amazonaws.com/{folder_name}{book}/OEBPS/'
-                    img_url = aws_path + equation_image['src']
-                    print("This is equation image")
-                    img_key = img_url.replace(s3_base_url + "/", "")
-                    print(img_key)
-                    equation_image_path = download_aws_image(img_key)
-                    img = Image.open(equation_image_path)
-                    latex_text= latex_ocr(img)
-                    text_to_speech=latext_to_text_to_speech(latex_text)
-                    eqaution_data={'id': equation_Id, 'text':latex_text, 'text_to_speech':text_to_speech}
-                else:
-                    aws_path = f'https://{bucket_name}.s3.{aws_region}.amazonaws.com/{folder_name}{book}/OEBPS/'
-                    img_url = aws_path+equation_image['src']
-                    print("this is equation image")
-                    img_key = img_url.replace(s3_base_url + "/", "")
-                    print(img_key)
-                    equation_image_path = download_aws_image(img_key)
-                    img = Image.open(equation_image_path)
-                    latex_text= latex_ocr(img)
-                    text_to_speech=latext_to_text_to_speech(latex_text)
-                    eqaution_data={'id': equation_Id, 'text':latex_text, 'text_to_speech':text_to_speech}
-                if section_data:
-                    section_data[-1]['content'] += '{{equation:' + \
-                        equation_Id + '}} '
-                    if 'equations' in section_data[-1]:
-                        section_data[-1]['equations'].append(eqaution_data)
-                    else:
-                        section_data[-1]['equations'] = [eqaution_data]
-                else:
-                    temp['title'] = ''
-                    temp['content'] = '{{equation:' + equation_Id + '}} '
-                    temp['tables'] = []
-                    temp['figures'] = []
-                    temp['code_snippet'] = []
-                    temp['equations'] = [eqaution_data]
-
+    
             # handling equaiton as text
             elif child.name == 'math':
                 print("equation here")
                 equation_Id = uuid.uuid4().hex
-                equation_text = child.get_text(strip=True)
                 eqaution_data = {'id': equation_Id,
-                                 'text': equation_text}
+                                 'math_tag':str(child)}
                 if section_data:
                     section_data[-1]['content'] += '{{equation:' + \
                         equation_Id + '}} '
@@ -629,7 +402,9 @@ def extract_data(elem, book, filename, db, section_data=[]):
                     temp['code_snippet'] = []
                     temp['equations'] = [eqaution_data]
 
+            #code oreilly publication
             elif child.name == 'pre':
+                print('code here')
                 code_tags = child.find_all('code')
                 code = ''
                 if code_tags:
@@ -653,59 +428,12 @@ def extract_data(elem, book, filename, db, section_data=[]):
                     temp['figures'] = []
                     temp['code_snippet'] = [code_data]
                     temp['equations'] = []
-            # elif child.name == 'p' and 'center1' in child.get('class', []):
-
-            elif child.name == 'p' and 'programlisting' in child.get('class', []):
-                # Handle p tags with class 'programlisting'
-                print("code here")
-                code = child.get_text(strip=True)
-                code_id = uuid.uuid4().hex
-                code_data = {'id': code_id, 'code_snippet': code}
-                if section_data:
-                    section_data[-1]['content'] += '{{code_snippet:' + code_id + '}} '
-                    if 'code_snippet' in section_data[-1]:
-                        section_data[-1]['code_snippet'].append(code_data)
-                    else:
-                        section_data[-1]['code_snippet'] = [code_data]
-                else:
-                    temp['title'] = ''
-                    temp['content'] = '{{code_snippet:' + code_id + '}} '
-                    temp['tables'] = []
-                    temp['figures'] = []
-                    temp['code_snippet'] = [code_data]
-                    temp['equations'] = []
-
-            elif elem.name == 'div' and elem.find('div', class_='mediaobject'):
-                code_block = elem.find('div', class_='LineGroup')
-                if code_block:
-                    fixed_lines = code_block.find_all(
-                        'div', class_='FixedLine')
-                    code = ' '.join(fixed_line.get_text()
-                                    for fixed_line in fixed_lines)
-                    code_id = uuid.uuid4().hex
-                    code_data = {'id': code_id, 'code_snippet': code}
-                    if section_data:
-                        section_data[-1]['content'] += '{{code_snippet:' + code_id + '}} '
-                        if 'code_snippet' in section_data[-1]:
-                            section_data[-1]['code_snippet'].append(code_data)
-                        else:
-                            section_data[-1]['code_snippet'] = [code_data]
-                    else:
-                        temp = {}
-                        temp['title'] = ''
-                        temp['content'] = '{{code_snippet:' + code_id + '}} '
-                        temp['tables'] = []
-                        temp['figures'] = []
-                        temp['code_snippet'] = [code_data]
-                        temp['equations'] = []
-
             elif child.contents:
                 section_data = extract_data(
                     child, book, filename, db, section_data=section_data)
         if temp:
             section_data.append(temp)
     return section_data
-
 
 @timeit
 def get_book_data(book):
@@ -760,7 +488,6 @@ def get_book_data(book):
 
                 if html_content:
                     try:
-
                         json_data = parse_html_to_json(
                             html_content, book, filename, db)
                         db['oct_chapters'].insert_one(
@@ -776,7 +503,6 @@ def get_book_data(book):
                     db['files_with_error'].insert_one(
                         {'book': book, 'filename': filename, 'error': 'no html content found'})
                 files.append(filename)
-
 
 def check_if_opf_exists(bucket_name, folder_name, book):
     '''
@@ -816,7 +542,6 @@ def check_if_opf_exists(bucket_name, folder_name, book):
                 files.append(obj['Key'].split('/')[-1])
     return files
 
-
 def get_heading_tags(elem):
     h_tag = []
     for child in elem.children:
@@ -826,7 +551,6 @@ def get_heading_tags(elem):
             elif child.contents:
                 h_tag = get_heading_tags(child, h_tag)
     return h_tag
-
 
 def clean_string(html_string):
     # Unescape HTML entities
@@ -838,65 +562,25 @@ def clean_string(html_string):
     return clean_text
 
 
-def get_all_books_info(bucket_name, folder_name):
-    book_info_saved = []
-    book_info_not_saved = []
-    books = get_all_books_names(bucket_name, folder_name)
-    print(len(books))
-    db = mongo_init(mongo_connection_string)
-    for book in books:
-        try:
-            opf_files = check_if_opf_exists(bucket_name, folder_name, book)
-            for opf_file in opf_files:
-                opf_content = get_file_object_aws(book, opf_file)
-                if opf_content:
-                    book_info = get_book_info(opf_content)
-                    book_info['book'] = book
-                    db['oct_basic_info'].insert_one(book_info)
-                    book_info_saved.append(book)
-                    break
-            if book not in book_info_saved:
-                book_info_not_saved.append(book)
-        except Exception as e:
-            print(f'Error while parsing {book} >> {e}')
-            book_info_not_saved.append(book)
-    return book_info_saved, book_info_not_saved
+db = mongo_init(mongo_connection_string)
+publisher_collection=db.publishers
+missing_s3_key=db.missing_s3_key_for_oreilly
+s3_keys=[]
+missing_s3Keys=[]
+if __name__ == "__main__":
+    for book in publisher_collection.find():
+        if 'publishers' in book and book['publishers'] and book['publishers'][0].startswith("O'Reilly"):
+            if 's3_key' in book:
+                bookname=book['s3_key'].split('/')[-2]
+                s3_keys.append(bookname)
+                get_book_data(bookname)
+            else:
+                missing_s3_key.insert_one(book)
+                missing_s3Keys.append(book['title'])
+    print(f'total books with s3_keys {len(s3_keys)}')
+    print(f'total books with s3_keys {len(missing_s3Keys)}')
 
-# if __name__ == '__main__':
-#     # get_book_data('A Field Guide to Digital Transformation (9780137571871)')
-#     # get_book_data('Accounting For Dummies 7th Edition (9781119837527)')
-#     # get_book_data('This is Learning Experience Design (9780138206307)')
-#     # get_book_data('Mastering API Architecture (9781492090625)')
-#     # get_book_data('How to Build Android Apps with Kotlin - Second Edition (9781837634934)')
-#     books = get_all_books_names('bud-datalake', 'Books/Oct29-1/')
-#     print(len(books))
-#     for book_number, book in enumerate(books, start=1):
-#         print(f"Processing book {book_number}")
-#         get_book_data(book)
-
-#     saved, not_saved = get_all_books_info('bud-datalake', 'Books/Oct29-1/')
-#     print(len(saved))
-#     print(len(not_saved))
-#     print(not_saved)
-#     # get_book_data('Advanced Python 3 Programming Techniques (9780321637727)')
-#     # pass
+# get_book_data('Essential Math for Data Science (9781098102920)')
 
 
-# @timeit
-# def process_all_books():
-#     books = get_all_books_names('bud-datalake', 'Books/Oct29-1/')
-#     print(len(books))
-#     for book_number, book in enumerate(books, start=1):
-#         print(f"Processing book {book_number} , {book}")
-#         get_book_data(book)
 
-#     saved, not_saved = get_all_books_info('bud-datalake', 'Books/Oct29-1/')
-#     print(len(saved))
-#     print(len(not_saved))
-#     print(not_saved)
-
-
-# process_all_books()
-
-
-get_book_data('AC Circuits and Power Systems in Practice (9781118924594)')

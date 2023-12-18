@@ -104,7 +104,7 @@ def process_pages(page, bookname, bookId):
     )
     page_obj = {
         "page_num":page_num,
-        "content":page_content,
+        "text":page_content,
         "tables":page_tables,
         "figures":page_figures,
         "equations":[]
