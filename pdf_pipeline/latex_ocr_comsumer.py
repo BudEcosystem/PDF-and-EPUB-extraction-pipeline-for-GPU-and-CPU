@@ -106,7 +106,7 @@ def process_pages(page, bookname, bookId):
         page_content = sort_text_blocks_and_extract_data(results, new_image_path, page_figures, page_equations, pdFigCap, bookname,bookId,page_num)
         page_obj={
             "page_num": page_num,
-            "content": page_content,
+            "text": page_content,
             "tables": page_tables,
             "figures": page_figures,
             "equations": page_equations

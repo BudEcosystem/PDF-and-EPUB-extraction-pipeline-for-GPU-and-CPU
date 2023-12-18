@@ -6,4 +6,6 @@
 latex_images
 book-set-2
 *.pdf
+math_latex/node_modules
+
 
