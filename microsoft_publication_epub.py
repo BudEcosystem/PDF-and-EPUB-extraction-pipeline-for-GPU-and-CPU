@@ -31,7 +31,7 @@ s3 = boto3.client('s3',
                   region_name=aws_region)
 
 bucket_name = 'bud-datalake'
-folder_name = 'Books/Oct29-oreilly-2/'
+folder_name = 'Books/Oct29-1/'
 s3_base_url = "https://bud-datalake.s3.ap-southeast-1.amazonaws.com"
 # print(aws_access_key_id)
 
@@ -53,11 +53,16 @@ def mongo_init(connection_string=None):
     else:
         client = MongoClient(connection_string)
     if client:
-        db = client['epub_testing']
+        db = client['epub_microsoft']
     return db
 
 db = mongo_init(mongo_connection_string)
+oct_toc=db.oct_toc
+oct_no_toc=db.oct_no_toc
+oct_chapters=db.oct_chapters
+files_with_error=db.files_with_error
 extracted_books=db.extracted_books
+
 
 
 def get_aws_s3_contents(bucket_name, folder_name):
@@ -331,11 +336,11 @@ def extract_data(elem, book, filename, db, section_data=[]):
                 img['id'] = uuid.uuid4().hex
                 aws_path = f'https://{bucket_name}.s3.{aws_region}.amazonaws.com/{folder_name}{book}/OEBPS/'
                 img['url'] = aws_path+child['src']
-                parent = child.find_parent('figure')
+                parent = child.find_parent('figure',class_='figure')
                 if parent:
-                    h6_tag = parent.find('h6')
-                    if h6_tag:
-                        img['caption'] = h6_tag.get_text(strip=True)
+                    figcaption = parent.find('figcaption')
+                    if figcaption:
+                        img['caption'] = figcaption.get_text(strip=True)
                 if section_data:
                     section_data[-1]['content'] += '{{figure:' + img['id'] + '}} '
                     if 'figures' in section_data[-1]:
@@ -354,6 +359,11 @@ def extract_data(elem, book, filename, db, section_data=[]):
             elif child.name == 'table':
                 print('table here')
                 caption_text=''
+                parent = child.find_parent('figure',class_='table')
+                if parent:
+                    tabcaption = parent.find('figcaption')
+                    if tabcaption:
+                        caption_text = tabcaption.get_text(strip=True)
                 caption=child.find('caption')
                 if caption:
                     caption_text=caption.get_text(strip=True)
@@ -434,10 +444,9 @@ def extract_data(elem, book, filename, db, section_data=[]):
 @timeit
 def get_book_data(book):
     print("Book Name >>> ", book)
-    db = mongo_init(mongo_connection_string)
     toc = []
     # check if book exists in db toc collection
-    db_toc = db['oct_toc'].find_one({'book': book})
+    db_toc = oct_toc.find_one({'book': book})
     if db_toc:
         toc = db_toc['toc']
     if not toc:
@@ -455,9 +464,9 @@ def get_book_data(book):
             error = str(e)
             print(f'Error while parsing {book} toc >> {e}')
         if not toc:
-            db['oct_no_toc'].insert_one({'book': book, 'error': error})
+            oct_no_toc.insert_one({'book': book, 'error': error})
         else:
-            db['oct_toc'].insert_one({'book': book, 'toc': toc})
+            oct_toc.insert_one({'book': book, 'toc': toc})
 
     files = []
     order_counter = 0
@@ -469,18 +478,16 @@ def get_book_data(book):
             filename = content_split[0]
             if filename != prev_filename:
                 if filename not in files:
-                    file_in_error = db['files_with_error'].find_one(
+                    file_in_error =files_with_error.find_one(
                         {'book': book, 'filename': filename})
                     if file_in_error:
-                        db['files_with_error'].delete_one(
-                            {'book': book, 'filename': filename})
-                    chapter_in_db = db['oct_chapters'].find_one(
-                        {'book': book, 'filename': filename})
+                        files_with_error.delete_one({'book': book, 'filename': filename})
+                    chapter_in_db =oct_chapters.find_one({'book': book, 'filename': filename})
                     if chapter_in_db:
                         if chapter_in_db['sections']:
                             continue
                         elif not chapter_in_db['sections']:
-                            db['oct_chapters'].delete_one(
+                            oct_chapters.delete_one(
                                 {'book': book, 'filename': filename})
 
                     html_content = get_file_object_aws(book, filename)
@@ -489,18 +496,18 @@ def get_book_data(book):
                         try:
                             json_data = parse_html_to_json(
                                 html_content, book, filename, db)
-                            db['oct_chapters'].insert_one(
+                            oct_chapters.insert_one(
                                 {'book': book, 'filename': filename, 'sections': json_data, 'order': order_counter})
                             order_counter += 1
                         except Exception as e:
                             print(f'Error while parsing {filename} html >> {e}')
-                            db['files_with_error'].insert_one(
+                            files_with_error.insert_one(
                                 {'book': book, 'filename': filename, 'error': e})
                             # clear mongo
-                            db['oct_chapters'].delete_many({'book': book})
+                            oct_chapters.delete_many({'book': book})
                     else:
                         print('no html content found : ', filename)
-                        db['files_with_error'].insert_one(
+                        files_with_error.insert_one(
                             {'book': book, 'filename': filename, 'error': 'no html content found'})
                     files.append(filename)
                 prev_filename = filename
@@ -569,16 +576,29 @@ def clean_string(html_string):
     return clean_text
 
 
-not_extracted=[]
-books = get_all_books_names('bud-datalake', 'Books/Oct29-oreilly-2/')
-print(len(books))
-for book_number, book in enumerate(books, start=1):
-    already_extracted=extracted_books.find_one({"book":book})
-    if not already_extracted:
-        # print(f"Processing book {book_number} , {book}")
-        not_extracted.append(book)
-        # get_book_data(book)
-        # # get_book_data(book)
-    else:
-        print(f'this {book} already extracted')
-print(len(not_extracted))
+# books = get_all_books_names('bud-datalake', 'Books/Oct29-oreilly-2/')
+# print(len(books))
+# for book_number, book in enumerate(books, start=1):
+#     already_extracted=extracted_books.find_one({"book":book})
+#     if not already_extracted:
+#         print(f"Processing book {book_number} , {book}")
+#         get_book_data(book)
+
+
+# publisher_collection=db.publishers
+# s3_keys=[]
+# missing_s3Keys=[]
+# for book in publisher_collection.find():
+#     if 'publishers' in book and book['publishers'] and book['publishers'][0].startswith("Microsoft"):
+#         if 's3_key' in book:
+#             bookname=book['s3_key'].split('/')[-2]
+#             f=open('mic.txt','w')
+#             f.write(str(s3_keys))
+#             s3_keys.append(bookname)
+#         else:
+#             missing_s3Keys.append(book['title'])
+
+# print(f'total books with s3_keys {len(s3_keys)}')
+# print(f'total books with s3_keys {len(missing_s3Keys)}')
+
+get_book_data('Exam Ref AZ-104 Microsoft Azure Administrator (9780136805328)')
