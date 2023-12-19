@@ -84,7 +84,8 @@ def download_book_from_aws(book_id, book_name):
         print('AWS book download >> ', book_name)
         book_folder = os.path.join(folder_name, book_id)
         os.makedirs(book_folder, exist_ok=True)
-        local_path = os.path.join(book_folder, book_name)
+        local_path = os.path.join(book_folder, f"{book_id}.pdf")
+        # book-set-2/123/123.pdf
         file_key = f'{folder_name}/{book_name}'
         response = s3.get_object(Bucket=bucket_name, Key=file_key)
         pdf_data = response['Body'].read()
@@ -94,14 +95,35 @@ def download_book_from_aws(book_id, book_name):
         print("An error occurred:", e)
     return local_path
 
+
+def get_page_num_from_split_path(split_path):
+    """
+    Function is used to get book_id, from_page and to_page from book path
+    """
+    # book-set-2/123/splits/123_0_1-30.pdf
+    parts = split_path.split('/')
+    if len(parts) > 1:
+        # it means input if filename and not complete path
+        # 123_0_1-30.pdf
+        filename = parts[-1]
+    else:
+        filename = split_path
+    filename_split = filename.replace(".pdf", "").split("_")
+    book_id = filename_split[0]
+    split_id = filename_split[1]
+    page_nums = filename_split[-1].split("-")
+    from_page = int(page_nums[0])
+    to_page = int(page_nums[-1])
+    return book_id, split_id, from_page, to_page
+
+
 @timeit
-def split_pdf(local_path):
+def split_pdf(book_id, local_path):
     """
     Function used to split the pdf into individual pages.
     """
-    # book-set-2/123/abc.pdf
+    # book-set-2/123/123.pdf
     print('Splitting pdf >> ', local_path)
-    book_id = local_path.split('/')[1]
     book_split_folder = os.path.join(folder_name, book_id, 'splits')
     os.makedirs(book_split_folder, exist_ok=True)
     # book-set-2/123/splits
@@ -109,7 +131,6 @@ def split_pdf(local_path):
 
     with open(local_path, 'rb') as f:
         inputpdf = PdfReader(f)
-        file_prefix = generate_unique_id()
         output_file_paths = []
         total_num_pages = len(inputpdf.pages)
         print("Total number of pages in the pdf: ", total_num_pages)
@@ -117,17 +138,23 @@ def split_pdf(local_path):
             print("Splitting pdf into batches")
             for i in range(0, total_num_pages, pdf_batch_size):
                 output = PdfWriter()
+                from_page = i+1
+                to_page = from_page
                 for page in inputpdf.pages[i:i+pdf_batch_size]:
                     output.add_page(page)
-                file_path = f"{book_split_folder}/{file_prefix}_{int(i/pdf_batch_size)}.pdf"
+                    to_page += 1
+                file_path = f"{book_split_folder}/{book_id}_{int(i/pdf_batch_size)}_{from_page}-{to_page}.pdf"
                 with open(file_path, "wb") as output_stream:
                     output.write(output_stream)
                 output_file_paths.append(file_path)
         else:
             output = PdfWriter()
+            from_page = 1
+            to_page = from_page
             for page in inputpdf.pages:
                 output.add_page(page)
-            file_path = f"{book_split_folder}/{file_prefix}_0.pdf"
+                to_page += 1
+            file_path = f"{book_split_folder}/{book_id}_0_{from_page}-{to_page}.pdf"
             with open(file_path, "wb") as output_stream:
                 output.write(output_stream)
             output_file_paths.append(file_path)
@@ -156,11 +183,25 @@ def read_image_from_str(image_str):
     image = cv2.imdecode(image_np_array, cv2.IMREAD_COLOR)
     return image
 
-def generate_image_str(image_path):
-    with open(image_path, 'rb') as img:
-        img_data = img.read()
-    image_data_base64 = base64.b64encode(img_data).decode('utf-8')
-    return image_data_base64
+def generate_image_str(book_id, image_path):
+    image_str = None
+    book_images_collection = get_mongo_collection(f'{book_id}_images')
+    image_data = book_images_collection.find_one({
+        "bookId": book_id,
+        "image_path": image_path
+    })
+    if image_data:
+        image_str = image_data["image_str"]
+    else:
+        with open(image_path, 'rb') as img:
+            img_data = img.read()
+        image_str = base64.b64encode(img_data).decode('utf-8')
+        book_images_collection.insert_one({
+            "bookId": book_id,
+            "image_path": image_path,
+            "image_str": image_str
+        })
+    return image_str
 
 def create_image_from_str(image_str):
     image_data = base64.b64decode(image_str)
@@ -168,6 +209,12 @@ def create_image_from_str(image_str):
     with open(image_path, 'wb') as img:
         img.write(image_data)
     return image_path
+
+def find_split_path(split_paths, page_num):
+    for split_path in split_paths:
+        _, _, fp, tp = get_page_num_from_split_path(split_path)
+        if page_num >= fp and page_num <= tp:
+            return split_path
 
 if __name__ == '__main__':
     BOOK_ID = '456'

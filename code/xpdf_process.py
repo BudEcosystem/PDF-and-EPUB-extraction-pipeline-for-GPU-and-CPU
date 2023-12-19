@@ -12,30 +12,30 @@ The main code for figure and caption extraction (figures_captions_list)
 
 '''
 
-import subprocess
+# import subprocess
 import os
 import numpy as np
-import matplotlib.pyplot as plt
-import sys
+# import matplotlib.pyplot as plt
+# import sys
 import cv2
-import codecs
-import matplotlib.patches as patches
-import scipy.misc
+# import codecs
+# import matplotlib.patches as patches
+# import scipy.misc
 import re
-from lxml import etree
-from selenium import webdriver
-from pdf_info import pdf_info
+# from lxml import etree
+# from selenium import webdriver
+from code.pdf_info import pdf_info
 
 
 
 def figures_captions_list(input_path, pdf, output_path):
-# input: single pdf file
-# output: bounding box list of figures and captions
+    # input: single pdf file
+    # output: bounding box list of figures and captions
     pdf_filename = input_path + pdf
     html_file_path = output_path + pdf[:-4]
-# 1. Read pdfs from input folder  (pdf_info)
+    # 1. Read pdfs from input folder  (pdf_info)
     info, html_boxes = pdf_info(html_file_path, pdf)
-#  2.1. graphical content detection
+    #  2.1. graphical content detection
     cap_box, fig_box, info, table_box, text_box = box_detection(html_file_path, info, html_boxes)
     pre_figures, cap_regions = fig_cap_matching(cap_box, fig_box, info, table_box, text_box)
     figures, captions = evaluation(pre_figures, cap_regions, html_file_path, info, html_boxes) # Remove figure_table and figure caption in one box
@@ -43,46 +43,9 @@ def figures_captions_list(input_path, pdf, output_path):
     no_of_figures = sum([len(figures[x]) for x in figures])
     no_of_caps = sum([len(cap_box[x]) for x in cap_box])
     no_of_figs = sum([len(fig_box[x]) for x in fig_box])
-    #print info['filename']
-    #print info['mess_up']
-    #print info['fig_no_est']
-
-    #
-    # print no_of_figures
-    # if no_of_figures == no_of_caps:
-    #     figures, cap_regions = same_no_caps_est(cap_box, fig_box, info, table_box, text_box)
-    #
+    
     r = info['png_ratio']
-    # plt.close("all")
-    # for i in range(info['page_no']):
-    #     page = 'page' + str(i + 1) + '.png'
-    #     img = cv2.imread(html_file_path + '/' + page)
-    #     fig, ax = plt.subplots(1)
-    #     ax.imshow(img)
-    #     for each_caption in cap_box[page]:
-    #         rect = patches.Rectangle((each_caption[0]*r, each_caption[1]*r), each_caption[2]*r, each_caption[3]*r,
-    #                                  linewidth=1, edgecolor='g',
-    #                                  facecolor='none')
-    #         ax.add_patch(rect)
-    #
-    #     for each_fig in fig_box[page]:
-    #         #each_fig = each_fig[0]
-    #         rect = patches.Rectangle((each_fig[0]*r, each_fig[1]*r), each_fig[2]*r, each_fig[3]*r,
-    #                                  linewidth=2, edgecolor='b',
-    #                                  facecolor='none')
-    #         ax.add_patch(rect)
-    #     for each_cap_region in cap_regions[page]:
-    #         rect = patches.Rectangle((each_cap_region[1][0]*r, each_cap_region[1][1]*r), each_cap_region[1][2]*r, each_cap_region[1][3]*r,
-    #                                  linewidth=1, edgecolor='y',
-    #                                  facecolor='none')
-    #         ax.add_patch(rect)
-    #     for each_result in figures[page]:
-    #         each_result = each_result[0]
-    #         rect = patches.Rectangle((each_result[0]*r, each_result[1]*r), each_result[2]*r, each_result[3]*r,
-    #                                  linewidth=1, edgecolor='r',
-    #                                  facecolor='none')
-    #         ax.add_patch(rect)
-    #     plt.show()
+    
     return figures, info
 
 
@@ -218,7 +181,7 @@ def box_detection(html_file_path, info, html_boxes):
 
             count = 0
 
-            if info['mess_up'] == False:# Need to set carefully
+            if info['mess_up'] == False: # Need to set carefully
                 while count < len(potential_bbox):# ###Need to think about it.....
                     flag = 0
                     for each_text_box in page_word_box:# Remove fig box that cross the text box

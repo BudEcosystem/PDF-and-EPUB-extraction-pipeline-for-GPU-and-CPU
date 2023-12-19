@@ -7,22 +7,17 @@ filename, height, width, page_no, figure_est_no, layout_bbox, text_mask
 from selenium import webdriver
 from multiprocessing import Pool, TimeoutError
 
-import time
 import os
 import json
-import numpy as np
-import matplotlib.pyplot as plt
-import sys
-import cv2
 
-    # Column width, middle gap, Maximum Figure number will be helpful
+# Column width, middle gap, Maximum Figure number will be helpful
 def pdf_info(html_file_path, pdf):
     # Get the pdf info by parsing html
     
     info = {}
-# obtain file name
+    # obtain file name
     info['filename'] = pdf
-# obtain page no
+    # obtain page no
     for_counting = []
     for page in os.listdir(html_file_path):
         if page.endswith('.png') & page.startswith('page'):
@@ -30,7 +25,7 @@ def pdf_info(html_file_path, pdf):
     page_no = len(for_counting)
     for_counting = sorted(for_counting)
     info['page_no'] = page_no
-# Obtain all html information
+    # Obtain all html information
     list_of_htmls = []
     html_info = []
     html_info_json = html_file_path+'/' + pdf[:-4] + '.json'
@@ -67,7 +62,7 @@ def pdf_info(html_file_path, pdf):
     #html_info = multithread.map(read_each_html, list_of_htmls)
     #multithread.close()
     #multithread.join()
-# obtain text layout
+    # obtain text layout
     row_width = []
     row_height = []
     column_no = 1
@@ -83,7 +78,7 @@ def pdf_info(html_file_path, pdf):
     for each_page_html in html_info:
         if each_page_html[0] in list_to_check:
             #print each_page_html[0]
-# Obtain page convas region
+            # Obtain page convas region
             info['page_height'] = each_page_html[2][0]
             info['page_width'] = each_page_html[2][1]
             for element in each_page_html[1]:
@@ -274,19 +269,19 @@ def pdf_info(html_file_path, pdf):
 
 
 
-def read_each_html(x):
-    #browser = webdriver.Chrome('/home/pengyuan/chromedriver')
-    #browser = webdriver.Chrome('/usa/pengyuan/Documents/RESEARCH/PDFigCapX/chromedriver/chromedriver')
-    #browser.implicitly_wait(2)
-    browser.get(x)
-    page_layout = browser.find_element_by_xpath("/html/body/img")
-    img_size = (page_layout.size['height'], page_layout.size['width'])
-    text_elements = browser.find_elements_by_xpath("/html/body/div")
-    text_boxes = []
-    for element in text_elements:
-        text = element.text
-        if len(text) > 0:
-            text_boxes.append([[element.location['x'], element.location['y'], element.size['width'], element.size['height']], text])
+# def read_each_html(x):
+#     #browser = webdriver.Chrome('/home/pengyuan/chromedriver')
+#     #browser = webdriver.Chrome('/usa/pengyuan/Documents/RESEARCH/PDFigCapX/chromedriver/chromedriver')
+#     #browser.implicitly_wait(2)
+#     browser.get(x)
+#     page_layout = browser.find_element_by_xpath("/html/body/img")
+#     img_size = (page_layout.size['height'], page_layout.size['width'])
+#     text_elements = browser.find_elements_by_xpath("/html/body/div")
+#     text_boxes = []
+#     for element in text_elements:
+#         text = element.text
+#         if len(text) > 0:
+#             text_boxes.append([[element.location['x'], element.location['y'], element.size['width'], element.size['height']], text])
 
-    browser.quit()
-    return int(os.path.basename(x)[4:-5]), text_boxes, img_size
+#     browser.quit()
+#     return int(os.path.basename(x)[4:-5]), text_boxes, img_size

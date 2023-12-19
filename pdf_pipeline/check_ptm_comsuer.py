@@ -5,37 +5,26 @@ import traceback
 import sys
 sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
-import os
-import pymongo
 import json
 from pdf_producer import error_queue, other_pages_queue, latex_ocr_queue, nougat_pdf_queue, book_completion_queue
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
-# sonali : added utility function
 from utils import generate_image_str, get_mongo_collection
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
-load_dotenv()
-
 figure_caption = get_mongo_collection('figure_caption')
-table_bank_done = get_mongo_collection('table_bank_done')
-publaynet_done = get_mongo_collection('publaynet_done')
-mfd_done = get_mongo_collection('mfd_done')
-publaynet_book_job_details = get_mongo_collection('publaynet_book_job_details')
-table_bank_book_job_details = get_mongo_collection('table_bank_book_job_details')
-mfd_book_job_details = get_mongo_collection('mfd_book_job_details')
-figure_caption = get_mongo_collection('figure_caption')
-nougat_done = get_mongo_collection('nougat_done')
-book_other_pages_done = get_mongo_collection('book_other_pages_done')
-latex_pages_done = get_mongo_collection('latex_pages_done')
+publaynet_pages = get_mongo_collection('publaynet_pages')
+table_bank_pages = get_mongo_collection('table_bank_pages')
+mfd_pages = get_mongo_collection('mfd_pages')
 
 
 def check_ptm_status(ch, method, properties, body):
     print("hello pmt called")
     message = json.loads(body)
-    bookname = message["bookname"]
     bookId = message["bookId"]
+    book_path = message["split_path"]
+    page_num = message["page_num"]  # can be None if request comes from pdfigcapx
     try:
         publeynet_done_document = publaynet_done.find_one({"bookId": bookId})
         table_done_document = table_bank_done.find_one({"bookId": bookId})
