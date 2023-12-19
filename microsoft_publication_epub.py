@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from latext import latex_to_text
 from pymongo import MongoClient
 import uuid
+import re
 import json
 import xml.etree.ElementTree as ET
 from lxml import etree
@@ -53,7 +54,7 @@ def mongo_init(connection_string=None):
     else:
         client = MongoClient(connection_string)
     if client:
-        db = client['epub_microsoft']
+        db = client['epub_testing']
     return db
 
 db = mongo_init(mongo_connection_string)
@@ -336,11 +337,36 @@ def extract_data(elem, book, filename, db, section_data=[]):
                 img['id'] = uuid.uuid4().hex
                 aws_path = f'https://{bucket_name}.s3.{aws_region}.amazonaws.com/{folder_name}{book}/OEBPS/'
                 img['url'] = aws_path+child['src']
-                parent = child.find_parent('figure',class_='figure')
-                if parent:
+                
+                parent = child.find_parent('figure', class_=['figure', 'image-l'])
+                # Find div with class 'mediaobject'
+                mediaobject_div = child.find_parent('div', class_='mediaobject')
+                # Find div with class 'image'
+                image_div = child.find_parent('div', class_='image')
+                if mediaobject_div:
+                    figure_contents=mediaobject_div.find_parent('div', class_='figure-contents')
+                    if figure_contents:
+                        figure_parent=figure_contents.find_parent('div', class_='figure')
+                        if figure_parent:
+                            figure_title=figure_parent.find('div',class_='figure-title')
+                            figure_cap=figure_parent.find('p', class_="title")
+                            if figure_title:
+                                img['caption']=figure_title.get_text(strip=True)
+                            elif figure_cap:
+                                img['caption']=figure_cap.get_text(strip=True)
+
+                elif image_div:
+                    image_div_parent=image_div.find_parent('div', class_='fig-heading')
+                    if image_div_parent:
+                        fig_cap=image_div_parent.find('p', class_='fig-caption')
+                        if fig_cap:
+                            img['caption']=fig_cap.get_text(strip=True)
+
+                elif parent:
                     figcaption = parent.find('figcaption')
                     if figcaption:
                         img['caption'] = figcaption.get_text(strip=True)
+                        print(img['caption'])
                 if section_data:
                     section_data[-1]['content'] += '{{figure:' + img['id'] + '}} '
                     if 'figures' in section_data[-1]:
@@ -360,13 +386,22 @@ def extract_data(elem, book, filename, db, section_data=[]):
                 print('table here')
                 caption_text=''
                 parent = child.find_parent('figure',class_='table')
+                # Find div with class 'table-contents'
+                table_contents_div = child.find_parent('div', class_='table-contents')
                 if parent:
                     tabcaption = parent.find('figcaption')
                     if tabcaption:
                         caption_text = tabcaption.get_text(strip=True)
-                caption=child.find('caption')
-                if caption:
-                    caption_text=caption.get_text(strip=True)
+                elif table_contents_div:
+                    table_div = table_contents_div.find_parent('div', class_='table')
+                    if table_div:
+                        table_title=table_div.find('div',class_='table-title')
+                        table_title2=table_div.find('p',class_='title')
+                        if table_title:
+                            caption_text=table_title.get_text(strip=True)
+                        elif table_title2:
+                            caption_text=table_title2.get_text(strip=True)
+
                 table_id = uuid.uuid4().hex
                 table_data = parse_table(child)
                 table = {'id': table_id,
@@ -601,4 +636,34 @@ def clean_string(html_string):
 # print(f'total books with s3_keys {len(s3_keys)}')
 # print(f'total books with s3_keys {len(missing_s3Keys)}')
 
-get_book_data('Exam Ref AZ-104 Microsoft Azure Administrator (9780136805328)')
+# get_book_data('Exam Ref AZ-104 Microsoft Azure Administrator (9780136805328)')
+# get_book_data('Microsoft® Start Here!™ Learn JavaScript (9780735667334)')
+# get_book_data('Deploying Microsoft® Forefront® Unified Access Gateway 2010 (9780735656758)')
+# get_book_data('Rapid Development (9780735634725)')
+# get_book_data('Microsoft Project 2019 Step by Step Fifth Edition (9781509307463)')
+
+
+# import csv
+
+# csv_file_path = '/home/bud-data-extraction/datapipeline/pdf_extraction_pipeline/List 1.csv'
+
+# book_ids = []
+# with open(csv_file_path, 'r') as file:
+#     reader = csv.reader(file)
+#     # Skip the header if it exists
+#     next(reader, None)
+#     for row in reader:
+#         # Assuming the book_id is in the first (and only) column
+#         book_id = row[0]
+#         book_ids.append(book_id)
+
+# not_extracted=[]
+# # Now, book_ids contains all the book_ids from the CSV file
+# print(len(book_ids))
+# for book in book_ids:
+#     already_extracted=extracted_books.find_one({"book":book})
+#     if not already_extracted:
+#         not_extracted.append(book)
+# print(len(not_extracted))
+# f=open('not_extracted.txt','w')
+# f.write(str(not_extracted))

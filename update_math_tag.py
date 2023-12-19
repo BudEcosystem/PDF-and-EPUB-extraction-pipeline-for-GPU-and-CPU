@@ -78,7 +78,6 @@ for document in all_documents:
 
     # Iterate over sections
     for section in document.get("sections", []):
-        section_id = section.get("_id") or str(uuid.uuid4())  # Use existing ID or generate a new UUID
         equations = section.get("equations", [])
 
         # Check if section has equations

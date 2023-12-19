@@ -575,10 +575,10 @@ print(len(books))
 for book_number, book in enumerate(books, start=1):
     already_extracted=extracted_books.find_one({"book":book})
     if not already_extracted:
-        # print(f"Processing book {book_number} , {book}")
-        not_extracted.append(book)
-        # get_book_data(book)
+        print(f"Processing book {book_number} , {book}")
+        # not_extracted.append(book)
+        get_book_data(book)
         # # get_book_data(book)
     else:
         print(f'this {book} already extracted')
-print(len(not_extracted))
+# print(len(not_extracted))
