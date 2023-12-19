@@ -4,12 +4,13 @@ const { MathMLToLaTeX } = require('mathml-to-latex');
 const app = express();
 
 app.use(express.json())
-const port = 9000;
+const port = 9001;
 
 // Define a route
 app.post('/', (req, res) => {
     try {
-        latex = MathMLToLaTeX.convert(req.body.math);
+        latex = MathMLToLaTeX.convert(req.body.math_tag);
+        console.log(latex)
         res.send({
             status: "success",
             data: latex
