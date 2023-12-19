@@ -9,7 +9,6 @@ from dotenv import load_dotenv
 from latext import latex_to_text
 from pymongo import MongoClient
 import uuid
-import re
 import json
 import xml.etree.ElementTree as ET
 from lxml import etree
@@ -54,7 +53,7 @@ def mongo_init(connection_string=None):
     else:
         client = MongoClient(connection_string)
     if client:
-        db = client['epub_testing']
+        db = client['epub_microsoft']
     return db
 
 db = mongo_init(mongo_connection_string)
@@ -422,27 +421,6 @@ def extract_data(elem, book, filename, db, section_data=[]):
                     temp['code_snippet'] = []
                     temp['equations'] = []
     
-            # handling equaiton as text
-            elif child.name == 'math':
-                print("equation here")
-                equation_Id = uuid.uuid4().hex
-                eqaution_data = {'id': equation_Id,
-                                 'math_tag':str(child)}
-                if section_data:
-                    section_data[-1]['content'] += '{{equation:' + \
-                        equation_Id + '}} '
-                    if 'equations' in section_data[-1]:
-                        section_data[-1]['equations'].append(eqaution_data)
-                    else:
-                        section_data[-1]['equations'] = [eqaution_data]
-                else:
-                    temp['title'] = ''
-                    temp['content'] = '{{equation:' + equation_Id + '}} '
-                    temp['tables'] = []
-                    temp['figures'] = []
-                    temp['code_snippet'] = []
-                    temp['equations'] = [eqaution_data]
-
             #code oreilly publication
             elif child.name == 'pre':
                 print('code here')
