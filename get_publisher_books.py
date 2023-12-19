@@ -230,6 +230,25 @@ def list_objects(bucket_name, prefix=''):
         else:
             break 
 
+
+def get_id_s3_key_mismatch():
+    """Get books with mismatch in book_id and title
+    """
+    results = collection.find({})
+    for result in results:
+        book_id = result.get('book_id')
+        title = result.get('title')
+        s3_key = result.get('s3_key')
+        if book_id and s3_key:
+            if book_id not in s3_key:
+                print(book_id)
+                print(s3_key)
+                error_collection.insert_one({
+                    "book_id": book_id,
+                    "title": title,
+                    "s3_key": s3_key
+                })
+
 if __name__ == '__main__':
     # Specify the folder path
     # folder_path = '../bud-datalake/ebook_jsons'
