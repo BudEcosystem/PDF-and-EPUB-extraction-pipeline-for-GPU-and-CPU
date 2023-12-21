@@ -16,10 +16,12 @@ from utils import (
     download_book_from_aws,
     generate_image_str,
     find_split_path,
-    get_page_num_from_split_path
+    get_page_num_from_split_path,
+    get_rabbitmq_connection,
+    get_channel
 )
 from pdf_producer import send_to_queue, error_queue
-from rabbitmq_connection import get_rabbitmq_connection, get_channel
+
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)

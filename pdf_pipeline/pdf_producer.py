@@ -6,8 +6,12 @@ import json
 from dotenv import load_dotenv
 import os
 import boto3
-from rabbitmq_connection import get_rabbitmq_connection, get_channel
-from utils import generate_image_str, get_mongo_collection, generate_unique_id
+from utils import (
+    get_mongo_collection,
+    generate_unique_id,
+    get_rabbitmq_connection,
+    get_channel
+)
 
 
 load_dotenv()

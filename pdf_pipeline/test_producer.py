@@ -1,5 +1,5 @@
 import json
-from rabbitmq_connection import get_rabbitmq_connection, get_channel
+from utils import get_rabbitmq_connection, get_channel
 
 def nougat_pdf_queue_test(queue_name, results, bookname, bookId):
     connection = get_rabbitmq_connection()

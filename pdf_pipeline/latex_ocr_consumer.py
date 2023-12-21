@@ -10,7 +10,9 @@ from utils import (
     timeit,
     create_image_from_str,
     generate_image_str,
-    get_mongo_collection
+    get_mongo_collection,
+    get_rabbitmq_connection,
+    get_channel
 )
 import json
 from pdf_producer import send_to_queue, error_queue
@@ -23,7 +25,6 @@ from element_extraction_utils import (
     process_list,
     process_equation
 )
-from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
 
 connection = get_rabbitmq_connection()

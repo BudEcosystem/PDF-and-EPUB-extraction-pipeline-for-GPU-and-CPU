@@ -6,8 +6,7 @@ sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
 import json
 from pdf_producer import error_queue, send_to_queue
-from rabbitmq_connection import get_rabbitmq_connection, get_channel
-from utils import get_mongo_collection
+from utils import get_mongo_collection, get_rabbitmq_connection, get_channel
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)

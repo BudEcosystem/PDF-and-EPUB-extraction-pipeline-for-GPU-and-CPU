@@ -5,12 +5,13 @@ import sys
 import traceback
 sys.path.append("pdf_extraction_pipeline")
 from pdf_producer import send_to_queue, error_queue
-from rabbitmq_connection import get_rabbitmq_connection, get_channel
 import layoutparser as lp
 from utils import (
     timeit,
     read_image_from_str,
-    get_mongo_collection
+    get_mongo_collection,
+    get_rabbitmq_connection,
+    get_channel
 )
 
 connection = get_rabbitmq_connection()

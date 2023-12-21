@@ -2,6 +2,7 @@
 import os
 import time
 from functools import wraps
+import pika
 import cv2
 import boto3
 import pymongo
@@ -13,6 +14,11 @@ import base64
 import numpy as np
 
 load_dotenv()
+
+RABBITMQ_HOST = os.getenv("RABBITMQ_HOST")
+RABBITMQ_PORT = int(os.getenv("RABBITMQ_PORT"))
+RABBITMQ_USERNAME = os.getenv("RABBITMQ_USERNAME")
+RABBITMQ_PASSWORD = os.getenv("RABBITMQ_PASSWORD")
 
 aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
 aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
@@ -44,6 +50,24 @@ def timeit(func):
         print(f'Function {func.__name__} Took {total_time:.4f} seconds')
         return result
     return timeit_wrapper
+
+def get_rabbitmq_connection():
+    credentials = pika.PlainCredentials(username=RABBITMQ_USERNAME, password=RABBITMQ_PASSWORD)
+    
+    # Specify the credentials in the connection parameters
+    connection_params = pika.ConnectionParameters(
+        host=RABBITMQ_HOST,
+        port=RABBITMQ_PORT,
+        # Replace with the appropriate port
+        heartbeat=0,
+        credentials=credentials,
+        connection_attempts=3
+    )
+    return pika.BlockingConnection(connection_params)
+
+def get_channel(connection):
+    return connection.channel()
+
 
 def crop_image(block, imagepath, id):
     """
@@ -236,4 +260,6 @@ if __name__ == '__main__':
     file_local_path = download_book_from_aws(BOOK_ID, BOOK)
     split_local_paths = split_pdf(file_local_path)
     print(split_local_paths)
+    # connection = get_rabbitmq_connection()
+    # print("RabbitMQ connection established")
 

@@ -4,8 +4,7 @@ import sys
 sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
 import json
-from utils import get_mongo_collection
-from rabbitmq_connection import get_rabbitmq_connection, get_channel
+from utils import get_mongo_collection, get_rabbitmq_connection, get_channel
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)

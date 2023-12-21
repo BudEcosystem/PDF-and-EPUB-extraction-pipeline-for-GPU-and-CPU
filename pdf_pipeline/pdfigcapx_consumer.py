@@ -10,9 +10,14 @@ import traceback
 sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
 from code.FigCap import extract_figure_and_caption
-from utils import timeit, get_mongo_collection, generate_unique_id
+from utils import (
+    timeit,
+    get_mongo_collection,
+    generate_unique_id,
+    get_rabbitmq_connection,
+    get_channel
+)
 from pdf_producer import send_to_queue, error_queue
-from rabbitmq_connection import get_rabbitmq_connection, get_channel
 
 
 load_dotenv()

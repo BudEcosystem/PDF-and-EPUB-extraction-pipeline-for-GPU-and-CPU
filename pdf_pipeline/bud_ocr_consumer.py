@@ -9,8 +9,12 @@ import os
 from pdf_extraction_pipeline.bud_api_table_extract import process_book_page
 from pdf_producer import error_queue
 import json
-from rabbitmq_connection import get_rabbitmq_connection, get_channel
-from utils import get_mongo_collection, create_image_from_str
+from utils import (
+    get_mongo_collection,
+    create_image_from_str,
+    get_rabbitmq_connection,
+    get_channel
+)
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
