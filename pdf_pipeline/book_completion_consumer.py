@@ -36,7 +36,7 @@ def book_complete(ch, method, properties, body):
             print(f"book {bookId} already extracted")
             return
         book_det = book_details.find_one({"bookId": bookId})
-        book_name = book_det["book_name"]
+        book_name = book_det["book"]
         book_path = book_det["book_path"]
         num_pages_done = book_det.get("num_pages_done")
         num_pages = book_det.get("num_pages")
