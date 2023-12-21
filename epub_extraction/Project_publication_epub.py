@@ -7,7 +7,7 @@ folder_name = 'Books/Oct29-1/'
 s3_base_url = "https://bud-datalake.s3.ap-southeast-1.amazonaws.com"
 
 
-db = mongo_init('epub_project')
+db = mongo_init('epub_testing')
 oct_toc=db.oct_toc
 oct_no_toc=db.oct_no_toc
 oct_chapters=db.oct_chapters
@@ -183,33 +183,52 @@ def get_book_data(book):
                                 
 
 
-if __name__ == '__main__':
-    # to run single file
-    # get_book_data('Essential Math for Data Science (9781098102920)')
-    publisher_collection=db.publishers
-    s3_keys=[]
-    missing_s3Keys=[]
-    extracted=[]
-    for book in publisher_collection.find():
-        if 'publishers' in book and book['publishers'] and book['publishers'][0].startswith("Project"):
-            if 's3_key' in book:
-                bookname=book['s3_key'].split('/')[-2]
-                already_extracted=extracted_books.find_one({"book":bookname})
-                if not already_extracted:
-                    get_book_data(bookname)
-                    extracted.append(bookname)
-                else:
-                    print('already extracted')
-                s3_keys.append(bookname)
+# if __name__ == '__main__':
+#     # to run single file
+#     # get_book_data('Essential Math for Data Science (9781098102920)')
+#     publisher_collection=db.publishers
+#     s3_keys=[]
+#     missing_s3Keys=[]
+#     extracted=[]
+#     for book in publisher_collection.find():
+#         if 'publishers' in book and book['publishers'] and book['publishers'][0].startswith("Project"):
+#             if 's3_key' in book:
+#                 bookname=book['s3_key'].split('/')[-2]
+#                 already_extracted=extracted_books.find_one({"book":bookname})
+#                 if not already_extracted:
+#                     get_book_data(bookname)
+#                     extracted.append(bookname)
+#                 else:
+#                     print('already extracted')
+#                 s3_keys.append(bookname)
+#             else:
+#                 missing_s3Keys.append(book['title'])
+
+#     print(f'total books with s3_keys {len(s3_keys)}')
+#     print(f'total books with s3_keys {len(missing_s3Keys)}')
+#     print(f'total project publication extracted books {len(extracted)}')
+
+
+
+
+
+
+
+publisher_collection=db.publishers
+s3_keys=[]
+figure_tags=[]
+no_figure_tag=[]
+missing_s3Keys=[]
+extracted=[] 
+for book in publisher_collection.find():
+    if 'publishers' in book and book['publishers'] and book['publishers'][0].startswith("Wiley"):
+        if 's3_key' in book:
+            s3_key=book['s3_key']
+            bookname=book['s3_key'].split('/')[-2]
+            s3_keys.append(bookname)
+            already_extracted=extracted_books.find_one({"book":bookname})
+            if not already_extracted:
+                print("not_extracted")
             else:
-                missing_s3Keys.append(book['title'])
-
-    print(f'total books with s3_keys {len(s3_keys)}')
-    print(f'total books with s3_keys {len(missing_s3Keys)}')
-    print(f'total project publication extracted books {len(extracted)}')
-
-
-
-
-
-
+                extracted.append(bookname)
+print(len(extracted))

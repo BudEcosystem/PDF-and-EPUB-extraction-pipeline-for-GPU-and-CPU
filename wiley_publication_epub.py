@@ -454,6 +454,8 @@ def extract_data(elem, book, filename, section_data=[]):
                     eqaution_data={'id': equation_Id, 'text':latex_text, 'text_to_speech':text_to_speech}
                     print("this is equation image")
                     os.remove(equation_image_path)
+                else:
+                    continue
                 if section_data:
                     section_data[-1]['content'] += '{{equation:' + \
                         equation_Id + '}} '

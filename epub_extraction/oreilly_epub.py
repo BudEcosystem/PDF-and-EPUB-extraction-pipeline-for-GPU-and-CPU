@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup, NavigableString
 from utils import timeit, mongo_init, parse_table, generate_unique_id, get_all_books_names, get_file_object_aws, get_toc_from_ncx, get_toc_from_xhtml
-
+import psutil
 
 bucket_name = 'bud-datalake'
 folder_name = 'Books/Oct29-oreilly-2/'
@@ -244,10 +244,33 @@ if __name__ == '__main__':
     print(len(books))
     for book_number, book in enumerate(books, start=0):
         already_extracted=extracted_books.find_one({"book":book})
+        mem = psutil.virtual_memory()
+        print(f"Total Memory: {mem.total / (1024 ** 3):.2f} GB")
+        print(f"Available Memory: {mem.available / (1024 ** 3):.2f} GB")
+        print(f"Memory Usage Percentage: {mem.percent:.2f}%")
         if not already_extracted:
-            not_extracted.append(book)
-            # print(f"Processing book {book_number} , {book}")
-            # get_book_data(book)
-        # else:
-        #     # print(f'this {book} already extracted')
+            # not_extracted.append(book)
+            print(f"Processing book /{book_number} , {book}")
+            get_book_data(book)
+        else:
+            print(f'this {book} already extracted')
     print(len(not_extracted))
+
+# publisher_collection=db.publishers
+# s3_keys=[]
+# figure_tags=[]
+# no_figure_tag=[]
+# missing_s3Keys=[]
+# extracted=[] 
+# for book in publisher_collection.find():
+#     if 'publishers' in book and book['publishers'] and book['publishers'][0].startswith("Wiley"):
+#         if 's3_key' in book:
+#             s3_key=book['s3_key']
+#             bookname=book['s3_key'].split('/')[-2]
+#             s3_keys.append(bookname)
+#             already_extracted=extracted_books.find_one({"book":bookname})
+#             if not already_extracted:
+#                 print("not_extracted")
+#             else:
+#                 extracted.append(bookname)
+# print(len(extracted))

@@ -1,5 +1,8 @@
 import os
+import pytesseract
 from bs4 import BeautifulSoup, NavigableString
+
+from PIL import Image
 from utils import timeit, mongo_init,generate_unique_id, get_s3, parse_table,get_file_object_aws,get_toc_from_xhtml, get_all_books_names, get_toc_from_ncx
 
 
@@ -72,6 +75,8 @@ def extract_data(elem, book, filename, db, section_data=[]):
                 image_parent=child.find_parent('p', class_='fimage')
                 #if image are inside p tag with class name figimgc
                 figimgc_parent= child.find_parent('p', class_="figimgc")
+                #if image are inside p tag with class name images
+                images_parent=child.find_parent('p', class_='images')
                 if image_parent:
                     figcap=image_parent.find_previous('p', class_='figcap')
                     if figcap:
@@ -80,11 +85,19 @@ def extract_data(elem, book, filename, db, section_data=[]):
                         nextcapt=image_parent.find_next('p', class_='figcap')
                         if nextcapt:
                             img['caption']=nextcapt.get_text(strip=True)               
-
                 elif figimgc_parent:
                     figcap = figimgc_parent.find_next('p', class_="figcapl")
                     if figcap:
                         img['caption']=figcap.get_text(strip=True)
+
+                elif images_parent:
+                    image_cap=images_parent.find_next('p', class_='figcap')
+                    if image_cap:
+                        print("yes parent images")
+                        img['caption']=image_cap.get_text(strip=True)
+                        print(img['caption'])
+
+
                 if section_data:
                     section_data[-1]['content'] += '{{figure:' + img['id'] + '}} '
                     if 'figures' in section_data[-1]:
@@ -102,7 +115,7 @@ def extract_data(elem, book, filename, db, section_data=[]):
 
 
             # # handle table as image p tag with class name timage and image-t
-            # elif child.name == 'p' and ('timage' in child.get('class', []) or 'image-t' in child.get('class', [])):
+            # elif child.name == 'p' and any(cls in child.get('class', []) for cls in ['timage', 'image-t', 'imaget']):
             #     print("hello")
             #     caption=''
             #     tabcap=child.find_next('p', class_='tabcap')
@@ -144,6 +157,48 @@ def extract_data(elem, book, filename, db, section_data=[]):
             #         temp['figures'] = []
             #         temp['code_snippet'] = []
             #         temp['equations'] = []
+
+            
+            #code inside p tag with class name code1
+            elif child.name == 'p' and 'code1' in child.get('class', []):
+                print('code here')
+                code_tag = child.find('code')
+                code_image=child.find('img')
+                code = ''
+                if code_tag:
+                    code = code_tag.get_text(strip=True)
+                elif code_image:
+                    aws_path = f'{s3_base_url}/{folder_name}{book}/OEBPS/'
+                    img_url = aws_path + code_image['src']
+                    print("This is code image")
+                    img_key = img_url.replace(s3_base_url + "/", "")
+                    code_image_path= download_aws_image(img_key)
+                    if not code_image_path:
+                        continue
+                    try:
+                        image =Image.open(code_image_path)
+                    except Exception as e:
+                        print("error while reading code image",e)
+                        continue
+                    code = pytesseract.image_to_string(image)
+                    if os.path.exists(code_image_path):
+                        os.remove(code_image_path)
+                code_id = generate_unique_id()
+                code_data = {'id': code_id, 'code_snippet': code}
+                if section_data:
+                    section_data[-1]['content'] += '{{code_snippet:' + code_id + '}} '
+                    if 'code_snippet' in section_data[-1]:
+                        section_data[-1]['code_snippet'].append(code_data)
+
+                    else:
+                        section_data[-1]['code_snippet'] = [code_data]
+                else:
+                    temp['title'] = ''
+                    temp['content'] = '{{code_snippet:' + code_id + '}} '
+                    temp['tables'] = []
+                    temp['figures'] = []
+                    temp['code_snippet'] = [code_data]
+                    temp['equations'] = []
 
             elif child.name == 'table':
                 print('table here')
@@ -230,11 +285,11 @@ def get_book_data(book):
         error = ''
         try:
             # get table of content
-            toc_content = get_file_object_aws(book, 'toc.ncx')
+            toc_content = get_file_object_aws(book, 'toc.ncx', folder_name, bucket_name)
             if toc_content:
                 toc = get_toc_from_ncx(toc_content)
             else:
-                toc_content = get_file_object_aws(book, 'toc.xhtml')
+                toc_content = get_file_object_aws(book, 'toc.xhtml', folder_name, bucket_name)
                 if toc_content:
                     toc = get_toc_from_xhtml(toc_content)
         except Exception as e:
@@ -267,7 +322,7 @@ def get_book_data(book):
                             oct_chapters.delete_one(
                                 {'book': book, 'filename': filename})
 
-                    html_content = get_file_object_aws(book, filename)
+                    html_content = get_file_object_aws(book, filename, folder_name, bucket_name)
 
                     if html_content:
                         try:
