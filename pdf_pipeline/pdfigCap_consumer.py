@@ -22,6 +22,43 @@ figure_caption = get_mongo_collection('figure_caption')
 class DocumentFound(Exception):
     pass
 
+def transform_to_figure_blocks(book_data):
+    figure_layout = []
+    # sonali : how did we decide on these values ?
+    # and if constant value then move to .env or global variable
+    old_page_width = 439
+    old_page_height = 666
+    new_page_width = 1831
+    new_page_height = 2776
+    for page in book_data:
+        figure_bbox_values = page.get("figure_bbox")
+        caption_text = page.get('caption_text')
+        caption = ''.join(caption_text)
+
+        width_scale = new_page_width / old_page_width
+        height_scale = new_page_height / old_page_height
+
+        x1, y1, x2, y2 = figure_bbox_values
+
+        x1 = x1 * width_scale
+        y1 = y1 * height_scale
+        x2 = x2 * width_scale
+        y2 = y2 * height_scale
+
+        x2 = x1 + x2
+        y2 = y1 + y2
+
+        figure_block = {
+            "x_1": x1,
+            "y_1": y1,
+            "x_2": x2,
+            "y_2": y2,
+            "type": "Figure",
+            "caption": caption
+        }
+        figure_layout.append(figure_block)
+    return figure_layout
+
 @timeit
 def get_figure_and_captions(ch, method, properties, body):
     message = json.loads(body)
@@ -54,10 +91,11 @@ def get_figure_and_captions(ch, method, properties, body):
     try:
         book_data = extract_figure_and_caption(pdf_input_folder, output_folder)
         if book_data:
+            figure_layout = transform_to_figure_blocks(book_data)
             figure_caption.insert_one({
                 "bookId": bookId,
                 "split_path": book_path,
-                "pages": book_data,
+                "pages": figure_layout,
                 "status": "success",
                 "from_page": from_page,
                 "to_page": to_page

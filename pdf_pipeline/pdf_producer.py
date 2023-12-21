@@ -121,9 +121,12 @@ def get_book_completion_queue_msg(bookId):
 
 def get_extraction_queue_msg(data):
     queue_msg = {
-        "page_result": data["page_result"],
-        "book_path": data["split_path"],
-        "bookId": data["bookId"]
+        "results": data.get("results", None),
+        "bookId": data["bookId"],
+        "page_num": data.get("page_num"),
+        "image_path": data.get("image_path"),
+        "is_figure_present": data.get("is_figure_present", None),
+        "split_id": data.get("split_id", None)
     }
     return queue_msg
 
@@ -166,7 +169,7 @@ def store_book_details():
     for book in books:
         doc = book_details.find_one({"book": book})
         if not doc:
-            book_data={
+            book_data = {
                 "bookId": generate_unique_id(),
                 "book": book,
                 "status": "not_extracted"
@@ -178,7 +181,7 @@ if __name__ == "__main__":
     try:
         # # # store all books from aws to book_details collection before running
         store_book_details()
-        books=book_details.find({})
+        books = book_details.find({})
         for book in books:
             if book['status']=='not_extracted':
                 send_to_queue('pdf_processing_queue', book)

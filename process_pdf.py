@@ -25,7 +25,7 @@ from urllib.parse import urlparse
 import urllib
 import uuid
 from PyPDF2 import PdfReader
-from tablecaption import process_book_page
+from pdf_extraction_pipeline.bud_api_table_extract import process_book_page
 from model_loader import ModelLoader 
 from utils import timeit, crop_image
 from latext import latex_to_text

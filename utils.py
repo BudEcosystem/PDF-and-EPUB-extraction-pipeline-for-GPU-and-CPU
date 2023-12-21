@@ -95,7 +95,6 @@ def download_book_from_aws(book_id, book_name):
         print("An error occurred:", e)
     return local_path
 
-
 def get_page_num_from_split_path(split_path):
     """
     Function is used to get book_id, from_page and to_page from book path
@@ -115,7 +114,6 @@ def get_page_num_from_split_path(split_path):
     from_page = int(page_nums[0])
     to_page = int(page_nums[-1])
     return book_id, split_id, from_page, to_page
-
 
 @timeit
 def split_pdf(book_id, local_path):
@@ -176,7 +174,6 @@ def get_mongo_collection(collection_name):
     collection = db[collection_name]
     return collection
 
-# sonali
 def read_image_from_str(image_str):
     image_bytes = base64.b64decode(image_str)
     image_np_array = np.frombuffer(image_bytes, np.uint8)
@@ -215,6 +212,16 @@ def find_split_path(split_paths, page_num):
         _, _, fp, tp = get_page_num_from_split_path(split_path)
         if page_num >= fp and page_num <= tp:
             return split_path
+
+def upload_to_aws_s3(image_path, image_id): 
+    image_folder_name = os.environ['AWS_PDF_IMAGE_UPLOAD_FOLDER']
+    s3_key = f"{image_folder_name}/{image_id}.png"
+    # Upload the image to the specified S3 bucket
+    s3.upload_file(image_path, bucket_name, s3_key)
+    # Get the URL of the uploaded image
+    image_url = f"https://{bucket_name}.s3.amazonaws.com/{s3_key}"
+    return image_url
+
 
 if __name__ == '__main__':
     BOOK_ID = '456'

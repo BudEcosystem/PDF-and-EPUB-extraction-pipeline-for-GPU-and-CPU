@@ -1,6 +1,5 @@
 # pylint: disable=all
 # type: ignore
-from dotenv import load_dotenv
 import sys
 sys.path.append("pdf_extraction_pipeline")
 from utils import timeit
@@ -9,66 +8,84 @@ import requests
 import img2pdf
 import traceback
 import json
-
-
+from dotenv import load_dotenv
 from rabbitmq_connection import get_rabbitmq_connection, get_channel
-from pdf_producer import book_completion_queue, error_queue
-from utils import get_mongo_collection, create_image_from_str
-
-connection = get_rabbitmq_connection()
-channel = get_channel(connection)
-channel.basic_qos(prefetch_count=1, global_qos=False)
+from pdf_producer import send_to_queue, error_queue
+from utils import (
+    get_mongo_collection,
+    create_image_from_str,
+    generate_image_str,
+    generate_unique_id
+)
 
 load_dotenv()
 
-# NOUGAT_API_URL=os.environ['NOUGAT_API_URL']
+connection = get_rabbitmq_connection()
+channel = get_channel(connection)
 
-nougat_done=get_mongo_collection('nougat_done')
+NOUGAT_BATCH_SIZE = os.environ["NOUGAT_BATCH_SIZE"]
+
+book_details = get_mongo_collection('book_details')
 
 @timeit
 def extract_text_equation_with_nougat(ch, method, properties, body):
+    message = json.loads(body)
+    bookId = message['bookId']
+    # page_num = message.get('page_num', None)
+    # image_path = message.get('image_path', None)
+    split_id = message.get('split_id', None)
+    print(f"nougat received message for {bookId}")
     try:
-        message = json.loads(body)
-        bookname = message['bookname']
-        bookId = message['bookId']
-        nougat_pages_data = get_mongo_collection('nougat_pages_data')
-        nougat_pages = nougat_pages_data.find({"bookId": bookId})
-        results = [each["page"] for each in nougat_pages]
-        print(f"nougat received message for {bookname} ({bookId})")
-        nougat_pages_doc = nougat_done.find_one({"bookId": bookId})
-        if nougat_pages_doc:
-            book_completion_queue('book_completion_queue', bookname, bookId)
-            return
-        pdf_file_name = f"{bookId}.pdf"
-        pdf_path = os.path.abspath(pdf_file_name)
-        print(f"nougat pdf path {pdf_path}")
+        process_remaining_pages = False
+        book = book_details.find_one({"bookId": bookId})
+        nougat_splits = book['nougat_splits']
 
-        # sonali: create pdf from image strings
-        image_strs = [result['image_str'] for result in results]
-        image_paths = []
-        for image_str in image_strs:
-            image_paths.append(create_image_from_str(image_str))
+        if not split_id:
+            split_ids = sorted(list(nougat_splits.keys()))
+            split_id = split_ids[-1]
+            process_remaining_pages = True
+       
+        nougat_pages = nougat_splits[split_id]
+        if len(nougat_pages) == NOUGAT_BATCH_SIZE or process_remaining_pages:
+            if split_id in book.get('processing_nougat_split', []):
+                return
+            book_details.update_one(
+                {"bookId": bookId},
+                {"$addToSet": {"processing_nougat_split": split_id}}
+            )
+            pages_extracted = 0
+            image_paths = [page["image_path"] for page in nougat_pages]
+            image_strs = []
+            for img_path in image_paths:
+                # will return image_str form db
+                image_strs.append(generate_image_str(img_path, bookId))
+            for image_str in image_strs:
+                image_paths.append(create_image_from_str(image_str))
+                pages_extracted += 1
+            pdf_path = os.path.abspath(f"{generate_unique_id()}.pdf")
+            with open(pdf_path, "wb") as f_pdf:
+                f_pdf.write(img2pdf.convert(image_paths))
 
-        # Iterate over results and create PDF
-        # image_paths = [result['image_path'] for result in results]
-        with open(pdf_path, "wb") as f_pdf:
-            f_pdf.write(img2pdf.convert(image_paths))
-        
-        for img_path in image_paths:
-            abs_path = os.path.abspath(img_path)
-            os.remove(abs_path)
+            # clean up local images created for pdf creation
+            for img_path in image_paths:
+                abs_path = os.path.abspath(img_path)
+                os.remove(abs_path)
 
-        page_nums = [result['page_num'] for result in results]
-        api_data = {
-            "bookId": bookId,
-            "bookname": bookname,
-            "page_nums": page_nums
-        }
-        _ = get_nougat_extraction(pdf_path, api_data)
-        if os.path.exists(pdf_path):
-            os.remove(pdf_path)
-        book_completion_queue('book_completion_queue', bookname, bookId)
-        print("after finish")
+            page_nums = [page["page_num"] for page in nougat_pages]
+            api_data = {
+                "bookId": bookId,
+                "page_nums": page_nums
+            }
+            _ = get_nougat_extraction(pdf_path, api_data)
+            if os.path.exists(pdf_path):
+                os.remove(pdf_path)
+            book_details.find_one_and_update(
+                {"bookId": bookId},
+                {
+                    "$inc": {"num_pages_done": pages_extracted}
+                }
+            )
+            send_to_queue('book_completion_queue', bookId)
     except Exception as e:
         error = {
             "consumer":"nougat_consumer",
@@ -77,7 +94,7 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
             "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno
         } 
         print(error)
-        error_queue('error_queue', bookname, bookId, error)
+        error_queue('error_queue', '', bookId, error)
     finally:
         print("message ack")
         ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -97,32 +114,28 @@ def get_nougat_extraction(pdf_path, data):
         return None
 
 def consume_nougat_pdf_queue():
-    try:
-        channel.basic_qos(prefetch_count=1, global_qos=False)
-        queue_name = "nougat_pdf_queue"
-         # Declare the queue
-        channel.queue_declare(queue=queue_name)
-        # Set up the callback function for handling messages from the queue
-        channel.basic_consume(queue=queue_name, on_message_callback=extract_text_equation_with_nougat)
+    channel.basic_qos(prefetch_count=1, global_qos=False)
+    queue_name = "nougat_pdf_queue"
+    # Declare the queue
+    channel.queue_declare(queue=queue_name)
+    # Set up the callback function for handling messages from the queue
+    channel.basic_consume(queue=queue_name, on_message_callback=extract_text_equation_with_nougat)
 
-        print(f' [*] Waiting for messages on {queue_name}. To exit, press CTRL+C')
-        channel.start_consuming()
+    print(f' [*] Waiting for messages on {queue_name}. To exit, press CTRL+C')
+    channel.start_consuming()
 
-    except KeyboardInterrupt:
-        pass
-    finally:
-        channel.close()
-        connection.close()
+    
 
 
 if __name__ == "__main__":
     try:
-        # sonali: changed to system argument
         nougat_api_url = sys.argv[1]
         print(f"Nougat consumer connected to {nougat_api_url}")
-        consume_nougat_pdf_queue()    
+        consume_nougat_pdf_queue() 
     except KeyboardInterrupt:
         pass
+    finally:
+        connection.close()
   
 
 

@@ -1,14 +1,10 @@
 
 import os
 from dotenv import load_dotenv
-import json
 import requests
 import math
-import uuid
 import re
 from bs4 import BeautifulSoup
-import uuid
-
 
 load_dotenv()
 
@@ -75,13 +71,11 @@ def find_closest_results_for_table_caption(data):
                 closest_values.append(closest_value)
     
     return closest_values
-# Example data
 
 def process_book_page(image_path, tableId):
     files = {
         'file': (image_path, open(image_path, 'rb'))
     }
-    print(files)
     response = requests.post(os.environ['BUD_OCR'], files=files)
     print(response)
     if response.status_code == 200:
@@ -92,22 +86,21 @@ def process_book_page(image_path, tableId):
             caption = caption[idx] if idx < len(caption) else ""
             if should_skip_table(table_data):
                 continue
+            # why this ?
             rows = [row for row in table_data]
             if not re.match(r'^Table\s+\d+', caption):
                 caption = ""
-            table_data={
+            table_data = {
                 "id": tableId,
                 "caption": caption,
                 "data": {
                     "rows": rows
-                    }
+                }
             }
             return table_data
     else:
         print('API request failed with status code:', response.status_code)
         return None
-
-      
 
 def should_skip_table(table):
     if len(table) <= 1 or all(len(row) == 1 for row in table):
