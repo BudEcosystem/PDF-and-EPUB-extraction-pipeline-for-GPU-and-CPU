@@ -1,17 +1,7 @@
-from latext import latex_to_text
-from utils import timeit, mongo_init, text_to_speech
+from utils import mongo_init, latext_to_text_to_speech
 import requests
 
-
-@timeit
-def latext_to_text_to_speech(text):
-    # Remove leading backslashes and add dollar signs at the beginning and end of the text
-    text = "${}$".format(text)
-    # Convert the LaTeX text to text to speech
-    text_to_speech = latex_to_text(text)
-    return text_to_speech
-
-db= mongo_init['epub_testing']
+db= mongo_init('epub_testing')
 oct_chapters=db.oct_chapters
 
 # Find all documents in oct_chapters
@@ -30,7 +20,7 @@ for document in all_documents:
             # Iterate over equations
             for equation in equations:
                 math_tag = equation.get("math_tag")
-                api_url = 'http://localhost:9001'
+                api_url = 'http://localhost:9007'
                 # Check if equations array is not empty and math_tag exists
                 if equations and math_tag:
                     # Call your API to get LaTeX code

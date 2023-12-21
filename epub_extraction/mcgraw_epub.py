@@ -1,8 +1,9 @@
 import os
 import pytesseract
 from bs4 import BeautifulSoup, NavigableString
-
+import shutil
 from PIL import Image
+from extract_epub_table import process_book_page
 from utils import timeit, mongo_init,generate_unique_id, get_s3, parse_table,get_file_object_aws,get_toc_from_xhtml, get_all_books_names, get_toc_from_ncx
 
 
@@ -18,15 +19,35 @@ oct_chapters=db.oct_chapters
 files_with_error=db.files_with_error
 extracted_books=db.extracted_books
 
-def download_aws_image(key):
+
+
+def download_aws_image(key, book):
     try:
-        os.makedirs(folder_name, exist_ok=True)
-        local_path = os.path.join(folder_name, os.path.basename(key))
-        s3=get_s3()
+        if os.path.exists(book):
+            shutil.rmtree(book)
+        os.makedirs(book)
+        local_path = os.path.join(book, os.path.basename(key))
+        s3 = get_s3()
         s3.download_file(bucket_name, key, local_path)
         return os.path.abspath(local_path)
     except Exception as e:
         print(e)
+        return None
+
+def get_figure_caption(parent):
+    figure_caption=''
+    prev_sib=parent.find_previous_sibling()
+    next_sib=parent.find_next_sibling()
+    if prev_sib:
+        classname=prev_sib.get('class', [''])[0]
+        if classname=='figcap':
+            figure_caption=prev_sib.get_text(strip=True)
+        elif next_sib:
+            classname=next_sib.get('class', [''])[0]
+            if classname=='figcap':
+                figure_caption=next_sib.get_text(strip=True)
+    return figure_caption
+
 
 def parse_html_to_json(html_content, book, filename, db):
     # html_content = get_file_object_aws(book, filename)
@@ -66,10 +87,10 @@ def extract_data(elem, book, filename, db, section_data=[]):
 
             elif child.name == 'img':
                 print("figure here from img")
-                img = {}
-                img['id'] = generate_unique_id()
+                figure_caption=''
+                id = generate_unique_id()
                 aws_path = f'{s3_base_url}/{folder_name}{book}/OEBPS/'
-                img['url'] = aws_path+child['src']
+                url= aws_path+child['src']
                 
                 #if image are inside p tag with class name f-image
                 image_parent=child.find_parent('p', class_='fimage')
@@ -77,27 +98,31 @@ def extract_data(elem, book, filename, db, section_data=[]):
                 figimgc_parent= child.find_parent('p', class_="figimgc")
                 #if image are inside p tag with class name images
                 images_parent=child.find_parent('p', class_='images')
+                #if image are inside p tag with class name f-image
+                imagec_parent=child.find_parent('p', class_='imagec')
+            
                 if image_parent:
-                    figcap=image_parent.find_previous('p', class_='figcap')
-                    if figcap:
-                        img['caption']=figcap.get_text(strip=True)
-                    else:
-                        nextcapt=image_parent.find_next('p', class_='figcap')
-                        if nextcapt:
-                            img['caption']=nextcapt.get_text(strip=True)               
-                elif figimgc_parent:
-                    figcap = figimgc_parent.find_next('p', class_="figcapl")
-                    if figcap:
-                        img['caption']=figcap.get_text(strip=True)
+                   figure_caption=get_figure_caption(image_parent)
+
+                elif figimgc_parent: 
+                    prev_sib=figimgc_parent.find_previous_sibling()
+                    next_sib=figimgc_parent.find_next_sibling()
+                    if prev_sib:
+                       classname=prev_sib.get('class', [''])[0]
+                       if classname=='figcapl':
+                           figure_caption=prev_sib.get_text(strip=True)
+                       elif next_sib:
+                           classname=next_sib.get('class', [''])[0]
+                           if classname=='figcapl':
+                               figure_caption=next_sib.get_text(strip=True)
 
                 elif images_parent:
-                    image_cap=images_parent.find_next('p', class_='figcap')
-                    if image_cap:
-                        print("yes parent images")
-                        img['caption']=image_cap.get_text(strip=True)
-                        print(img['caption'])
+                    figure_caption=get_figure_caption(images_parent)
 
-
+                elif imagec_parent:
+                    figure_caption=get_figure_caption(imagec_parent)
+                                        
+                img={'id':id, 'url':url, 'caption':figure_caption}
                 if section_data:
                     section_data[-1]['content'] += '{{figure:' + img['id'] + '}} '
                     if 'figures' in section_data[-1]:
@@ -112,55 +137,170 @@ def extract_data(elem, book, filename, db, section_data=[]):
                     temp['tables'] = []
                     temp['code_snippet'] = []
                     temp['equations'] = []
-
-
-            # # handle table as image p tag with class name timage and image-t
-            # elif child.name == 'p' and any(cls in child.get('class', []) for cls in ['timage', 'image-t', 'imaget']):
-            #     print("hello")
-            #     caption=''
-            #     tabcap=child.find_next('p', class_='tabcap')
-            #     if tabcap:
-            #         caption=tabcap.get_text(strip=True)
-            #     else:
-            #         tabcap2=child.find_previous('p', class_='tabcap')
-            #         if tabcap2:
-            #             caption=tabcap2.get_text(strip=True)
-            #     print("yes table found and its caption is", caption)
-            #     table_image = child.find('img')
-            #     table_id = generate_unique_id()
-            #     if table_image:
-            #         aws_path = f'{s3_base_url}/{folder_name}{book}/OEBPS/'
-            #         img_url = aws_path + table_image['src']
-            #         print("This is table image")
-            #         img_key = img_url.replace(s3_base_url + "/", "")
-            #         table_image_path = download_aws_image(img_key)
-            #         print(table_image_path)
-            #         if not table_image_path:
-            #             continue
-            #         data=process_book_page(table_image_path)
-            #         if data:
-            #             table={"id":table_id, "data":data, "caption":caption}   
-            #         else:
-            #             table={"id":table_id, "data":'', "caption":caption}  
-            #         os.remove(table_image_path)
-            #     if section_data:
-            #         section_data[-1]['content'] += '{{table:' + \
-            #             table['id'] + '}} '
-            #         if 'tables' in section_data[-1]:
-            #             section_data[-1]['tables'].append(table)
-            #         else:
-            #             section_data[-1]['tables'] = [table]
-            #     else:
-            #         temp['title'] = ''
-            #         temp['content'] = '{{table:' + table['id'] + '}} '
-            #         temp['tables'] = [table]
-            #         temp['figures'] = []
-            #         temp['code_snippet'] = []
-            #         temp['equations'] = []
-
             
+            #handling p tag with class name image, it contains either image or table image
+            elif child.name == 'p' and 'image' in child.get('class', []):
+                print("inside p with classname image")
+                image_tag=child.find('img')
+                id = generate_unique_id()
+                aws_path = f'{s3_base_url}/{folder_name}{book}/OEBPS/'
+                image_path = aws_path+image_tag['src']
+                figure_caption=''
+                table_caption=''
+                fig_next_sib_class=''
+                fig_prev_sib_class=''
+                # we are doing like this beacuase we find immediate next sibling of image class
+                next_sibling = child.find_next_sibling()
+                previous_sibling=child.find_previous_sibling()
+                if next_sibling:
+                    fig_next_sib_class=next_sibling.get('class', [''])[0]
+                if previous_sibling:
+                    fig_prev_sib_class=previous_sibling.get('class',[''])[0]
+                if fig_next_sib_class=='figcap':
+                    figure_caption=next_sibling.get_text(strip=True)
+                elif fig_next_sib_class=='tabcap':
+                    table_caption=next_sibling.get_text(strip=True)
+                elif fig_prev_sib_class=='figcap':
+                    figure_caption=previous_sibling.get_text(strip=True)
+                if table_caption!="":
+                    img_key = image_path.replace(s3_base_url + "/", "")
+                    table_image_path = download_aws_image(img_key, book)
+                    print(table_image_path)
+                    if not table_image_path:
+                        continue
+                    try:
+                        data=process_book_page(table_image_path)
+                    except Exception as e:
+                        print("error while extrcating table using bud-ocr")
+                        continue
+                    table={"id":id, "data":data, "caption":table_caption}   
+                    if os.path.exists(table_image_path):
+                        os.remove(table_image_path)
+                    if section_data:
+                        section_data[-1]['content'] += '{{table:' + table['id'] + '}} '
+                        if 'tables' in section_data[-1]:
+                            section_data[-1]['tables'].append(table)
+                        else:
+                            section_data[-1]['tables'] = [table]
+                    else:
+                        temp['title'] = ''
+                        temp['content'] = '{{table:' + table['id'] + '}} '
+                        temp['tables'] = [table]
+                        temp['figures'] = []
+                        temp['code_snippet'] = []
+                        temp['equations'] = []
+                else:
+                    img={'id':id,'url':image_path,'caption':figure_caption}
+                    if section_data:
+                        section_data[-1]['content'] += '{{figure:' + img['id'] + '}} '
+                        if 'figures' in section_data[-1]:
+                            section_data[-1]['figures'].append(img)
+                        else:
+                            section_data[-1]['figures'] = [img]
+                    else:
+                        temp['title'] = ''
+                        temp['content'] = '{{figure:' + img['id'] + '}} '
+                        temp['figures'] = [img]
+                        temp['tables'] = []
+                        temp['code_snippet'] = []
+                        temp['equations'] = []
+
+
+            # handle table as image p tag with class name timage and image-t
+            elif child.name == 'p' and any(cls in child.get('class', []) for cls in ['timage', 'image-t', 'imaget']):
+                print("hello")
+                caption=''
+                next_sibling = child.find_next_sibling()
+                previous_sibling=child.find_previous_sibling()
+                if next_sibling:
+                    tab_next_sib_class=next_sibling.get('class', [''])[0]
+                    if tab_next_sib_class=='tabcap':
+                        caption=next_sibling.get_text(strip=True)
+                    elif previous_sibling:
+                        tab_prev_sib_class=previous_sibling.get('class',[''])[0]
+                        if tab_prev_sib_class=='tabcap':
+                            caption=previous_sibling.get_text(strip=True)
+
+                print("yes table found and its caption is", caption)
+                table_image = child.find('img')
+                table_id = generate_unique_id()
+                if table_image:
+                    aws_path = f'{s3_base_url}/{folder_name}{book}/OEBPS/'
+                    img_url = aws_path + table_image['src']
+                    print("This is table image")
+                    img_key = img_url.replace(s3_base_url + "/", "")
+                    table_image_path = download_aws_image(img_key, book)
+                    print(table_image_path)
+                    if not table_image_path:
+                        continue
+                    try:
+                        data=process_book_page(table_image_path)
+                    except Exception as e:
+                        print("error while extrcating table using bud-ocr",e)
+                        continue
+                    table={"id":table_id, "data":data, "caption":caption} 
+                    if os.path.exists(table_image_path):
+                        os.remove(table_image_path)
+                if section_data:
+                    section_data[-1]['content'] += '{{table:' + \
+                        table['id'] + '}} '
+                    if 'tables' in section_data[-1]:
+                        section_data[-1]['tables'].append(table)
+                    else:
+                        section_data[-1]['tables'] = [table]
+                else:
+                    temp['title'] = ''
+                    temp['content'] = '{{table:' + table['id'] + '}} '
+                    temp['tables'] = [table]
+                    temp['figures'] = []
+                    temp['code_snippet'] = []
+                    temp['equations'] = []
+            
+            #handle image and code
+            elif child.name == 'p' and 'code' in child.get('class', []):
+                code_tag = child.find('code')
+                image_tag = child.find('img')
+                if code_tag:
+                    print("code inside code")
+                    code = code_tag.get_text(strip=True)
+                    code_id = generate_unique_id()
+                    code_data = {'id': code_id, 'code_snippet': code}
+                    if section_data:
+                        section_data[-1]['content'] += '{{code_snippet:' + code_id + '}} '
+                        if 'code_snippet' in section_data[-1]:
+                            section_data[-1]['code_snippet'].append(code_data)
+                        else:
+                            section_data[-1]['code_snippet'] = [code_data]
+                    else:
+                        temp['title'] = ''
+                        temp['content'] = '{{code_snippet:' + code_id + '}} '
+                        temp['tables'] = []
+                        temp['figures'] = []
+                        temp['code_snippet'] = [code_data]
+                        temp['equations'] = []
+
+                elif image_tag:
+                    print("image inside class code")
+                    img = {}
+                    img['id'] = generate_unique_id()
+                    aws_path = f'{s3_base_url}/{folder_name}{book}/OEBPS/'
+                    img['url'] = aws_path+image_tag['src']
+                    if section_data:
+                        section_data[-1]['content'] += '{{figure:' + img['id'] + '}} '
+                        if 'figures' in section_data[-1]:
+                            section_data[-1]['figures'].append(img)
+                        else:
+                            section_data[-1]['figures'] = [img]
+                    else:
+                        temp['title'] = ''
+                        temp['content'] = '{{figure:' + img['id'] + '}} '
+                        temp['figures'] = [img]
+                        temp['tables'] = []
+                        temp['code_snippet'] = []
+                        temp['equations'] = []
+                
             #code inside p tag with class name code1
-            elif child.name == 'p' and 'code1' in child.get('class', []):
+            elif child.name == 'p' and any(cls in child.get('class', []) for cls in ['code1', 'imagepre', 'imageprei']):
                 print('code here')
                 code_tag = child.find('code')
                 code_image=child.find('img')
@@ -172,7 +312,7 @@ def extract_data(elem, book, filename, db, section_data=[]):
                     img_url = aws_path + code_image['src']
                     print("This is code image")
                     img_key = img_url.replace(s3_base_url + "/", "")
-                    code_image_path= download_aws_image(img_key)
+                    code_image_path= download_aws_image(img_key,book)
                     if not code_image_path:
                         continue
                     try:

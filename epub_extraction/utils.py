@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import boto3
 from pymongo import MongoClient
 import boto3
+from latext import latex_to_text
 from uuid import uuid4
 import html
 import time
@@ -229,3 +230,9 @@ def clean_string(html_string):
     clean_text = clean_text.strip()
     return clean_text
 
+def latext_to_text_to_speech(text):
+    # Remove leading backslashes and add dollar signs at the beginning and end of the text
+    text = "${}$".format(text)
+    # Convert the LaTeX text to text to speech
+    text_to_speech = latex_to_text(text)
+    return text_to_speech
