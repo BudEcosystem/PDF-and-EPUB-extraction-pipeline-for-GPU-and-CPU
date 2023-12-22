@@ -12,7 +12,7 @@ folder_name = 'Books/Oct29-1/'
 s3_base_url = "https://bud-datalake.s3.ap-southeast-1.amazonaws.com"
 # print(aws_access_key_id)
 
-db = mongo_init('epub_mcgraw')
+db = mongo_init('epub_testing')
 oct_toc=db.oct_toc
 oct_no_toc=db.oct_no_toc
 oct_chapters=db.oct_chapters
@@ -142,6 +142,8 @@ def extract_data(elem, book, filename, db, section_data=[]):
             elif child.name == 'p' and 'image' in child.get('class', []):
                 print("inside p with classname image")
                 image_tag=child.find('img')
+                if not image_tag:
+                    continue
                 id = generate_unique_id()
                 aws_path = f'{s3_base_url}/{folder_name}{book}/OEBPS/'
                 image_path = aws_path+image_tag['src']
@@ -493,25 +495,25 @@ def get_book_data(book):
 
 if __name__ == '__main__':
     #run single book
-    get_book_data('OCA Java SE 8 Programmer I Exam Guide (Exams 1Z0-808) (9781260011388)')
-    # publisher_collection=db.publishers
-    # s3_keys=[]
-    # missing_s3Keys=[]
-    # extracted=[]
-    # for book in publisher_collection.find():
-    #     if 'publishers' in book and book['publishers'] and book['publishers'][0].startswith("Mc"):
-    #         if 's3_key' in book:
-    #             bookname=book['s3_key'].split('/')[-2]
-    #             already_extracted=extracted_books.find_one({"book":bookname})
-    #             if not already_extracted:
-    #                 # get_book_data(bookname)
-    #                 extracted.append(bookname)
-    #             else:
-    #                 print('already extracted')
-    #             s3_keys.append(bookname)
-    #         else:
-    #             missing_s3Keys.append(book['title'])
+    # get_book_data('OCA Java SE 8 Programmer I Exam Guide (Exams 1Z0-808) (9781260011388)')
+    publisher_collection=db.publishers
+    s3_keys=[]
+    missing_s3Keys=[]
+    extracted=[]
+    for book in publisher_collection.find():
+        if 'publishers' in book and book['publishers'] and book['publishers'][0].startswith("Mc"):
+            if 's3_key' in book:
+                bookname=book['s3_key'].split('/')[-2]
+                already_extracted=extracted_books.find_one({"book":bookname})
+                if not already_extracted:
+                    get_book_data(bookname)
+                    extracted.append(bookname)
+                else:
+                    print('already extracted')
+                s3_keys.append(bookname)
+            else:
+                missing_s3Keys.append(book['title'])
 
-    # print(f'total books with s3_keys {len(s3_keys)}')
-    # print(f'total books with out s3_keys {len(missing_s3Keys)}')
-    # print(f'total mcgraw extracted books {len(extracted)}')
+    print(f'total books with s3_keys {len(s3_keys)}')
+    print(f'total books with out s3_keys {len(missing_s3Keys)}')
+    print(f'total mcgraw extracted books {len(extracted)}')
