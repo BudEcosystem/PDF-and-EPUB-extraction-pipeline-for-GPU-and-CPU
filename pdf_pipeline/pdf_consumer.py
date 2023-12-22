@@ -22,6 +22,7 @@ from utils import (
 )
 from pdf_producer import send_to_queue, error_queue
 
+QUEUE_NAME = 'pdf_processing_queue'
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
@@ -106,13 +107,13 @@ def process_book(ch, method, properties, body):
             split_path = find_split_path(split_book_paths, page_num)
             process_page(page_num, pdf_book, book_folder, split_path)
     except Exception as e:
+        print(traceback.format_exc())
         error = {
-            "consumer" : "pdf_consumer",
+            "consumer" : QUEUE_NAME,
             "consumer_message" : message,
             "error" : str(e),
             "line_number" : traceback.extract_tb(e.__traceback__)[-1].lineno
         }
-        print(error) 
         error_queue(book_name, book_id, error)   
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -146,11 +147,11 @@ def consume_pdf_processing_queue():
     try:
         channel.basic_qos(prefetch_count=1, global_qos=False)
         # Declare the queue
-        channel.queue_declare(queue='pdf_processing_queue')
+        channel.queue_declare(queue=QUEUE_NAME)
         # Set up the callback function for handling messages from the queue
-        channel.basic_consume(queue='pdf_processing_queue', on_message_callback=process_book)
+        channel.basic_consume(queue=QUEUE_NAME, on_message_callback=process_book)
 
-        print(' [*] Waiting for messages on pdf_processing_queue. To exit, press CTRL+C')
+        print(f' [*] Waiting for messages on {QUEUE_NAME}. To exit, press CTRL+C')
         channel.start_consuming()
 
     except KeyboardInterrupt:

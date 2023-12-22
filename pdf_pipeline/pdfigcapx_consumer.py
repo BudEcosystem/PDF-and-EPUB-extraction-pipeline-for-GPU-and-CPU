@@ -18,8 +18,12 @@ from utils import (
 )
 from pdf_producer import send_to_queue, error_queue
 
-
 load_dotenv()
+
+QUEUE_NAME = 'pdfigcapx_queue'
+
+connection = get_rabbitmq_connection()
+channel = get_channel(connection)
 
 figure_caption = get_mongo_collection('figure_caption')
 
@@ -132,12 +136,12 @@ def get_figure_and_captions(ch, method, properties, body):
             "to_page": to_page
         })
         error = {
-            "consumer": "pdfigcapx",
+            "consumer": QUEUE_NAME,
             "consumer_message": message,
             "error": str(e),
             "line_number": traceback.extract_tb(e.__traceback__)[-1].lineno
         } 
-        print(error)
+        print(traceback.format_exc())
         send_to_queue('check_ptm_completion_queue', queue_msg)
         error_queue(book_path, bookId, error)
     finally:
@@ -149,25 +153,22 @@ def get_figure_and_captions(ch, method, properties, body):
 
 
 def consume_pdfigcap_queue():
-    connection = get_rabbitmq_connection()
-    channel = get_channel(connection)
+    channel.basic_qos(prefetch_count=1, global_qos=False)
+    # Declare the queue
+    channel.queue_declare(queue=QUEUE_NAME)
+
+    # Set up the callback function for handling messages from the queue
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=get_figure_and_captions)
+
+    print(f' [*] Waiting for messages on {QUEUE_NAME}. To exit, press CTRL+C')
+    channel.start_consuming()
+
+
+if __name__ == "__main__":
     try:
-        queue_name = "pdfigcapx_queue"
-        channel.basic_qos(prefetch_count=1, global_qos=False)
-        # Declare the queue
-        channel.queue_declare(queue=queue_name)
-
-        # Set up the callback function for handling messages from the queue
-        channel.basic_consume(queue=queue_name, on_message_callback=get_figure_and_captions)
-
-        print(f' [*] Waiting for messages on {queue_name}. To exit, press CTRL+C')
-        channel.start_consuming()
-
+        consume_pdfigcap_queue()
     except KeyboardInterrupt:
         pass
     finally:
         connection.close()
-
-
-if __name__ == "__main__":
-    consume_pdfigcap_queue()     
+    

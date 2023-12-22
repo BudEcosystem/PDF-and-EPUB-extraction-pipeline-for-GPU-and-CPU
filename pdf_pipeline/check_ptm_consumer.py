@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+QUEUE_NAME = "check_ptm_completion_queue"
+
 nougat_batch_size = int(os.environ["NOUGAT_BATCH_SIZE"])
 
 connection = get_rabbitmq_connection()
@@ -112,12 +114,12 @@ def check_ptm_status(ch, method, properties, body):
         else:
             print(f"figure extraction for {page_num} - {bookId} not yet completed")
     except Exception as e:
+        print(traceback.format_exc())
         error = {
-            "consumer": "check_ptm_consumer",
+            "consumer": QUEUE_NAME,
             "consumer_message": message,
             "error": str(e),
             "line_number": traceback.extract_tb(e.__traceback__)[-1].lineno} 
-        print(error)
         error_queue(book_path, bookId, error)      
     finally:
         print("message ack sent")
@@ -269,12 +271,12 @@ def consume_ptm_completion_queue():
     channel.basic_qos(prefetch_count=1, global_qos=False)
 
     # Declare the queue
-    channel.queue_declare(queue='check_ptm_completion_queue')
+    channel.queue_declare(queue=QUEUE_NAME)
 
     # Set up the callback function for handling messages from the queue
-    channel.basic_consume(queue='check_ptm_completion_queue', on_message_callback=check_ptm_status)
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=check_ptm_status)
 
-    print(' [*] Waiting for messages on check_ptm_completion_queue. To exit, press CTRL+C')
+    print(f' [*] Waiting for messages on {QUEUE_NAME}. To exit, press CTRL+C')
     channel.start_consuming()
    
 

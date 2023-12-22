@@ -14,6 +14,8 @@ from utils import (
     get_channel
 )
 
+QUEUE_NAME = "table_bank_queue"
+
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
@@ -78,8 +80,9 @@ def table_bank_layout(ch, method, properties, body):
             table_bank_pages.insert_one(new_book_document)
         send_to_queue('check_ptm_completion_queue', queue_msg)
     except Exception as e:
+        print(traceback.format_exc())
         error = {
-            "consumer": "publaynet",
+            "consumer": QUEUE_NAME,
             "consumer_message": message,
             "page_num": page_num,
             "error": str(e),
@@ -94,12 +97,12 @@ def table_bank_layout(ch, method, properties, body):
 def consume_table_bank_queue():
     channel.basic_qos(prefetch_count=1, global_qos=False)
     # Declare the queue
-    channel.queue_declare(queue='table_bank_queue')
+    channel.queue_declare(queue=QUEUE_NAME)
 
     # Set up the callback function for handling messages from the queue
-    channel.basic_consume(queue='table_bank_queue', on_message_callback=table_bank_layout)
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=table_bank_layout)
 
-    print(' [*] Waiting for messages on table_bank_queue. To exit, press CTRL+C')
+    print(f' [*] Waiting for messages on {QUEUE_NAME}. To exit, press CTRL+C')
     channel.start_consuming()
 
 

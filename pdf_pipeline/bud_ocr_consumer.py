@@ -16,6 +16,8 @@ from utils import (
     get_channel
 )
 
+QUEUE_NAME = "bud_table_extraction_queue"
+
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
@@ -57,8 +59,9 @@ def extract_page_table(ch, method, properties, body):
         if os.path.exists(image_path):
             os.remove(image_path)
     except Exception as e:
+        print(traceback.format_exc())
         error = {
-            "consumer": "table_consumer",
+            "consumer": QUEUE_NAME,
             "consumer_message": message,
             "error": str(e),
             "line_number": traceback.extract_tb(e.__traceback__)[-1].lineno
@@ -69,15 +72,14 @@ def extract_page_table(ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)
   
 def consume_table_queue():
-    queue_name = "bud_table_extraction_queue"
     channel.basic_qos(prefetch_count=1, global_qos=False)
     # Declare the queue
-    channel.queue_declare(queue=queue_name)
+    channel.queue_declare(queue=QUEUE_NAME)
 
     # Set up the callback function for handling messages from the queue
-    channel.basic_consume(queue=queue_name, on_message_callback=extract_page_table)
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=extract_page_table)
 
-    print(f' [*] Waiting for messages on {queue_name} To exit, press CTRL+C')
+    print(f' [*] Waiting for messages on {QUEUE_NAME} To exit, press CTRL+C')
     channel.start_consuming()
 
 

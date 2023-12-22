@@ -22,6 +22,7 @@ nougat_pages = get_mongo_collection('nougat_pages')
 other_pages = get_mongo_collection('other_pages')
 latex_pages = get_mongo_collection('latex_pages')
 
+QUEUE_NAME = "book_completion_queue"
 
 @timeit
 def book_complete(ch, method, properties, body):
@@ -74,8 +75,9 @@ def book_complete(ch, method, properties, body):
         else:
             print(f"Book {bookId} not yet completed")
     except Exception as e:
+        print(traceback.format_exc())
         error = {
-            "consumer": "book_completion_consumer",
+            "consumer": QUEUE_NAME,
             "consumer_message": message,
             "error": str(e),
             "line_number": traceback.extract_tb(e.__traceback__)[-1].lineno
@@ -88,10 +90,10 @@ def book_complete(ch, method, properties, body):
 def consume_book_completion_queue():
     channel.basic_qos(prefetch_count=1, global_qos=False)
 
-    channel.queue_declare(queue='book_completion_queue')
+    channel.queue_declare(queue=QUEUE_NAME)
 
     # Set up the callback function for handling messages from the queue
-    channel.basic_consume(queue='book_completion_queue', on_message_callback=book_complete)
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=book_complete)
 
     print(' [*] Waiting for messages on book_completion_queue. To exit, press CTRL+C')
     channel.start_consuming()

@@ -26,6 +26,7 @@ from element_extraction_utils import (
     process_equation
 )
 
+QUEUE_NAME = 'latex_ocr_queue'
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
@@ -65,8 +66,9 @@ def extract_latex_pages(ch, method, properties, body):
         )
         send_to_queue('book_completion_queue', bookId)
     except Exception as e:
+        print(traceback.format_exc())
         error = {
-            "consumer": "latex_ocr_consumer",
+            "consumer": QUEUE_NAME,
             "consumer_message": message,
             "page_num": page_num,
             "error": str(e),
@@ -135,16 +137,15 @@ def sort_text_blocks_and_extract_data(blocks, image_path, is_figure_present, boo
 
 
 def consume_latex_ocr_queue():
-    queue_name = 'latex_ocr_queue'
     channel.basic_qos(prefetch_count=1, global_qos=False)
 
     # Declare the queue
-    channel.queue_declare(queue=queue_name)
+    channel.queue_declare(queue=QUEUE_NAME)
 
     # Set up the callback function for handling messages from the queue
-    channel.basic_consume(queue=queue_name, on_message_callback=extract_latex_pages)
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=extract_latex_pages)
 
-    print(f' [*] Waiting for messages on {queue_name} To exit, press CTRL+C')
+    print(f' [*] Waiting for messages on {QUEUE_NAME} To exit, press CTRL+C')
     channel.start_consuming()
 
 

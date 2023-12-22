@@ -14,6 +14,8 @@ from utils import (
     get_channel
 )
 
+QUEUE_NAME = 'mfd_queue'
+
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
@@ -79,8 +81,9 @@ def mathformuladetection_layout(ch, method, properties, body):
             mfd_pages.insert_one(new_book_document)
         send_to_queue('check_ptm_completion_queue', queue_msg)
     except Exception as e:
+        print(traceback.format_exc())
         error = {
-            "consumer": "publaynet",
+            "consumer": QUEUE_NAME,
             "consumer_message": message,
             "page_num": page_num,
             "error": str(e),
@@ -94,11 +97,11 @@ def mathformuladetection_layout(ch, method, properties, body):
 def consume_mfd_queue():
     channel.basic_qos(prefetch_count=1, global_qos=False)
 
-    channel.queue_declare(queue='mfd_queue')
+    channel.queue_declare(queue=QUEUE_NAME)
     # Set up the callback function for handling messages from the queue
-    channel.basic_consume(queue='mfd_queue', on_message_callback=mathformuladetection_layout)
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=mathformuladetection_layout)
 
-    print(' [*] Waiting for messages on mfd_queue. To exit, press CTRL+C')
+    print(f' [*] Waiting for messages on {QUEUE_NAME}. To exit, press CTRL+C')
     channel.start_consuming()
    
 

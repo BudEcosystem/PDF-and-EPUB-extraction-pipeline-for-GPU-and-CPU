@@ -21,6 +21,8 @@ from utils import (
 
 load_dotenv()
 
+QUEUE_NAME = 'nougat_queue'
+
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
@@ -88,9 +90,9 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
             )
             send_to_queue('book_completion_queue', bookId)
     except Exception as e:
-        print(e)
+        print(traceback.format_exc())
         error = {
-            "consumer": "nougat_consumer",
+            "consumer": QUEUE_NAME,
             "consumer_message": message,
             "error": str(e),
             "line_number": traceback.extract_tb(e.__traceback__)[-1].lineno
@@ -116,13 +118,12 @@ def get_nougat_extraction(pdf_path, data):
 
 def consume_nougat_pdf_queue():
     channel.basic_qos(prefetch_count=1, global_qos=False)
-    queue_name = "nougat_queue"
     # Declare the queue
-    channel.queue_declare(queue=queue_name)
+    channel.queue_declare(queue=QUEUE_NAME)
     # Set up the callback function for handling messages from the queue
-    channel.basic_consume(queue=queue_name, on_message_callback=extract_text_equation_with_nougat)
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=extract_text_equation_with_nougat)
 
-    print(f' [*] Waiting for messages on {queue_name}. To exit, press CTRL+C')
+    print(f' [*] Waiting for messages on {QUEUE_NAME}. To exit, press CTRL+C')
     channel.start_consuming()
 
     

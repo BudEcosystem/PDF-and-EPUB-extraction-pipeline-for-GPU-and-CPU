@@ -14,6 +14,8 @@ from utils import (
     get_channel
 )
 
+QUEUE_NAME = "publaynet_queue"
+
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
@@ -79,8 +81,9 @@ def publaynet_layout(ch, method, properties, body):
             publaynet_pages.insert_one(new_book_document)
         send_to_queue('check_ptm_completion_queue', queue_msg)
     except Exception as e:
+        print(traceback.format_exc())
         error = {
-            "consumer": "publaynet",
+            "consumer": QUEUE_NAME,
             "consumer_message": message,
             "page_num": page_num,
             "error": str(e),
@@ -93,21 +96,20 @@ def publaynet_layout(ch, method, properties, body):
 
 
 def consume_publaynet_queue():
-    queue_name = "publaynet_queue"
     channel.basic_qos(prefetch_count=1, global_qos=False)
     # Declare the queue
-    channel.queue_declare(queue=queue_name)
+    channel.queue_declare(queue=QUEUE_NAME)
 
     # Set up the callback function for handling messages from the queue
-    channel.basic_consume(queue=queue_name, on_message_callback=publaynet_layout)
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=publaynet_layout)
 
-    print(' [*] Waiting for messages on publeynet_queue. To exit, press CTRL+C')
+    print(f' [*] Waiting for messages on {QUEUE_NAME}. To exit, press CTRL+C')
     channel.start_consuming()
 
 
 if __name__ == "__main__":
     try:
-        consume_publaynet_queue()     
+        consume_publaynet_queue()
     except KeyboardInterrupt:
         pass
     finally:

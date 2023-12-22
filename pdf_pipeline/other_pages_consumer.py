@@ -25,6 +25,8 @@ from element_extraction_utils import (
     process_list
 )
 
+QUEUE_NAME = 'other_pages_queue'
+
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
@@ -63,8 +65,9 @@ def extract_other_pages(ch, method, properties, body):
         )
         send_to_queue('book_completion_queue', bookId)
     except Exception as e:
+        print(traceback.format_exc())
         error = {
-            "consumer": "other_pages_consumer",
+            "consumer": QUEUE_NAME,
             "consumer_message": message,
             "page_num": page_num,
             "error": str(e),
@@ -132,12 +135,12 @@ def consume_other_pages_queue():
     try:
         channel.basic_qos(prefetch_count=1, global_qos=False)
         # Declare the queue
-        channel.queue_declare(queue='other_pages_queue')
+        channel.queue_declare(queue=QUEUE_NAME)
 
         # Set up the callback function for handling messages from the queue
-        channel.basic_consume(queue='other_pages_queue', on_message_callback=extract_other_pages)
+        channel.basic_consume(queue=QUEUE_NAME, on_message_callback=extract_other_pages)
 
-        print(' [*] Waiting for messages on other_pages_queue To exit, press CTRL+C')
+        print(f' [*] Waiting for messages on {QUEUE_NAME} To exit, press CTRL+C')
         channel.start_consuming()
 
     except KeyboardInterrupt:
