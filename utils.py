@@ -89,7 +89,7 @@ def crop_image(block, imagepath, id):
 
     #crop the expanded bounding box
     bbox = img[int(y1):int(y2), int(x1):int(x2)]
-    cropped_image_path = os.path.abspath(f"cropeed{id}.png")
+    cropped_image_path = os.path.abspath(f"cropped_{id}.png")
     cv2.imwrite(cropped_image_path,bbox)
 
     return cropped_image_path
@@ -204,15 +204,16 @@ def read_image_from_str(image_str):
     image = cv2.imdecode(image_np_array, cv2.IMREAD_COLOR)
     return image
 
-def generate_image_str(book_id, image_path):
+def generate_image_str(book_id, image_path, save=True):
     # book-set-2/123/pages/page_1.jpg
     image_str = None
     filename = os.path.basename(image_path)
     page_num = os.path.splitext(filename)[0].split('_')[-1]
     book_images_collection = get_mongo_collection('book_images')
-    book_images = book_images_collection.find_one({
-        "bookId": book_id
-    })
+    book_images = book_images_collection.find_one(
+        {"bookId": book_id},
+        {"_id":0, f"images.{page_num}": 1}
+    )
     image_data = {}
     if book_images:
         image_data = book_images.get('images', {})
@@ -222,20 +223,21 @@ def generate_image_str(book_id, image_path):
             with open(image_path, 'rb') as img:
                 img_data = img.read()
             image_str = base64.b64encode(img_data).decode('utf-8')
-            image_data[page_num] = image_str
-            book_images_collection.update_one(
-                {"bookId": book_id},
-                {"$set": {"images": image_data}}
-            )
+            if save:
+                book_images_collection.update_one(
+                    {"bookId": book_id},
+                    {"$set": {f"images.{page_num}": image_str}}
+                )
     else:
         with open(image_path, 'rb') as img:
             img_data = img.read()
         image_str = base64.b64encode(img_data).decode('utf-8')
         image_data[page_num] = image_str
-        book_images_collection.insert_one({
-            "bookId": book_id,
-            "images": image_data
-        })
+        if save:
+            book_images_collection.insert_one({
+                "bookId": book_id,
+                "images": image_data
+            })
     return image_str
 
 def create_image_from_str(image_str):
