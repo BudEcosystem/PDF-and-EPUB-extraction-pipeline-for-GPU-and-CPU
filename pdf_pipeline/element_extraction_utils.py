@@ -43,10 +43,10 @@ def process_table(table_block, image_path, bookId, page_num):
         y2 = img.shape[0]
     cropped_image = img[int(y1):int(y2), int(x1):int(x2)] 
     tableId = generate_unique_id() 
-    table_image_path = os.path.abspath(f"cropeed{tableId}.png")
+    table_image_path = os.path.abspath(f"cropped_{tableId}.png")
     cv2.imwrite(table_image_path, cropped_image)
     output = f"{{{{table:{tableId}}}}}"
-    data = {'img': generate_image_str(bookId, table_image_path)}
+    data = {'img': generate_image_str(bookId, table_image_path, save=False)}
     bud_table_msg = {
         'tableId': tableId,
         'data': data,
@@ -65,7 +65,8 @@ def process_figure(figure_block, image_path):
     figure_image_path = crop_image(figure_block, image_path, figureId)
     output = f"{{{{figure:{figureId}}}}}"
 
-    figure_url = upload_to_aws_s3(figure_image_path, figureId)
+    # figure_url = upload_to_aws_s3(figure_image_path, figureId)
+    figure_url = "test"
     figure = {
         "id": figureId,
         "url": figure_url,
@@ -90,7 +91,8 @@ def process_publaynet_figure(figure_block, image_path, prev_block, next_block):
     if next_block and not caption:
         caption = get_fig_caption(next_block, image_path)
 
-    figure_url = upload_to_aws_s3(figure_image_path, figureId)
+    # figure_url = upload_to_aws_s3(figure_image_path, figureId)
+    figure_url = "test"
     figure = {
         "id": figureId,
         "url": figure_url,
