@@ -97,12 +97,14 @@ def check_ptm_status(ch, method, properties, body):
         pdfigcapx_done, pdfigcapx_data = get_fig_data(bookId, book_path)
         if pdfigcapx_done:
             from_page = pdfigcapx_data["from_page"]
-            to_page = pdfigcapx_data["from_page"]
+            to_page = pdfigcapx_data["to_page"]
             if page_num:
                 from_page = page_num
                 to_page = page_num
             for page_no in range(from_page, to_page + 1):
                 fig_result = list(filter(lambda x: x["page_num"] == page_no, pdfigcapx_data['pages']))
+                # without image_path
+                fig_result = pdfigcapx_data['pages'].get(page_no, [])
                 page_data = check_ptm(page_no, bookId)
                 if page_data:
                     page_data["split_path"] = book_path
@@ -159,7 +161,10 @@ def process_page(process_page_data, fig_result):
         # if pdfigcapx find figure then remove figures identified by publaynet
         # and add pdfigcapx results
         results = [block for block in results if "type" in block and block['type'] != 'Figure']
-        results.extend(fig_result['result'])
+        for each in fig_result:
+            each['image_path'] = image_path
+        # results.extend(fig_result['result'])
+        results.extend(fig_result)
     book_data = book_details.find_one({"bookId": bookId})
     num_nougat_pages = book_data.get("num_nougat_pages", [])
     num_latex_pages = book_data.get("num_latex_pages", [])

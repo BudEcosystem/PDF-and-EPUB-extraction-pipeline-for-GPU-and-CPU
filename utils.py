@@ -221,7 +221,7 @@ def generate_image_str(book_id, image_path, save=True):
             if save:
                 book_images_collection.update_one(
                     {"bookId": book_id, "page_num": page_num},
-                    {"$set": {"image_str": image_str}}
+                    {"$set": {"image_str": image_str, "image_path": image_path}}
                 )
     else:
         with open(image_path, 'rb') as img:
@@ -231,7 +231,8 @@ def generate_image_str(book_id, image_path, save=True):
             book_images_collection.insert_one({
                 "bookId": book_id,
                 "page_num": page_num,
-                "image_str": image_str
+                "image_str": image_str,
+                "image_path": image_path
             })
     return image_str
 

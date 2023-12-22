@@ -27,16 +27,18 @@ class DocumentFound(Exception):
     pass
 
 def transform_to_figure_blocks(book_data):
-    figure_layout = []
     # sonali : how did we decide on these values ?
     # and if constant value then move to .env or global variable
     old_page_width = 439
     old_page_height = 666
     new_page_width = 1831
     new_page_height = 2776
-    for page in book_data:
-        figure_bbox_values = page.get("figure_bbox")
-        caption_text = page.get('caption_text')
+
+    results = {}
+    for figure in book_data:
+        page_no = figure["page_num"]
+        figure_bbox_values = figure.get("figure_bbox")
+        caption_text = figure.get('caption_text')
         caption = ''.join(caption_text)
 
         width_scale = new_page_width / old_page_width
@@ -60,8 +62,10 @@ def transform_to_figure_blocks(book_data):
             "type": "Figure",
             "caption": caption
         }
-        figure_layout.append(figure_block)
-    return figure_layout
+        if page_num not in results:
+            results[page_num] = []
+        results[page_num].append(figure_block)
+    return results
 
 @timeit
 def get_figure_and_captions(ch, method, properties, body):
