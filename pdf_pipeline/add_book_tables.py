@@ -35,6 +35,7 @@ def delete_wrong_tables():
                     for table_id in matches:
                         # table_id = int(table_id_match, 16)
                         print(f'Table ID :: {table_id}')
+                        table_present = False
                         table_details = table_collection.find_one({"tableId": table_id})
                         if table_details:
                             table_data = table_details.get('table_data', {})
@@ -45,8 +46,9 @@ def delete_wrong_tables():
                                         '$addToSet': {'pages.$.tables': table_data}
                                     }
                                 )
+                                table_present = True
                         # Check if the tableId is present in the tables array
-                        if not any(table.get('id', '') == table_id for table in page['tables']):
+                        if not table_present and (not any(table.get('id', '') == table_id for table in page['tables'])):
                             # Replace the pattern with an empty string
                             text = text.replace(f'{{{{table:{table_id}}}}}', '')
                             print(text)
