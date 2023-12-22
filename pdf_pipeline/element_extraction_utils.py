@@ -65,8 +65,7 @@ def process_figure(figure_block, image_path):
     figure_image_path = crop_image(figure_block, image_path, figureId)
     output = f"{{{{figure:{figureId}}}}}"
 
-    # figure_url = upload_to_aws_s3(figure_image_path, figureId)
-    figure_url = "test"
+    figure_url = upload_to_aws_s3(figure_image_path, figureId)
     figure = {
         "id": figureId,
         "url": figure_url,
@@ -91,8 +90,7 @@ def process_publaynet_figure(figure_block, image_path, prev_block, next_block):
     if next_block and not caption:
         caption = get_fig_caption(next_block, image_path)
 
-    # figure_url = upload_to_aws_s3(figure_image_path, figureId)
-    figure_url = "test"
+    figure_url = upload_to_aws_s3(figure_image_path, figureId)
     figure = {
         "id": figureId,
         "url": figure_url,
