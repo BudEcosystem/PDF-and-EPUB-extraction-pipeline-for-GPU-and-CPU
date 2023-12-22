@@ -181,8 +181,7 @@ def process_page(process_page_data, fig_result):
             book_details.find_one_and_update(
                 {"bookId": bookId},
                 {
-                    "$addToSet": {"num_nougat_pages": page_num},
-                    "$addToSet": {"nougat_pages": nougat_queue_msg}
+                    "$addToSet": {"nougat_pages": nougat_queue_msg, "num_nougat_pages": page_num}
                 }
             )
         split_id = calculate_split_id(nougat_queue_msg)

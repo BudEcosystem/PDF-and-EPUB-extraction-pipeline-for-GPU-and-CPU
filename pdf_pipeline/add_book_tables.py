@@ -1,57 +1,62 @@
-import pymongo
+import sys
+sys.path.append('pdf_extraction_pipeline')
 from dotenv import load_dotenv
 import os
 import re
 import uuid
-load_dotenv()
-client = pymongo.MongoClient(os.environ['DATABASE_URL'])
-db1 = client.book_set_2
-book_other_pages=db1.book_other_pages
-nougat_pages=db1.nougat_pages
-nougat_done=db1.nougat_done
-book_other_pages_done=db1.book_other_pages_done
-latex_pages=db1.latex_pages
-latex_pages_done=db1.latex_pages_done
-table_bank_done = db1.table_bank_done
-publaynet_done = db1.publaynet_done
-mfd_done = db1.mfd_done
-publaynet_book_job_details = db1.publaynet_book_job_details
-table_bank_book_job_details = db1.table_bank_book_job_details
-mfd_book_job_details = db1.mfd_book_job_details
-figure_caption = db1.figure_caption
-
-table_collection=db1.table_collection
-book_set_2_new = db1.book_set_2_new
+from utils import get_mongo_collection
 
 
-#second database
-db2=client.books
-book_set_old=db2.book_set_2_new
-
+book_set_2 = get_mongo_collection('book_set_2')
+book_images = get_mongo_collection('book_images')
+table_collection = get_mongo_collection('table_collection')
+book_details = get_mongo_collection('book_details')
+figure_caption = get_mongo_collection('figure_caption')
+publaynet_pages = get_mongo_collection('publaynet_pages')
+table_bank_pages = get_mongo_collection('table_bank_pages')
+mfd_pages = get_mongo_collection('mfd_pages')
+nougat_pages = get_mongo_collection('nougat_pages')
+latex_pages = get_mongo_collection('latex_pages')
+other_pages = get_mongo_collection('other_pages')
 
 # delete wrong tables
 def delete_wrong_tables():
-    for document in book_set_2_new.find():
-        print("jdhdfjn")
+    for document in book_set_2.find():
+        print(f"BookId :: {document['bookId']}")
         for page in document['pages']:
             page_num = page['page_num']
+            print(f'page number :: {page_num}')
             text = page['text']
-            print('yehjk')
-            # Search for the pattern '{{table:someid}}'
-            matches = re.findall(r'\{\{table:(\w+)\}\}', text)
-            print(matches)
-            for table_id_match in matches:
-                table_id = int(table_id_match, 16)
-                # Check if the tableId is present in the tables array
-                if not any(int(table.get('id'), 16) == table_id for table in page['tables']):
-                    # Replace the pattern with an empty string
-                    text = text.replace(f'{{{{table:{table_id_match}}}}}', '')
-                    print(text)
-            # Update the text field in the current page
-            book_set_2_new.update_one(
-                {'_id': document['_id'], 'pages.page_num': page_num},
-                {'$set': {'pages.$.text': text}}
-            )
+            if text:
+                # Search for the pattern '{{table:someid}}'
+                matches = re.findall(r'\{\{table:(\w+)\}\}', text)
+                print(f'Matches :: {matches}')
+                if matches:
+                    for table_id in matches:
+                        # table_id = int(table_id_match, 16)
+                        print(f'Table ID :: {table_id}')
+                        table_details = table_collection.find_one({"tableId": table_id})
+                        if table_details:
+                            table_data = table_details.get('table_data', {})
+                            if table_data:
+                                book_set_2.update_one(
+                                    {'_id': document['_id'], 'pages.page_num': page_num},
+                                    {
+                                        '$addToSet': {'pages.$.tables': table_data}
+                                    }
+                                )
+                        # Check if the tableId is present in the tables array
+                        if not any(table.get('id', '') == table_id for table in page['tables']):
+                            # Replace the pattern with an empty string
+                            text = text.replace(f'{{{{table:{table_id}}}}}', '')
+                            print(text)
+                            # Update the text field in the current page
+                            book_set_2.update_one(
+                                {'_id': document['_id'], 'pages.page_num': page_num},
+                                {
+                                    '$set': {'pages.$.text': text},
+                                }
+                            )
     print("Text replacement completed.")
 
 #remove page_num from every page object and add key id to every page object
@@ -78,7 +83,7 @@ def check_duplicate_and_add_books():
         else:
             print(f'This book {book} already present')
 
-#remove book's other document, like other_pages, nougat_pages, nougat_done etc once book is completly extracted
+# remove book's other document, like other_pages, nougat_pages, nougat_done etc once book is completly extracted
 def remove_matching_documents():
     # Iterate over documents in collection1
     for document in book_set_2_new.find():
@@ -164,19 +169,22 @@ def remove_matching_documents():
     print("Processing completed.")
 
 
+def clean_db(bookId):
+    book_images.delete_many({"bookId": bookId})
+    nougat_pages.delete_one({"bookId": bookId})
+    latex_pages.delete_one({"bookId": bookId})
+    other_pages.delete_one({"bookId": bookId})
+    publaynet_pages.delete_one({"bookId": bookId})
+    table_bank_pages.delete_one({"bookId": bookId})
+    mfd_pages.delete_one({"bookId": bookId})
+    figure_caption.delete_many({"bookId": bookId})
+    # table_collection.delete_many({"bookId": bookId})
 
 
-
-
-
-
-
-
-
-# delete_wrong_tables()
-# remove_page_num_and_add_page_id()
-# check_duplicate_and_add_books()
-    
-# remove_matching_documents()
-
+if __name__=='__main__':
+    # delete_wrong_tables()
+    # for book in book_details.find({"status": "extracted"}):
+    #     bookId = book["bookId"]
+    #     clean_db(bookId)
+    pass
 

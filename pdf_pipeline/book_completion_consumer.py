@@ -19,10 +19,9 @@ channel = get_channel(connection)
 books = get_mongo_collection('book_set_2')
 book_details = get_mongo_collection('book_details')
 nougat_pages = get_mongo_collection('nougat_pages')
-other_pages=get_mongo_collection('other_pages')
-latex_pages=get_mongo_collection('latex_pages')
+other_pages = get_mongo_collection('other_pages')
+latex_pages = get_mongo_collection('latex_pages')
 
-folder_name=os.environ['BOOK_FOLDER_NAME']
 
 @timeit
 def book_complete(ch, method, properties, body):
