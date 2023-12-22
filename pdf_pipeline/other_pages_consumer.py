@@ -124,7 +124,7 @@ def sort_text_blocks_and_extract_data(blocks, image_path, is_figure_present, boo
         elif block['type'] == "List":
             output = process_list(block, image_path)
         page_content += output
-    page_content = re.sub(r'\s+', ' ', output).strip()
+    page_content = re.sub(r'\s+', ' ', page_content).strip()
     return page_content, figures
 
 

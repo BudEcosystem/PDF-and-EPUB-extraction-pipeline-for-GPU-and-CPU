@@ -56,19 +56,19 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
             )
             pages_extracted = 0
             image_paths = [page["image_path"] for page in nougat_pages]
-            image_strs = []
+            local_image_paths = []
             for img_path in image_paths:
                 # will return image_str form db
-                image_strs.append(generate_image_str(bookId, img_path))
-            for image_str in image_strs:
-                image_paths.append(create_image_from_str(image_str))
+                image_str = generate_image_str(bookId, img_path)
+                local_image_paths.append(create_image_from_str(image_str))
                 pages_extracted += 1
+
             pdf_path = os.path.abspath(f"{generate_unique_id()}.pdf")
             with open(pdf_path, "wb") as f_pdf:
-                f_pdf.write(img2pdf.convert(image_paths))
+                f_pdf.write(img2pdf.convert(local_image_paths))
 
             # clean up local images created for pdf creation
-            for img_path in image_paths:
+            for img_path in local_image_paths:
                 abs_path = os.path.abspath(img_path)
                 os.remove(abs_path)
 
@@ -88,13 +88,13 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
             )
             send_to_queue('book_completion_queue', bookId)
     except Exception as e:
+        print(e)
         error = {
-            "consumer":"nougat_consumer",
-            "consumer_message":message,
-            "error":str(e),
-            "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno
-        } 
-        print(error)
+            "consumer": "nougat_consumer",
+            "consumer_message": message,
+            "error": str(e),
+            "line_number": traceback.extract_tb(e.__traceback__)[-1].lineno
+        }
         error_queue('', bookId, error)
     finally:
         print("message ack")
@@ -116,7 +116,7 @@ def get_nougat_extraction(pdf_path, data):
 
 def consume_nougat_pdf_queue():
     channel.basic_qos(prefetch_count=1, global_qos=False)
-    queue_name = "nougat_pdf_queue"
+    queue_name = "nougat_queue"
     # Declare the queue
     channel.queue_declare(queue=queue_name)
     # Set up the callback function for handling messages from the queue

@@ -39,13 +39,14 @@ def store_errors(ch, method, properties, body):
    
 
 def consume_error_queue():
+    queue_name = "error_queue"
     channel.basic_qos(prefetch_count=1, global_qos=False)
 
     # Declare the queue
-    channel.queue_declare(queue='error_queue')
+    channel.queue_declare(queue=queue_name)
 
     # Set up the callback function for handling messages from the queue
-    channel.basic_consume(queue='error_queue', on_message_callback=store_errors)
+    channel.basic_consume(queue=queue_name, on_message_callback=store_errors)
 
     print(' [*] Waiting for messages on error_queue. To exit, press CTRL+C')
     channel.start_consuming()
