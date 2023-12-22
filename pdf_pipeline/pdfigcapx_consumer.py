@@ -137,11 +137,11 @@ def get_figure_and_captions(ch, method, properties, body):
         send_to_queue('check_ptm_completion_queue', queue_msg)
         error_queue(book_path, bookId, error)
     finally:
-        ch.basic_ack(delivery_tag=method.delivery_tag)
         if os.path.exists(pdf_input_folder):
             shutil.rmtree(pdf_input_folder)   
         if os.path.exists(output_folder):
             shutil.rmtree(output_folder)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
 def consume_pdfigcap_queue():
