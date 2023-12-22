@@ -21,6 +21,7 @@ book_details = get_mongo_collection('book_details')
 nougat_pages = get_mongo_collection('nougat_pages')
 other_pages = get_mongo_collection('other_pages')
 latex_pages = get_mongo_collection('latex_pages')
+book_images = get_mongo_collection('book_images')
 
 QUEUE_NAME = "book_completion_queue"
 
@@ -71,7 +72,8 @@ def book_complete(ch, method, properties, body):
             )
             book_folder = os.path.dirname(book_path)
             if os.path.exists(book_folder):
-                shutil.rmtree(book_folder)  
+                shutil.rmtree(book_folder)
+            book_images.delete_many({"bookId": bookId})
         else:
             print(f"Book {bookId} not yet completed")
     except Exception as e:
