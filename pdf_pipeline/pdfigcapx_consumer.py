@@ -62,9 +62,9 @@ def transform_to_figure_blocks(book_data):
             "type": "Figure",
             "caption": caption
         }
-        if page_num not in results:
-            results[page_num] = []
-        results[page_num].append(figure_block)
+        if page_no not in results:
+            results[page_no] = []
+        results[page_no].append(figure_block)
     return results
 
 @timeit
