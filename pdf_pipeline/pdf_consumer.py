@@ -93,7 +93,7 @@ def process_book(ch, method, properties, body):
             figure_caption.find_one_and_update(
                 {"bookId": book_id, "split_path": split_path},
                 {"$set": {
-                    "pages": [],
+                    "pages": {},
                     "status": "failed",
                     "from_page": from_page,
                     "to_page": to_page

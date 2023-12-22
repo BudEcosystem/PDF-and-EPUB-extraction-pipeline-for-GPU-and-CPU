@@ -116,7 +116,7 @@ def get_figure_and_captions(ch, method, properties, body):
             figure_caption.insert_one({
                 "bookId": bookId,
                 "split_path": book_path,
-                "pages": [],
+                "pages": {},
                 "status":"failed",
                 "from_page": from_page,
                 "to_page": to_page
@@ -126,7 +126,7 @@ def get_figure_and_captions(ch, method, properties, body):
         figure_caption.insert_one({
             "bookId": bookId,
             "split_path": book_path,
-            "pages": [],
+            "pages": {},
             "status":"failed",
             "from_page": from_page,
             "to_page": to_page
