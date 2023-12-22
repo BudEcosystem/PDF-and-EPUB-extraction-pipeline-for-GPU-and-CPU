@@ -1,5 +1,6 @@
 # pylint: disable=all
 # type: ignore
+import os
 import traceback
 import sys
 sys.path.append("pdf_extraction_pipeline/code")
@@ -7,6 +8,11 @@ sys.path.append("pdf_extraction_pipeline")
 import json
 from pdf_producer import error_queue, send_to_queue
 from utils import get_mongo_collection, get_rabbitmq_connection, get_channel
+from dotenv import load_dotenv
+
+load_dotenv()
+
+nougat_batch_size = int(os.environ["NOUGAT_BATCH_SIZE"])
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
@@ -39,8 +45,6 @@ def get_fig_data(bookId, book_path):
     #     }
     # ]
     if fig:
-        # assuming pages key will always exists
-        fig = fig["pages"]
         fig_done = True
     return fig_done, fig
 
@@ -96,11 +100,20 @@ def check_ptm_status(ch, method, properties, body):
             to_page = pdfigcapx_data["from_page"]
             if page_num:
                 from_page = page_num
-                to_page = page_num + 1
-            for page_no in range(from_page, to_page):
-                fig_result = list(filter(lambda x: x["page_num"] == page_no, pdfigcapx_data))
+                to_page = page_num
+            for page_no in range(from_page, to_page + 1):
+                fig_result = list(filter(lambda x: x["page_num"] == page_no, pdfigcapx_data['pages']))
                 page_data = check_ptm(page_no, bookId)
                 if page_data:
+                    book_data = book_details.find_one({"bookId": bookId})
+                    if book_data.get("sent_to_process", []):
+                        if page_no in book_data["sent_to_process"]:
+                            continue
+                        else:
+                            book_details.find_one_and_update(
+                                {"bookId": bookId},
+                                {"$addToSet": {"sent_to_process": page_no}}
+                            )
                     page_data["split_path"] = book_path
                     process_page(page_data, fig_result)
         else:
@@ -211,32 +224,44 @@ def process_page(process_page_data, fig_result):
     if num_nougat_pages > 0 and num_nougat_pages + num_latex_pages + num_other_pages == total_pages_in_book:
         send_to_queue("nougat_queue", {"bookId": bookId})
 
-def calculate_split_id(nougat_page):
-    nougat_batch_size = 6
+
+def calculate_split_id(nougat_page: dict) -> str:
     bookId = nougat_page['bookId']
+    page_num = nougat_page['page_num']
     book = book_details.find_one({"bookId": bookId})
     nougat_splits = book.get("nougat_splits", {})  # {0: [], 1: [], ...}
     split_id = None
     if not nougat_splits:
         split_id = 0
-        nougat_splits[split_id] = [nougat_page]
+        nougat_splits[str(split_id)] = [nougat_page]
     else:
-        sorted_split_ids = list(nougat_splits.keys())
+        # TODO: optimize with indexing or other methods
+        page_exists = False
+        for s_id, pages in nougat_splits.items():
+            for page in pages:
+                if page['page_num'] == page_num:
+                    split_id = s_id
+                    page_exists = True
+                    break
+        if page_exists:
+            return split_id
+        sorted_split_ids = sorted(map(int, nougat_splits.keys()))
         largest_split_id = sorted_split_ids[-1]
-        pages = nougat_splits[largest_split_id]
+        pages = nougat_splits[str(largest_split_id)]
         if len(pages) < nougat_batch_size:
             split_id = largest_split_id
-            nougat_splits[largest_split_id].append(nougat_page)
+            nougat_splits[str(largest_split_id)].append(nougat_page)
         else:
             next_split_id = largest_split_id + 1
             split_id = next_split_id
-            nougat_splits[next_split_id] = [nougat_page]
+            nougat_splits[str(next_split_id)] = [nougat_page]
     book_details.update_one(
         {"bookId": bookId},
-        {"set": {"nougat_splits": nougat_splits}}
+        {"$set": {"nougat_splits": nougat_splits}}
     )
-    return split_id
+    return str(split_id)
         
+
 def consume_ptm_completion_queue():
     channel.basic_qos(prefetch_count=1, global_qos=False)
 
