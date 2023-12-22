@@ -28,10 +28,10 @@ def publaynet_layout(ch, method, properties, body):
     message = json.loads(body)
     image_path = message["image_path"]
     page_num = message["page_num"]
-    book_path = message["book_path"]
+    book_path = message["split_path"]
     bookId = message["bookId"]
     image_str = message["image_str"]
-    print("Received message for {image_path}")
+    print(f"Received message for {image_path}")
     queue_msg = {
         "bookId": bookId,
         "split_path": book_path,
@@ -77,6 +77,7 @@ def publaynet_layout(ch, method, properties, body):
                 "pages": [book_page_data]
             }
             publaynet_pages.insert_one(new_book_document)
+        send_to_queue('check_ptm_completion_queue', queue_msg)
     except Exception as e:
         error = {
             "consumer": "publaynet",
@@ -85,19 +86,20 @@ def publaynet_layout(ch, method, properties, body):
             "error": str(e),
             "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno
         }
-        error_queue('error_queue', book_path, bookId, error)
+        error_queue(book_path, bookId, error)
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
 
 def consume_publaynet_queue():
+    queue_name = "publaynet_queue"
     channel.basic_qos(prefetch_count=1, global_qos=False)
     # Declare the queue
-    channel.queue_declare(queue='publeynet_queue')
+    channel.queue_declare(queue=queue_name)
 
     # Set up the callback function for handling messages from the queue
-    channel.basic_consume(queue='publeynet_queue', on_message_callback=publaynet_layout)
+    channel.basic_consume(queue=queue_name, on_message_callback=publaynet_layout)
 
     print(' [*] Waiting for messages on publeynet_queue. To exit, press CTRL+C')
     channel.start_consuming()

@@ -112,7 +112,7 @@ def check_ptm_status(ch, method, properties, body):
             "error": str(e),
             "line_number": traceback.extract_tb(e.__traceback__)[-1].lineno} 
         print(error)
-        error_queue('error_queue', book_path, bookId, error)      
+        error_queue(book_path, bookId, error)      
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 

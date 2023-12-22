@@ -54,7 +54,7 @@ def send_to_queue(queue_name, data):
     if queue_msg is not None:
         channel.queue_declare(queue=queue_name)
         channel.basic_publish(exchange='', routing_key=queue_name, body=json.dumps(queue_msg))
-        print(f" [x] Sent {book['book']} ({book['bookId']}) to PDF processing queue")
+        print(f" [x] Sent data to {queue_name}")
     else:
         error_queue_name = "error_queue"
         queue_msg = {
@@ -169,6 +169,7 @@ def store_book_details():
     books = ["A First Introduction to Quantum Physics - Pieter Kok.pdf"]
     books = ["Understanding Cryptography - Christof Paar- Jan Pelzl.pdf"]
     books = ["Taxation in European Union - Pietro Boria.pdf"]
+    books = ["output_1.pdf", "output_2.pdf", "output_3.pdf"]
     print(books)
     for book in books:
         doc = book_details.find_one({"book": book})

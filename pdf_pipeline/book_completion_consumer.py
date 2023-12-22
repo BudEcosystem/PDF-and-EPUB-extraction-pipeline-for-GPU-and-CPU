@@ -81,7 +81,7 @@ def book_complete(ch, method, properties, body):
             "error": str(e),
             "line_number": traceback.extract_tb(e.__traceback__)[-1].lineno
         }
-        error_queue('error_queue', book_name, bookId, error)
+        error_queue(book_name, bookId, error)
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 

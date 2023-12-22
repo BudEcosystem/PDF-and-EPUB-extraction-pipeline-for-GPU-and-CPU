@@ -165,7 +165,7 @@ def split_pdf(book_id, local_path):
                 for page in inputpdf.pages[i:i+pdf_batch_size]:
                     output.add_page(page)
                     to_page += 1
-                file_path = f"{book_split_folder}/{book_id}_{int(i/pdf_batch_size)}_{from_page}-{to_page}.pdf"
+                file_path = f"{book_split_folder}/{book_id}_{int(i/pdf_batch_size)}_{from_page}-{to_page-1}.pdf"
                 with open(file_path, "wb") as output_stream:
                     output.write(output_stream)
                 output_file_paths.append(file_path)
@@ -176,7 +176,7 @@ def split_pdf(book_id, local_path):
             for page in inputpdf.pages:
                 output.add_page(page)
                 to_page += 1
-            file_path = f"{book_split_folder}/{book_id}_0_{from_page}-{to_page}.pdf"
+            file_path = f"{book_split_folder}/{book_id}_0_{from_page}-{to_page-1}.pdf"
             with open(file_path, "wb") as output_stream:
                 output.write(output_stream)
             output_file_paths.append(file_path)
@@ -205,22 +205,36 @@ def read_image_from_str(image_str):
     return image
 
 def generate_image_str(book_id, image_path):
+    # book-set-2/123/pages/page_1.jpg
     image_str = None
-    book_images_collection = get_mongo_collection(f'{book_id}_images')
-    image_data = book_images_collection.find_one({
-        "bookId": book_id,
-        "image_path": image_path
+    filename = os.path.basename(image_path)
+    page_num = os.path.splitext(filename)[0].split('_')[-1]
+    book_images_collection = get_mongo_collection('book_images')
+    book_images = book_images_collection.find_one({
+        "bookId": book_id
     })
-    if image_data:
-        image_str = image_data["image_str"]
+    image_data = {}
+    if book_images:
+        image_data = book_images.get('images', {})
+        if image_data and page_num in image_data:
+            image_str = image_data[page_num]
+        else:
+            with open(image_path, 'rb') as img:
+                img_data = img.read()
+            image_str = base64.b64encode(img_data).decode('utf-8')
+            image_data[page_num] = image_str
+            book_images_collection.update_one(
+                {"bookId": book_id},
+                {"$set": {"images": image_data}}
+            )
     else:
         with open(image_path, 'rb') as img:
             img_data = img.read()
         image_str = base64.b64encode(img_data).decode('utf-8')
+        image_data[page_num] = image_str
         book_images_collection.insert_one({
             "bookId": book_id,
-            "image_path": image_path,
-            "image_str": image_str
+            "images": image_data
         })
     return image_str
 

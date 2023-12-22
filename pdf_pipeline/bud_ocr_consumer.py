@@ -63,7 +63,7 @@ def extract_page_table(ch, method, properties, body):
             "error": str(e),
             "line_number": traceback.extract_tb(e.__traceback__)[-1].lineno
         } 
-        error_queue('error_queue', '', bookId, error)    
+        error_queue('', bookId, error)    
     finally:
         print("ack sent")
         ch.basic_ack(delivery_tag=method.delivery_tag)

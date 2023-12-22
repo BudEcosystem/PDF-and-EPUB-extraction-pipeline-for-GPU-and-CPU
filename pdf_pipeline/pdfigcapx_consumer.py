@@ -135,7 +135,7 @@ def get_figure_and_captions(ch, method, properties, body):
         } 
         print(error)
         send_to_queue('check_ptm_completion_queue', queue_msg)
-        error_queue('error_queue', book_path, bookId, error)
+        error_queue(book_path, bookId, error)
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
         if os.path.exists(pdf_input_folder):

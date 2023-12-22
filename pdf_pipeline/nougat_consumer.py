@@ -59,7 +59,7 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
             image_strs = []
             for img_path in image_paths:
                 # will return image_str form db
-                image_strs.append(generate_image_str(img_path, bookId))
+                image_strs.append(generate_image_str(bookId, img_path))
             for image_str in image_strs:
                 image_paths.append(create_image_from_str(image_str))
                 pages_extracted += 1
@@ -95,7 +95,7 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
             "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno
         } 
         print(error)
-        error_queue('error_queue', '', bookId, error)
+        error_queue('', bookId, error)
     finally:
         print("message ack")
         ch.basic_ack(delivery_tag=method.delivery_tag)

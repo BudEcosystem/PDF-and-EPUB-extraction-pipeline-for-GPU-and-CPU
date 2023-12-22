@@ -34,8 +34,8 @@ figure_caption = get_mongo_collection('figure_caption')
 def process_book(ch, method, properties, body): 
     message = json.loads(body)
     book = message["book"]
-    book_name = book['book']
-    book_id = book['bookId']
+    book_name = book["book"]
+    book_id = book["bookId"]
     try:
         book_data = book_details.find_one({'bookId': book_id})
         if book_data and book_data['status'] == 'processing':
@@ -90,14 +90,16 @@ def process_book(ch, method, properties, body):
         else:
             split_path = split_book_paths[0]
             _, _, from_page, to_page = get_page_num_from_split_path(split_path)
-            figure_caption.insert_one({
-                "bookId": book_id,
-                "split_path": split_path,
-                "pages": [],
-                "status": "failed",
-                "from_page": from_page,
-                "to_page": to_page
-            })
+            figure_caption.find_one_and_update(
+                {"bookId": book_id, "split_path": split_path},
+                {"$set": {
+                    "pages": [],
+                    "status": "failed",
+                    "from_page": from_page,
+                    "to_page": to_page
+                }},
+                upsert=True
+            )
         
         pdf_book = fitz.open(book_path)
         for page_num in range(1, num_pages + 1):
@@ -111,7 +113,7 @@ def process_book(ch, method, properties, body):
             "line_number" : traceback.extract_tb(e.__traceback__)[-1].lineno
         }
         print(error) 
-        error_queue('error_queue', book_name, book_id, error)   
+        error_queue(book_name, book_id, error)   
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -125,14 +127,15 @@ def process_page(page_num, pdf_book, book_folder, split_path):
     os.makedirs(page_images_folder_path, exist_ok=True)
     book_image = page_image.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
     image_path = os.path.join(page_images_folder_path, f'page_{page_num}.jpg')
-    book_image.save(image_path)
+    if not os.path.exists(image_path):
+        book_image.save(image_path)
     absolute_image_path = os.path.abspath(image_path)
     queue_msg = {
         "page_num": page_num,
         "bookId": book_id,
         "split_path": split_path,
         "image_path": absolute_image_path,
-        "image_str": generate_image_str(absolute_image_path)
+        "image_str": generate_image_str(book_id, absolute_image_path)
     }
     send_to_queue('publaynet_queue', queue_msg)
     send_to_queue('table_bank_queue', queue_msg)

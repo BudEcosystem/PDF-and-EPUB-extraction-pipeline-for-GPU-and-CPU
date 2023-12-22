@@ -72,7 +72,7 @@ def extract_other_pages(ch, method, properties, body):
             "error": str(e),
             "line_number": traceback.extract_tb(e.__traceback__)[-1].lineno
         } 
-        error_queue('error_queue', '', bookId, error)
+        error_queue('', bookId, error)
     finally:
         print("ack sent")
         ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -83,7 +83,7 @@ def process_page(page, bookId):
     results = page["results"]
     page_num = page["page_num"]
     is_figure_present = page["is_figure_present"]
-    image_str = generate_image_str(page["image_str"])
+    image_str = generate_image_str(bookId, page["image_str"])
     new_image_path = create_image_from_str(image_str)
     
     page_content, figures = sort_text_blocks_and_extract_data(

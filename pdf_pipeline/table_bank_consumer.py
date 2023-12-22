@@ -28,10 +28,10 @@ def table_bank_layout(ch, method, properties, body):
     message = json.loads(body)
     image_path = message["image_path"]
     page_num = message["page_num"]
-    book_path = message["book_path"]
+    book_path = message["split_path"]
     bookId = message["bookId"]
     image_str = message["image_str"]
-    print("Received message for {image_path}")
+    print(f"Received message for {image_path}")
     queue_msg = {
         "bookId": bookId,
         "split_path": book_path,
@@ -76,6 +76,7 @@ def table_bank_layout(ch, method, properties, body):
                 "pages": [book_page_data]
             }
             table_bank_pages.insert_one(new_book_document)
+        send_to_queue('check_ptm_completion_queue', queue_msg)
     except Exception as e:
         error = {
             "consumer": "publaynet",
@@ -84,7 +85,7 @@ def table_bank_layout(ch, method, properties, body):
             "error": str(e),
             "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno
         }
-        error_queue('error_queue', book_path, bookId, error)
+        error_queue(book_path, bookId, error)
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
