@@ -31,7 +31,6 @@ from pdf_info import pdf_info
 def figures_captions_list(input_path, pdf, output_path):
     # input: single pdf file
     # output: bounding box list of figures and captions
-    pdf_filename = input_path + pdf
     html_file_path = output_path + pdf[:-4]
     # 1. Read pdfs from input folder  (pdf_info)
     info, html_boxes = pdf_info(html_file_path, pdf)

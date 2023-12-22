@@ -86,14 +86,15 @@ def get_figure_and_captions(ch, method, properties, body):
         send_to_queue('check_ptm_completion_queue', queue_msg)
         ch.basic_ack(delivery_tag=method.delivery_tag)
         return
-    
     pdf_input_folder = generate_unique_id()
     os.makedirs(pdf_input_folder, exist_ok=True)
     output_folder = f"{pdf_input_folder}_output"
     os.makedirs(output_folder, exist_ok=True)
     shutil.copy(book_path, pdf_input_folder)
     try:
-        book_data = extract_figure_and_caption(pdf_input_folder, output_folder)
+        abs_input_path = os.path.abspath(pdf_input_folder)
+        abs_output_path = os.path.abspath(output_folder)
+        book_data = extract_figure_and_caption(abs_input_path, abs_output_path)
         if book_data:
             figure_layout = transform_to_figure_blocks(book_data)
             figure_caption.insert_one({

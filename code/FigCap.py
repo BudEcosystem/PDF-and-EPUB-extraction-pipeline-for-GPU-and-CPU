@@ -17,7 +17,8 @@ Start from 19/10/2017
 1.0 version 28/02/2018
 
 """
-
+import sys
+sys.path.append("pdf_extraction_pipeline")
 import os
 from xpdf_process import figures_captions_list
 import subprocess
@@ -59,7 +60,7 @@ def extract_figure_and_caption(input_path, output_path):
     """
     xpdf_path = output_path +'/xpdf/'
     if not os.path.isdir(xpdf_path):
-        os.mkdir(xpdf_path)
+        os.makedirs(xpdf_path)
     # Read each files in the input path
     all_data=[]
     # ["book-set-2/123/splits/123_0_1-30.pdf"]
@@ -124,8 +125,8 @@ def extract_figure_and_caption(input_path, output_path):
     return book_data
 
 if __name__=='__main__':
-    input_files_path = "/home/developer/prakash/book-set-2/123/splits"
-    output_files_directory = "/home/developer/prakash/book-set-2/123/figure_output"
+    input_files_path = "/home/developer/prakash/book-set-2/ab840dd76e114b449c58013bf5bed6d8/splits"
+    output_files_directory = "/home/developer/prakash/book-set-2/ab840dd76e114b449c58013bf5bed6d8/figure_output"
     extract_figure_and_caption(input_files_path, output_files_directory)
 
     
