@@ -19,7 +19,7 @@ Start from 19/10/2017
 """
 
 import os
-from code.xpdf_process import figures_captions_list
+from xpdf_process import figures_captions_list
 import subprocess
 from utils import get_page_num_from_split_path
 from dotenv import load_dotenv

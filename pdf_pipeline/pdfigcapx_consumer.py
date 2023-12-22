@@ -1,6 +1,5 @@
 # pylint: disable=all
 # type: ignore
-import pika.exceptions
 import json
 from dotenv import load_dotenv
 import sys
@@ -9,7 +8,7 @@ import shutil
 import traceback
 sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
-from code.FigCap import extract_figure_and_caption
+from FigCap import extract_figure_and_caption
 from utils import (
     timeit,
     get_mongo_collection,
@@ -148,14 +147,15 @@ def consume_pdfigcap_queue():
     connection = get_rabbitmq_connection()
     channel = get_channel(connection)
     try:
+        queue_name = "pdfigcapx_queue"
         channel.basic_qos(prefetch_count=1, global_qos=False)
         # Declare the queue
-        channel.queue_declare(queue='pdfigcap_queue')
+        channel.queue_declare(queue=queue_name)
 
         # Set up the callback function for handling messages from the queue
-        channel.basic_consume(queue='pdfigcap_queue', on_message_callback=get_figure_and_captions)
+        channel.basic_consume(queue=queue_name, on_message_callback=get_figure_and_captions)
 
-        print(' [*] Waiting for messages on pdfigcap_queue. To exit, press CTRL+C')
+        print(f' [*] Waiting for messages on {queue_name}. To exit, press CTRL+C')
         channel.start_consuming()
 
     except KeyboardInterrupt:

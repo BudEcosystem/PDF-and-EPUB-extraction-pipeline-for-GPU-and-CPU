@@ -24,7 +24,7 @@ import cv2
 import re
 # from lxml import etree
 # from selenium import webdriver
-from code.pdf_info import pdf_info
+from pdf_info import pdf_info
 
 
 
