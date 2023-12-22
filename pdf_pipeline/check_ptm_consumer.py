@@ -102,9 +102,9 @@ def check_ptm_status(ch, method, properties, body):
                 from_page = page_num
                 to_page = page_num
             for page_no in range(from_page, to_page + 1):
-                fig_result = list(filter(lambda x: x["page_num"] == page_no, pdfigcapx_data['pages']))
+                # fig_result = list(filter(lambda x: x["page_num"] == page_no, pdfigcapx_data['pages']))
                 # without image_path
-                fig_result = pdfigcapx_data['pages'].get(page_no, [])
+                fig_result = pdfigcapx_data['pages'].get(str(page_no), [])
                 page_data = check_ptm(page_no, bookId)
                 if page_data:
                     page_data["split_path"] = book_path

@@ -36,7 +36,7 @@ def transform_to_figure_blocks(book_data):
 
     results = {}
     for figure in book_data:
-        page_no = figure["page_num"]
+        page_no = str(figure["page_num"])
         figure_bbox_values = figure.get("figure_bbox")
         caption_text = figure.get('caption_text')
         caption = ''.join(caption_text)
