@@ -68,7 +68,6 @@ def get_rabbitmq_connection():
 def get_channel(connection):
     return connection.channel()
 
-
 def crop_image(block, imagepath, id):
     """
     Function to crop the image based on the bounding box coordinates.
@@ -210,33 +209,29 @@ def generate_image_str(book_id, image_path, save=True):
     filename = os.path.basename(image_path)
     page_num = os.path.splitext(filename)[0].split('_')[-1]
     book_images_collection = get_mongo_collection('book_images')
-    book_images = book_images_collection.find_one(
-        {"bookId": book_id},
-        {"_id":0, f"images.{page_num}": 1}
+    book_image = book_images_collection.find_one(
+        {"bookId": book_id, "page_num": page_num}
     )
-    image_data = {}
-    if book_images:
-        image_data = book_images.get('images', {})
-        if image_data and page_num in image_data:
-            image_str = image_data[page_num]
-        else:
+    if book_image:
+        image_str = book_image.get('image_str', '')
+        if not image_str:
             with open(image_path, 'rb') as img:
                 img_data = img.read()
             image_str = base64.b64encode(img_data).decode('utf-8')
             if save:
                 book_images_collection.update_one(
-                    {"bookId": book_id},
-                    {"$set": {f"images.{page_num}": image_str}}
+                    {"bookId": book_id, "page_num": page_num},
+                    {"$set": {"image_str": image_str}}
                 )
     else:
         with open(image_path, 'rb') as img:
             img_data = img.read()
         image_str = base64.b64encode(img_data).decode('utf-8')
-        image_data[page_num] = image_str
         if save:
             book_images_collection.insert_one({
                 "bookId": book_id,
-                "images": image_data
+                "page_num": page_num,
+                "image_str": image_str
             })
     return image_str
 
