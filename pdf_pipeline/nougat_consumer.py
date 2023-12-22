@@ -24,7 +24,7 @@ load_dotenv()
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
-NOUGAT_BATCH_SIZE = os.environ["NOUGAT_BATCH_SIZE"]
+NOUGAT_BATCH_SIZE = int(os.environ["NOUGAT_BATCH_SIZE"])
 
 book_details = get_mongo_collection('book_details')
 
@@ -42,8 +42,8 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
         nougat_splits = book['nougat_splits']
 
         if not split_id:
-            split_ids = sorted(list(nougat_splits.keys()))
-            split_id = split_ids[-1]
+            split_ids = sorted(map(int, nougat_splits.keys()))
+            split_id = str(split_ids[-1])
             process_remaining_pages = True
        
         nougat_pages = nougat_splits[split_id]

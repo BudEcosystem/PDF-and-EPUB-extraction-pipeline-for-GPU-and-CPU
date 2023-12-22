@@ -25,8 +25,6 @@ from element_extraction_utils import (
     process_list
 )
 
-
-
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
@@ -50,7 +48,7 @@ def extract_other_pages(ch, method, properties, body):
         page_obj = process_page(message, bookId)
         document = other_pages.find_one({'bookId': bookId})
         if document:
-            other_pages.update_one({"_id":document["_id"]}, {"$push": {"pages": page_obj}})
+            other_pages.update_one({"_id": document["_id"]}, {"$push": {"pages": page_obj}})
         else:
             new_book_document = {
                 "bookId": bookId,
@@ -83,7 +81,7 @@ def process_page(page, bookId):
     results = page["results"]
     page_num = page["page_num"]
     is_figure_present = page["is_figure_present"]
-    image_str = generate_image_str(bookId, page["image_str"])
+    image_str = generate_image_str(bookId, page["image_path"])
     new_image_path = create_image_from_str(image_str)
     
     page_content, figures = sort_text_blocks_and_extract_data(
