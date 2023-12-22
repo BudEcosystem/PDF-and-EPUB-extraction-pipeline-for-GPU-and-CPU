@@ -14,26 +14,24 @@ error_collection = get_mongo_collection('error_collection')
 def store_errors(ch, method, properties, body):
     try:
         message = json.loads(body)
-        bookname = message["bookname"]
         bookId = message["bookId"]
-        error=message['error']
-        error_doc=error_collection.find_one({"bookId":bookId})
+        error = message["error"]
+        error_doc = error_collection.find_one({"bookId": bookId})
         if error_doc:
             # If the document exists, update the errors array
             error_collection.update_one(
                 {'bookId': bookId},
                 {'$push': {'errors': error}}
             )
-            print(f"Updated existing document for bookId: {bookId}")
+            print(f"Updated error to existing document for bookId: {bookId}")
         else:
             # If the document does not exist, create a new one
             new_document = {
-                'book': bookname,
                 'bookId': bookId,
                 'errors': [error]
             }
             error_collection.insert_one(new_document)
-
+            print(f"Add error document for bookId: {bookId}")
     except Exception as e:
         print("error while storing erros", e)
     finally:
@@ -41,25 +39,16 @@ def store_errors(ch, method, properties, body):
    
 
 def consume_error_queue():
-    try:
-        channel.basic_qos(prefetch_count=1, global_qos=False)
+    channel.basic_qos(prefetch_count=1, global_qos=False)
 
-        # Declare the queue
-        channel.queue_declare(queue='error_queue')
+    # Declare the queue
+    channel.queue_declare(queue='error_queue')
 
-        # Set up the callback function for handling messages from the queue
-        channel.basic_consume(queue='error_queue', on_message_callback=store_errors)
+    # Set up the callback function for handling messages from the queue
+    channel.basic_consume(queue='error_queue', on_message_callback=store_errors)
 
-        print(' [*] Waiting for messages on error_queue. To exit, press CTRL+C')
-        channel.start_consuming()
-
-    except KeyboardInterrupt:
-        pass
-    finally:
-        channel.close()
-        connection.close()
-
-   
+    print(' [*] Waiting for messages on error_queue. To exit, press CTRL+C')
+    channel.start_consuming()
 
 
 if __name__ == "__main__":
@@ -67,3 +56,5 @@ if __name__ == "__main__":
         consume_error_queue()      
     except KeyboardInterrupt:
         pass
+    finally:
+        connection.close()

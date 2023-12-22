@@ -6,7 +6,7 @@ import sys
 sys.path.append("pdf_extraction_pipeline/code")
 sys.path.append("pdf_extraction_pipeline")
 import os
-from pdf_extraction_pipeline.bud_api_table_extract import process_book_page
+from bud_api_table_extract import process_book_page
 from pdf_producer import error_queue
 import json
 from utils import (
@@ -69,14 +69,15 @@ def extract_page_table(ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)
   
 def consume_table_queue():
+    queue_name = "bud_table_extraction_queue"
     channel.basic_qos(prefetch_count=1, global_qos=False)
     # Declare the queue
-    channel.queue_declare(queue='table_queue')
+    channel.queue_declare(queue=queue_name)
 
     # Set up the callback function for handling messages from the queue
-    channel.basic_consume(queue='table_queue', on_message_callback=extract_page_table)
+    channel.basic_consume(queue=queue_name, on_message_callback=extract_page_table)
 
-    print(' [*] Waiting for messages on stable_queue To exit, press CTRL+C')
+    print(f' [*] Waiting for messages on {queue_name} To exit, press CTRL+C')
     channel.start_consuming()
 
 

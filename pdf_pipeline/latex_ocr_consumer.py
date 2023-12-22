@@ -83,7 +83,7 @@ def process_page(page, bookId):
     results = page["results"]
     page_num = page["page_num"]
     is_figure_present = page["is_figure_present"]
-    image_str = generate_image_str(bookId, page["image_str"])
+    image_str = generate_image_str(bookId, page["image_path"])
     new_image_path = create_image_from_str(image_str)
     
     page_content, figures, equations = sort_text_blocks_and_extract_data(
@@ -144,7 +144,7 @@ def consume_latex_ocr_queue():
     # Set up the callback function for handling messages from the queue
     channel.basic_consume(queue=queue_name, on_message_callback=extract_latex_pages)
 
-    print(' [*] Waiting for messages on latec_ocr_queue To exit, press CTRL+C')
+    print(f' [*] Waiting for messages on {queue_name} To exit, press CTRL+C')
     channel.start_consuming()
 
 
