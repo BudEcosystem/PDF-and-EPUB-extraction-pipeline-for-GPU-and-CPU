@@ -31,21 +31,6 @@ def get_fig_data(bookId, book_path):
         "bookId": bookId,
         "split_path": book_path
     })
-    # "pages": [
-    #     {
-    #         "page_num": 23,
-    #         "figure_bbox": [
-    #             256,
-    #             465,
-    #             115,
-    #             85
-    #         ],
-    #         "type": "Figure",
-    #         "caption_text": [
-    #             "Fig. 1.1 LATEX and other word processors"
-    #         ]
-    #     }
-    # ]
     if fig:
         fig_done = True
     return fig_done, fig
@@ -65,23 +50,6 @@ def get_ptm_data(layout_name, bookId, page_num):
     elif layout_name == "mfd":
         data = mfd_pages.find_one(find_data)
     if data:
-        # "pages": [
-        #     {
-        #     "page_num": 0,
-        #     "job": "mfd",
-        #     "image_path": "/home/azureuser/prakash2/LaTeX in 24 Hours - Dilip Datta/page_1.jpg",
-        #     "status": "done",
-        #     "result": [
-        #         {
-        #         "x_1": 1196.4873046875,
-        #         "y_1": 2496.9365234375,
-        #         "x_2": 1641.310546875,
-        #         "y_2": 2618.2470703125,
-        #         "type": "Equation"
-        #         }
-        #     ]
-        #     }
-        # ]
         layout_done = True
         data = list(filter(lambda x: x['page_num'] == page_num, data['pages']))
         # no check because layout block for page_num should always be present
@@ -186,9 +154,9 @@ def process_page(process_page_data, fig_result):
                     "$addToSet": {"nougat_pages": nougat_queue_msg, "num_nougat_pages": page_num}
                 }
             )
-        split_id = calculate_split_id(nougat_queue_msg)
-        nougat_queue_msg["split_id"] = split_id
-        send_to_queue("nougat_queue", nougat_queue_msg)
+            split_id = calculate_split_id(nougat_queue_msg)
+            nougat_queue_msg["split_id"] = split_id
+            send_to_queue("nougat_queue", nougat_queue_msg)
     elif any(block['type'] == "Equation" for block in results):
         latex_ocr_queue_msg = {
             "results": results,
@@ -204,7 +172,7 @@ def process_page(process_page_data, fig_result):
                     "$addToSet": {"num_latex_pages": page_num}
                 }
             )
-        send_to_queue("latex_ocr_queue", latex_ocr_queue_msg)
+            send_to_queue("latex_ocr_queue", latex_ocr_queue_msg)
     else:
         other_pages_queue_msg = {
             "results": results,
@@ -220,7 +188,7 @@ def process_page(process_page_data, fig_result):
                     "$addToSet": {"num_other_pages": page_num}
                 }
             )
-        send_to_queue('other_pages_queue', other_pages_queue_msg)
+            send_to_queue('other_pages_queue', other_pages_queue_msg)
     book_data = book_details.find_one({"bookId": bookId})
     total_pages_in_book = book_data["num_pages"]
     num_nougat_pages = len(book_data.get('num_nougat_pages', []))
