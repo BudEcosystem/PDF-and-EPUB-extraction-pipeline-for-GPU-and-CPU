@@ -39,11 +39,11 @@ def figures_captions_list(input_path, pdf, output_path):
     pre_figures, cap_regions = fig_cap_matching(cap_box, fig_box, info, table_box, text_box)
     figures, captions = evaluation(pre_figures, cap_regions, html_file_path, info, html_boxes) # Remove figure_table and figure caption in one box
     figures, captions = check_region(info, figures, captions)
-    no_of_figures = sum([len(figures[x]) for x in figures])
-    no_of_caps = sum([len(cap_box[x]) for x in cap_box])
-    no_of_figs = sum([len(fig_box[x]) for x in fig_box])
+    # no_of_figures = sum([len(figures[x]) for x in figures])
+    # no_of_caps = sum([len(cap_box[x]) for x in cap_box])
+    # no_of_figs = sum([len(fig_box[x]) for x in fig_box])
     
-    r = info['png_ratio']
+    # r = info['png_ratio']
     
     return figures, info
 

@@ -260,7 +260,7 @@ def upload_to_aws_s3(image_path, image_id):
 
 
 if __name__ == '__main__':
-    BOOK_ID = '456'
+    BOOK_ID = '123'
     BOOK = 'output_2.pdf'
     BOOKS = [
         'Evidence-Based Critical Care - Robert C Hyzy.pdf',
@@ -269,9 +269,10 @@ if __name__ == '__main__':
         'Evolutionary Thinking in Medicine - Alexandra Alvergne- Crispin Jenkinson- Charlotte Faurie.pdf',
         'Exam Survival Guide: Physical Chemistry - Jochen Vogt.pdf'
         ]
-    file_local_path = download_book_from_aws(BOOK_ID, BOOK)
-    split_local_paths = split_pdf(file_local_path)
-    print(split_local_paths)
+    BOOK = "Witnessing Torture - Alexandra S Moore- Elizabeth Swanson.pdf"
+    # file_local_path = download_book_from_aws(BOOK_ID, BOOK)
+    # split_local_paths = split_pdf(BOOK_ID, file_local_path)
+    # print(split_local_paths)
     # connection = get_rabbitmq_connection()
     # print("RabbitMQ connection established")
 
