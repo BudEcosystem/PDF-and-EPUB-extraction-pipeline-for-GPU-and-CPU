@@ -166,10 +166,11 @@ def store_book_details():
 # "Introduction to Statistics and Data Analysis  - Christian Heumann- Michael Schomaker-  Shalabh.pdf","Introduction to Time Series and Forecasting - Peter J Brockwell- Richard A Davis.pdf"
 # ,"Introductory Quantum Mechanics - Paul R Berman.pdf","Introductory Statistics with R - Peter Dalgaard.pdf","Introductory Time Series with R - Paul SP Cowpertwait- Andrew V Metcalfe.pdf",
 # "Knowledge Management - Klaus North- Gita Kumta.pdf","Language Across the Curriculum & CLIL in English as an Additional Language (EAL) Contexts - Angel MY Lin.pdf"]
-    books = ["A First Introduction to Quantum Physics - Pieter Kok.pdf"]
-    books = ["Understanding Cryptography - Christof Paar- Jan Pelzl.pdf"]
-    books = ["Taxation in European Union - Pietro Boria.pdf"]
-    books = ["output_1.pdf", "output_2.pdf", "output_3.pdf"]
+    books = ["output_3.pdf"]
+    books = [
+        "Writing for Publication - Mary Renck Jalongo- Olivia N Saracho.pdf",
+        "Witnessing Torture - Alexandra S Moore- Elizabeth Swanson.pdf",
+        "Understanding Statistics Using R - Randall Schumacker- Sara Tomek.pdf"]
     print(books)
     for book in books:
         doc = book_details.find_one({"book": book})
