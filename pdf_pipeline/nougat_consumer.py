@@ -35,8 +35,8 @@ nougat_pages_collection = get_mongo_collection('nougat_pages')
 def extract_text_equation_with_nougat(ch, method, properties, body):
     message = json.loads(body)
     bookId = message['bookId']
-    # page_num = message.get('page_num', None)
-    # image_path = message.get('image_path', None)
+    page_num = message.get('page_num', None)
+    image_path = message.get('image_path', None)
     split_id = message.get('split_id', None)
     print(f"nougat received message for {bookId}")
     try:
@@ -50,15 +50,22 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
             process_remaining_pages = True
        
         nougat_pages = nougat_splits[split_id]
-        if len(nougat_pages) == NOUGAT_BATCH_SIZE or process_remaining_pages:
-            if split_id in book.get('processing_nougat_split', []):
+        page_present_in_split = True
+        if page_num:
+            page_present_in_split = any(page['page_num'] == page_num for page in nougat_pages)
+        if len(nougat_pages) == NOUGAT_BATCH_SIZE or process_remaining_pages or \
+            not page_present_in_split:
+            if split_id in book.get('processing_nougat_split', []) and page_present_in_split:
                 return
-            book_details.update_one(
-                {"bookId": bookId},
-                {"$addToSet": {"processing_nougat_split": split_id}}
-            )
-            # pages_extracted = 0
-            image_paths = [page["image_path"] for page in nougat_pages]
+            if page_present_in_split:
+                book_details.update_one(
+                    {"bookId": bookId},
+                    {"$addToSet": {"processing_nougat_split": split_id}}
+                )
+            if not page_present_in_split:
+                image_paths = [image_path]
+            else:
+                image_paths = [page["image_path"] for page in nougat_pages]
             local_image_paths = []
             for img_path in image_paths:
                 # will return image_str form db
@@ -75,7 +82,10 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
                 abs_path = os.path.abspath(img_path)
                 os.remove(abs_path)
 
-            page_nums = [page["page_num"] for page in nougat_pages]
+            if not page_present_in_split:
+                page_nums = [page_num]
+            else:
+                page_nums = [page["page_num"] for page in nougat_pages]
             api_data = {
                 "bookId": bookId,
                 "page_nums": page_nums
