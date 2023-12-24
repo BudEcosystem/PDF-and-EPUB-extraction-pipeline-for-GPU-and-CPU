@@ -42,6 +42,8 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
     try:
         process_remaining_pages = False
         book = book_details.find_one({"bookId": bookId})
+        if book["status"] == "extracted":
+            return
         nougat_splits = book['nougat_splits']
 
         if not split_id:
