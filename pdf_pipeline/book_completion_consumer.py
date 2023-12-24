@@ -39,10 +39,13 @@ def book_complete(ch, method, properties, body):
         book_det = book_details.find_one({"bookId": bookId})
         book_name = book_det["book"]
         book_path = book_det["book_path"]
-        num_pages_done = book_det.get("num_pages_done")
+        num_pages_done = book_det.get("num_pages_done", 0)
+        print("num pages done > ", num_pages_done)
+        num_nougat_pages_done = book_det.get("num_nougat_pages_done", 0)
+        print("num_nougat_pages_done > ", num_nougat_pages_done)
         num_pages = book_det.get("num_pages")
         book_completed = False
-        if num_pages_done >= num_pages:
+        if (num_pages_done + num_nougat_pages_done) >= num_pages:
             book_completed = True
         if book_completed:
             other_pages_document = other_pages.find_one({"bookId": bookId})
