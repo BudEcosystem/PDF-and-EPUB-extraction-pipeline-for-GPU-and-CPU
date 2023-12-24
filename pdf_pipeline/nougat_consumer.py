@@ -29,6 +29,7 @@ channel = get_channel(connection)
 NOUGAT_BATCH_SIZE = int(os.environ["NOUGAT_BATCH_SIZE"])
 
 book_details = get_mongo_collection('book_details')
+nougat_pages_collection = get_mongo_collection('nougat_pages')
 
 @timeit
 def extract_text_equation_with_nougat(ch, method, properties, body):
@@ -56,14 +57,14 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
                 {"bookId": bookId},
                 {"$addToSet": {"processing_nougat_split": split_id}}
             )
-            pages_extracted = 0
+            # pages_extracted = 0
             image_paths = [page["image_path"] for page in nougat_pages]
             local_image_paths = []
             for img_path in image_paths:
                 # will return image_str form db
                 image_str = generate_image_str(bookId, img_path)
                 local_image_paths.append(create_image_from_str(image_str))
-                pages_extracted += 1
+                # pages_extracted += 1
 
             pdf_path = os.path.abspath(f"{generate_unique_id()}.pdf")
             with open(pdf_path, "wb") as f_pdf:
@@ -82,12 +83,16 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
             _ = get_nougat_extraction(pdf_path, api_data)
             if os.path.exists(pdf_path):
                 os.remove(pdf_path)
-            book_details.find_one_and_update(
-                {"bookId": bookId},
-                {
-                    "$inc": {"num_pages_done": pages_extracted}
-                }
-            )
+            n_pages = nougat_pages_collection.find_one({"bookId": bookId})
+            pages = n_pages.get('pages', {})
+            if pages:
+                pages_extracted = len(list(pages.keys()))
+                book_details.find_one_and_update(
+                    {"bookId": bookId},
+                    {
+                        "$set": {"num_nougat_pages_done": pages_extracted}
+                    }
+                )
             send_to_queue('book_completion_queue', bookId)
     except Exception as e:
         print(traceback.format_exc())
