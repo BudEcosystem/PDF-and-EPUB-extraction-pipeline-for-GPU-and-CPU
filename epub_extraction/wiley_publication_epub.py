@@ -397,6 +397,7 @@ def get_html_from_epub(epub_path):
 #                 print(f"this {bookname}already extracted")
 
 # get all books from aws and checking if it has pattern (figure tag inside any html file)
+extracted=[]
 books=get_all_books_names(bucket_name, folder_name)
 print(len(books))
 book_with_figure_tags=[]
@@ -406,6 +407,7 @@ for book in books:
     s3_key=f'{folder_name}{book}/{book}.epub'
     print(s3_key)
     if not already_extracted:
+        print('e')
         epub_path = download_epub_from_s3(book, s3_key)
         if not epub_path:
             continue
@@ -422,12 +424,14 @@ for book in books:
             if os.path.exists(epub_path):
                 os.remove(epub_path)
     else:
-        print(f"this {book}already extracted")
+        extracted.append(book)
+       
 
 print("total books", len(books))
+print("total extracted", len(extracted))
 print("total books with figure tag",len(book_with_figure_tags))
-f=open('wiley_aws_books_with_figure','w')
-f.write(str(book_with_figure_tags))
+# f=open('wiley_aws_books_with_figure','w')
+# f.write(str(book_with_figure_tags))
 print("total books with out figure tag",len(book_with_figure_tags))
-f=open('wiley_aws_books_without_figure','w')
-f.write(str(books_with_out_figure_tags))
+# f=open('wiley_aws_books_without_figure','w')
+# f.write(str(books_with_out_figure_tags))

@@ -53,3 +53,5 @@ def process_book_page(image_path):
             return {}
     else:
         print('API request failed with status code:', response.status_code)
+
+# process_book_page('/home/bud-data-extraction/datapipeline/pdf_extraction_pipeline/epub_extraction/page_41.jpg')
