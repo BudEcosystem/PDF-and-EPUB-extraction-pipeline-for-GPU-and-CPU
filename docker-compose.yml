@@ -3,7 +3,7 @@ services:
   rabbitmq:
     image: rabbitmq:3.12-management
     ports:
-      - "56722:5672"
+      - "5672:5672"
       - "15673:15672"
     healthcheck:
       test:
