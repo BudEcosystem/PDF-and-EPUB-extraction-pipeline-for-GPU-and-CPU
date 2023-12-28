@@ -14,6 +14,8 @@ from utils import (
     get_mongo_collection,
     get_rabbitmq_connection,
     get_channel,
+    generate_image_str,
+    create_image_from_str,
 )
 import json
 from pdf_producer import send_to_queue, error_queue
@@ -32,7 +34,6 @@ def extract_text(ch, method, properties, body):
     message = json.loads(body)
     bookId = message["bookId"]
     page_num = message["page_num"]
-    image_path = message.get("image_path")
 
     print(f"other pages received {page_num} : {bookId}")
     try:
@@ -41,7 +42,7 @@ def extract_text(ch, method, properties, body):
             print(f"other page {page_num} already extracted")
             send_to_queue("book_completion_queue", bookId)
             return
-        page_obj = process_page(page_num, image_path)
+        page_obj = process_page(message, bookId)
         document = text_pages.find_one({"bookId": bookId})
         if document:
             text_pages.update_one(
@@ -69,15 +70,15 @@ def extract_text(ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
-def process_page(page_num, image_path):
+def process_page(page, bookId):
     page_obj = {}
-    # results = page["results"]
-    # page_num = page["page_num"]
-    # # is_figure_present = page["is_figure_present"]
-    # image_str = generate_image_str(bookId, page["image_path"])
-    # new_image_path = create_image_from_str(image_str)
-    image_data = Image.open(image_path)
+    page_num = page["page_num"]
+    # is_figure_present = page["is_figure_present"]
+    image_str = generate_image_str(bookId, page["image_path"])
+    new_image_path = create_image_from_str(image_str)
+    image_data = Image.open(new_image_path)
     page_content = pytesseract.image_to_string(image_data)
+    page_content = re.sub(r"\s+", " ", page_content).strip()
     page_obj = {
         "page_num": page_num,
         "text": page_content,
@@ -85,7 +86,7 @@ def process_page(page_num, image_path):
         "figures": [],
         "equations": [],
     }
-    os.remove(image_path)
+    os.remove(new_image_path)
     return page_obj
 
 
