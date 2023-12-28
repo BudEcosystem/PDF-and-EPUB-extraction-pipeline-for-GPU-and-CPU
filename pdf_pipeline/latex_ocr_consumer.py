@@ -19,7 +19,7 @@ import json
 from pdf_producer import send_to_queue, error_queue
 from element_extraction_utils import (
     process_table,
-    process_figure,
+    # process_figure,
     process_publaynet_figure,
     process_text,
     process_title,

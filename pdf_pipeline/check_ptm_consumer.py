@@ -111,7 +111,7 @@ def check_ptm(page_no, bookId):
     return process_page_data
 
 
-def process_page(process_page_data, fig_result):
+def process_page(process_page_data):
     page_num = process_page_data["page_num"]
     results = process_page_data["results"]
     image_path = process_page_data["image_path"]
