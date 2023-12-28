@@ -48,7 +48,12 @@ def send_to_queue(queue_name, data):
         queue_msg = get_layout_queue_msg(data)
     elif queue_name == "check_ptm_completion_queue":
         queue_msg = get_check_ptm_queue_msg(data)
-    elif queue_name in ["other_pages_queue", "latex_ocr_queue", "nougat_queue"]:
+    elif queue_name in [
+        "other_pages_queue",
+        "latex_ocr_queue",
+        "nougat_queue",
+        "text_pages_queue",
+    ]:
         queue_msg = get_extraction_queue_msg(data)
     elif queue_name == "bud_table_extraction_queue":
         queue_msg = get_bud_table_extraction_queue_msg(data)

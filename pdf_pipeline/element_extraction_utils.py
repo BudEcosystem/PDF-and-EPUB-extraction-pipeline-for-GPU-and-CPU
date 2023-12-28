@@ -134,7 +134,11 @@ def process_equation(equation_block, image_path):
     equation_image_path = crop_image(equation_block, image_path, equation_id)
     output = f"{{{{equation:{equation_id}}}}}"
     img = Image.open(equation_image_path)
-    latex_text = latex_model(img)
+    latex_text = ""
+    try:
+        latex_text = latex_model(img)
+    except Exception as e:
+        print("error while extracting equation using latex ocr", e)
     text_to_speech = latext_to_text_to_speech(latex_text)
     equation = {"id": equation_id, "text": latex_text, "text_to_speech": text_to_speech}
     if os.path.exists(equation_image_path):

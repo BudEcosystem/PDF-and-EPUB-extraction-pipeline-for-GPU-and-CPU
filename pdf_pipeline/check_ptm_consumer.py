@@ -133,11 +133,28 @@ def process_page(process_page_data):
     num_nougat_pages = book_data.get("num_nougat_pages", [])
     num_latex_pages = book_data.get("num_latex_pages", [])
     num_other_pages = book_data.get("num_other_pages", [])
+    num_text_pages = book_data.get("num_text_pages", [])
+    print(results)
+    # send pages to text_pages if page has only text.
     if (
         not results
         or not any("x_1" in block and "y_1" in block for block in results)
-        or not any(block["type"] in ["Table", "Figure"] for block in results)
+        or not any(
+            block["type"] in ["Table", "Figure", "Equation"] for block in results
+        )
     ):
+        text_pages_queue_msg = {
+            "image_path": image_path,
+            "page_num": page_num,
+            "bookId": bookId,
+        }
+        if page_num not in num_text_pages:
+            book_details.find_one_and_update(
+                {"bookId": bookId}, {"$addToSet": {"num_text_pages": page_num}}
+            )
+            send_to_queue("text_pages_queue", text_pages_queue_msg)
+
+    elif not any(block["type"] in ["Table", "Figure"] for block in results):
         nougat_queue_msg = {
             "image_path": image_path,
             "page_num": page_num,
@@ -156,6 +173,7 @@ def process_page(process_page_data):
             split_id = calculate_split_id(nougat_queue_msg)
             nougat_queue_msg["split_id"] = split_id
             send_to_queue("nougat_queue", nougat_queue_msg)
+
     elif any(block["type"] == "Equation" for block in results):
         latex_ocr_queue_msg = {
             "results": results,
@@ -187,9 +205,11 @@ def process_page(process_page_data):
     num_nougat_pages = len(book_data.get("num_nougat_pages", []))
     num_latex_pages = len(book_data.get("num_latex_pages", []))
     num_other_pages = len(book_data.get("num_other_pages", []))
+    num_text_pages = len(book_data.get("num_text_pages", []))
     if (
         num_nougat_pages > 0
-        and num_nougat_pages + num_latex_pages + num_other_pages == total_pages_in_book
+        and num_nougat_pages + num_latex_pages + num_other_pages + num_text_pages
+        == total_pages_in_book
     ):
         send_to_queue("nougat_queue", {"bookId": bookId})
 
