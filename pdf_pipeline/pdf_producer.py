@@ -34,6 +34,7 @@ bucket_name = os.environ["AWS_BUCKET_NAME"]
 folder_name = os.environ["BOOK_FOLDER_NAME"]
 
 book_details = get_mongo_collection("book_details")
+sequentially_extracted_books = get_mongo_collection("sequentially_extracted_books")
 
 
 def send_to_queue(queue_name, data):
@@ -166,23 +167,23 @@ def error_queue(book_path, bookId, error):
 
 
 def store_book_details():
-    #     books= get_all_books_names(bucket_name, folder_name + '/')
-    #     books=books[127:]
     #     books=["Guide to Competitive Programming - Antti Laaksonen.pdf","Guide to Computer Network Security - Joseph Migga Kizza.pdf","Guide to Discrete Mathematics - Gerard O'Regan.pdf","Guide to Scientific Computing in C++ - Joe Pitt-Francis- Jonathan Whiteley.pdf","Handbook of Consumer Finance Research - Jing Jian Xiao.pdf","Handbook of Disaster Research - Havidan Rodriguez- Enrico L Quarantelli- Russell Dynes.pdf","Handbook of Evolutionary Research in Archaeology - Anna Marie Prentiss.pdf","Handbook of LGBT Elders - Debra A Harley- Pamela B Teaster.pdf","Handbook of Marriage and the Family - Gary W Peterson- Kevin R Bush.pdf","Handbook of Quantitative Criminology - Alex R Piquero- David Weisburd.pdf","Handbook of the Life Course - Jeylan T Mortimer- Michael J Shanahan.pdf","International Business Management - Kamal Fatehi- Jeongho Choi.pdf","International Humanitarian Action - Hans-Joachim Heintze- Pierre Thielbörger.pdf","International Perspectives on Psychotherapy - Stefan G Hofmann.pdf","International Trade Theory and Policy - Giancarlo Gandolfo.pdf","Internet of Things From Hype to Reality - Ammar Rayes- Samer Salam.pdf","Introduction to Data Science - Laura Igual- Santi Seguí.pdf","Introduction to Deep Learning - Sandro Skansi.pdf","Introduction to Electronic Commerce and Social Commerce - Efraim Turban- Judy Whiteside- David King- Jon Outland.pdf","Introduction to Evolutionary Computing - AE Eiben- JE Smith.pdf","Introduction to Formal Philosophy - Sven Ove Hansson- Vincent F Hendricks.pdf","Introduction to General Relativity - Cosimo Bambi.pdf","Introduction to Law - Jaap Hage- Antonia Waltermann- Bram Akkermans.pdf",
     # "Introduction to Mathematica® for Physicists - Andrey Grozin.pdf","Introduction to Parallel Computing - Roman Trobec- Boštjan Slivnik- Patricio Bulić- Borut Robič.pdf","Introduction to Partial Differential Equations - David Borthwick.pdf","Introduction to Programming with Fortran - Ian Chivers- Jane Sleightholme.pdf","Introduction to Smooth Manifolds - John Lee.pdf",
     # "Introduction to Statistics and Data Analysis  - Christian Heumann- Michael Schomaker-  Shalabh.pdf","Introduction to Time Series and Forecasting - Peter J Brockwell- Richard A Davis.pdf"
     # ,"Introductory Quantum Mechanics - Paul R Berman.pdf","Introductory Statistics with R - Peter Dalgaard.pdf","Introductory Time Series with R - Paul SP Cowpertwait- Andrew V Metcalfe.pdf",
     # "Knowledge Management - Klaus North- Gita Kumta.pdf","Language Across the Curriculum & CLIL in English as an Additional Language (EAL) Contexts - Angel MY Lin.pdf"]
-    books = ["output_3.pdf"]
-    books = [
-        "Writing for Publication - Mary Renck Jalongo- Olivia N Saracho.pdf",
-        "Witnessing Torture - Alexandra S Moore- Elizabeth Swanson.pdf",
-        "Understanding Statistics Using R - Randall Schumacker- Sara Tomek.pdf",
-    ]
-    print(books)
+    # books = ["output_3.pdf"]
+    # books = [
+    #     "Writing for Publication - Mary Renck Jalongo- Olivia N Saracho.pdf",
+    #     "Witnessing Torture - Alexandra S Moore- Elizabeth Swanson.pdf",
+    #     "Understanding Statistics Using R - Randall Schumacker- Sara Tomek.pdf",
+    # ]
+    books = get_all_books_names(bucket_name, folder_name + "/")
+    print(len(books))
     for book in books:
         doc = book_details.find_one({"book": book})
-        if not doc:
+        doc2 = sequentially_extracted_books.find_one({"book": book})
+        if not doc and not doc2:
             book_data = {
                 "bookId": generate_unique_id(),
                 "book": book,
@@ -197,8 +198,12 @@ if __name__ == "__main__":
         # store_book_details()
         books = book_details.find({})
         for book in books:
-            if book["status"] == "not_extracted":
-                send_to_queue("pdf_processing_queue", book)
+            if book["status"] == "yet_extracted":
+                if book["book"].endswith(".pdf"):
+                    print(book["book"])
+                    send_to_queue("pdf_processing_queue", book)
+                else:
+                    print("skipping this book as it not a pdf file")
 
     except KeyboardInterrupt:
         pass

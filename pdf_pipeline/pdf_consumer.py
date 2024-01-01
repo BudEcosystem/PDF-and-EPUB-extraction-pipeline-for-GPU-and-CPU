@@ -66,7 +66,11 @@ def process_book(ch, method, properties, body):
             split_book_paths = book_data.get("split_book_paths", [])
             num_pages = book_data.get("num_pages", None)
         if not split_book_paths:
-            book = PdfReader(book_path)
+            try:
+                book = PdfReader(book_path)
+            except Exception as e:
+                print("error while reading pdf file", e)
+                return
             num_pages = len(book.pages)
             split_book_paths = split_pdf(book_id, book_path)
             # save in book_details
