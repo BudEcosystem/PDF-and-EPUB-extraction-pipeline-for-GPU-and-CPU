@@ -134,7 +134,7 @@ def process_page(process_page_data):
     num_latex_pages = book_data.get("num_latex_pages", [])
     num_other_pages = book_data.get("num_other_pages", [])
     num_text_pages = book_data.get("num_text_pages", [])
-    print(results)
+    # print(results)
     queue_msg = {
         "image_path": image_path,
         "page_num": page_num,
@@ -174,12 +174,14 @@ def process_page(process_page_data):
             book_details.find_one_and_update(
                 {"bookId": bookId}, {"$addToSet": {"num_latex_pages": page_num}}
             )
+            queue_msg["results"] = results
             send_to_queue("latex_ocr_queue", queue_msg)
     else:
         if page_num not in num_other_pages:
             book_details.find_one_and_update(
                 {"bookId": bookId}, {"$addToSet": {"num_other_pages": page_num}}
             )
+            queue_msg["results"] = results
             send_to_queue("other_pages_queue", queue_msg)
     book_data = book_details.find_one({"bookId": bookId})
     total_pages_in_book = book_data["num_pages"]
