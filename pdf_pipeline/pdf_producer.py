@@ -21,7 +21,6 @@ aws_access_key_id = os.environ["AWS_ACCESS_KEY_ID"]
 aws_secret_access_key = os.environ["AWS_SECRET_ACCESS_KEY"]
 aws_region = os.environ["AWS_REGION"]
 
-
 # Create an S3 client
 s3 = boto3.client(
     "s3",
@@ -35,6 +34,7 @@ folder_name = os.environ["BOOK_FOLDER_NAME"]
 
 book_details = get_mongo_collection("book_details")
 sequentially_extracted_books = get_mongo_collection("sequentially_extracted_books")
+pdf_error = get_mongo_collection("pdf_error")
 
 
 def send_to_queue(queue_name, data):
@@ -210,6 +210,13 @@ if __name__ == "__main__":
                     print(book["book"])
                     send_to_queue("pdf_processing_queue", book)
                 else:
+                    pdf_error.insert_one(
+                        {
+                            "bookId": book["book_id"],
+                            "book": book["bookId"],
+                            "error": "not a pdf file",
+                        }
+                    )
                     print("skipping this book as it not a pdf file")
 
     except KeyboardInterrupt:

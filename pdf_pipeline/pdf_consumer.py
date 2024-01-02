@@ -29,6 +29,7 @@ channel = get_channel(connection)
 
 book_details = get_mongo_collection("book_details")
 figure_caption = get_mongo_collection("figure_caption")
+pdf_error = get_mongo_collection("pdf_error")
 
 
 @timeit
@@ -70,6 +71,9 @@ def process_book(ch, method, properties, body):
                 book = PdfReader(book_path)
             except Exception as e:
                 print("error while reading pdf file", e)
+                pdf_error.insert_one(
+                    {"bookId": book_id, "book": book_name, "error": str(e)}
+                )
                 return
             num_pages = len(book.pages)
             split_book_paths = split_pdf(book_id, book_path)
