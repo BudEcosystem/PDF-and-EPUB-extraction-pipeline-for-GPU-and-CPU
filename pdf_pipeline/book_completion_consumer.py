@@ -29,6 +29,16 @@ text_pages = get_mongo_collection("text_pages")
 QUEUE_NAME = "book_completion_queue"
 
 
+def get_unique_pages(original_list):
+    unique_values = set()
+    result_list = []
+    if original_list:
+        for item in original_list:
+            if (item['page_num'] not in unique_values):
+                unique_values.add(item['page_num'])
+                result_list.append(item)
+    return result_list
+
 @timeit
 def book_complete(ch, method, properties, body):
     message = json.loads(body)
@@ -43,7 +53,23 @@ def book_complete(ch, method, properties, body):
         book_det = book_details.find_one({"bookId": bookId})
         book_name = book_det["book"]
         book_path = book_det["book_path"]
-        num_pages_done = book_det.get("num_pages_done", 0)
+        other_pages_document = other_pages.find_one({"bookId": bookId})
+        latex_pages_document = latex_pages.find_one({"bookId": bookId})
+        text_pages_document = text_pages.find_one({"bookId": bookId})
+        other_pages_result = (
+            other_pages_document.get("pages", []) if other_pages_document else []
+        )
+        latex_pages_result = (
+                latex_pages_document.get("pages", []) if latex_pages_document else []
+        )
+        text_pages_result = (
+            text_pages_document.get("pages", []) if text_pages_document else []
+        )
+        other_pages_result = get_unique_pages(other_pages_result)
+        latex_pages_result = get_unique_pages(latex_pages_result)
+        text_pages_result = get_unique_pages(text_pages_result)
+
+        num_pages_done = len(other_pages_result) + len(latex_pages_result) + len(text_pages_result)
         print("num pages done > ", num_pages_done)
         num_nougat_pages_done = book_det.get("num_nougat_pages_done", 0)
         print("num_nougat_pages_done > ", num_nougat_pages_done)
@@ -52,29 +78,29 @@ def book_complete(ch, method, properties, body):
         if (num_pages_done + num_nougat_pages_done) >= num_pages:
             book_completed = True
         if book_completed:
-            other_pages_document = other_pages.find_one({"bookId": bookId})
+            # other_pages_document = other_pages.find_one({"bookId": bookId})
             nougat_pages_document = nougat_pages.find_one({"bookId": bookId})
-            latex_pages_document = latex_pages.find_one({"bookId": bookId})
-            text_pages_document = text_pages.find_one({"bookId": bookId})
+            # latex_pages_document = latex_pages.find_one({"bookId": bookId})
+            # text_pages_document = text_pages.find_one({"bookId": bookId})
 
             # Initialize lists to hold pages from each document
-            other_pages_result = (
-                other_pages_document.get("pages", []) if other_pages_document else []
-            )
+            # other_pages_result = (
+            #     other_pages_document.get("pages", []) if other_pages_document else []
+            # )
             nougat_pages_result = []
             nougat_pages_result_dict = (
                 nougat_pages_document.get("pages", []) if nougat_pages_document else []
             )
             if nougat_pages_result_dict:
                 nougat_pages_result = [
-                    result for page_num, result in nougat_pages_result_dict.items()
+                    result for _, result in nougat_pages_result_dict.items()
                 ]
-            latex_pages_result = (
-                latex_pages_document.get("pages", []) if latex_pages_document else []
-            )
-            text_pages_result = (
-                text_pages_document.get("pages", []) if text_pages_document else []
-            )
+            # latex_pages_result = (
+            #     latex_pages_document.get("pages", []) if latex_pages_document else []
+            # )
+            # text_pages_result = (
+            #     text_pages_document.get("pages", []) if text_pages_document else []
+            # )
 
             all_pages = (
                 other_pages_result

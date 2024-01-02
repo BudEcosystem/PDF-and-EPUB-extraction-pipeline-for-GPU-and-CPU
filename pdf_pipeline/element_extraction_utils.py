@@ -5,7 +5,13 @@ import pytesseract
 from PIL import Image
 from pix2tex.cli import LatexOCR
 from latext import latex_to_text
-from utils import generate_unique_id, generate_image_str, upload_to_aws_s3, crop_image
+from utils import (
+    generate_unique_id,
+    generate_image_str,
+    upload_to_aws_s3,
+    crop_image,
+    timeit,
+)
 from pdf_producer import send_to_queue
 
 latex_model = LatexOCR()
@@ -26,7 +32,7 @@ latex_model = LatexOCR()
 #         os.remove(block_image_path)
 # return caption/
 
-
+@timeit
 def process_table(table_block, image_path, bookId, page_num):
     output = None
     x1, y1, x2, y2 = (
@@ -80,7 +86,7 @@ def process_table(table_block, image_path, bookId, page_num):
 #         os.remove(figure_image_path)
 #     return output, figure
 
-
+@timeit
 def process_publaynet_figure(figure_block, image_path):
     print("publaynet figure")
     output = None
@@ -95,7 +101,7 @@ def process_publaynet_figure(figure_block, image_path):
         os.remove(figure_image_path)
     return output, figure
 
-
+@timeit
 def process_text(text_block, image_path):
     textId = generate_unique_id()
     cropped_image_path = crop_image(text_block, image_path, textId)
@@ -106,7 +112,7 @@ def process_text(text_block, image_path):
         os.remove(cropped_image_path)
     return output
 
-
+@timeit
 def process_title(title_block, image_path):
     title_id = generate_unique_id()
     cropped_image_path = crop_image(title_block, image_path, title_id)
@@ -117,7 +123,7 @@ def process_title(title_block, image_path):
         os.remove(cropped_image_path)
     return output
 
-
+@timeit
 def process_list(list_block, image_path):
     list_id = generate_unique_id()
     cropped_image_path = crop_image(list_block, image_path, list_id)
@@ -128,7 +134,7 @@ def process_list(list_block, image_path):
         os.remove(cropped_image_path)
     return output
 
-
+@timeit
 def process_equation(equation_block, image_path):
     equation_id = generate_unique_id()
     equation_image_path = crop_image(equation_block, image_path, equation_id)
@@ -145,7 +151,7 @@ def process_equation(equation_block, image_path):
         os.remove(equation_image_path)
     return output, equation
 
-
+@timeit
 def latext_to_text_to_speech(text):
     text = "${}$".format(text.lstrip("\\"))
     text_to_speech = latex_to_text(text)

@@ -51,17 +51,25 @@ def extract_other_pages(ch, method, properties, body):
             send_to_queue("book_completion_queue", bookId)
             return
         page_obj = process_page(message, bookId)
-        document = other_pages.find_one({"bookId": bookId})
-        if document:
-            other_pages.update_one(
-                {"_id": document["_id"]}, {"$push": {"pages": page_obj}}
-            )
-        else:
-            new_book_document = {"bookId": bookId, "pages": [page_obj]}
-            other_pages.insert_one(new_book_document)
-        book_details.find_one_and_update(
-            {"bookId": bookId}, {"$inc": {"num_pages_done": 1}}
+        other_pages.find_one_and_update(
+            {
+                "bookId": bookId,
+                "pages": {"$not": {"$elemMatch": {"page_num": page_obj["page_num"]}}}
+            },
+            {"$addToSet": {"pages": page_obj}},
+            upsert=True
         )
+        # document = other_pages.find_one({"bookId": bookId})
+        # if document:
+        #     other_pages.update_one(
+        #         {"_id": document["_id"]}, {"$push": {"pages": page_obj}}
+        #     )
+        # else:
+        #     new_book_document = {"bookId": bookId, "pages": [page_obj]}
+        #     other_pages.insert_one(new_book_document)
+        # book_details.find_one_and_update(
+        #     {"bookId": bookId}, {"$inc": {"num_pages_done": 1}}
+        # )
         send_to_queue("book_completion_queue", bookId)
     except Exception as e:
         print(traceback.format_exc())
