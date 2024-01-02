@@ -35,11 +35,11 @@ def extract_text(ch, method, properties, body):
     bookId = message["bookId"]
     page_num = message["page_num"]
 
-    print(f"other pages received {page_num} : {bookId}")
+    print(f"text pages received {page_num} : {bookId}")
     try:
         text_page = text_pages.find_one({"bookId": bookId, "pages.page_num": page_num})
         if text_page:
-            print(f"other page {page_num} already extracted")
+            print(f"text page {page_num} already extracted")
             send_to_queue("book_completion_queue", bookId)
             return
         page_obj = process_page(message, bookId)
