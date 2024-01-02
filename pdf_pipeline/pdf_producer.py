@@ -34,7 +34,6 @@ folder_name = os.environ["BOOK_FOLDER_NAME"]
 
 book_details = get_mongo_collection("book_details")
 sequentially_extracted_books = get_mongo_collection("sequentially_extracted_books")
-pdf_error = get_mongo_collection("pdf_error")
 
 
 def send_to_queue(queue_name, data):
@@ -105,7 +104,7 @@ def get_layout_queue_msg(data):
         "image_path": data["image_path"],
         "page_num": data["page_num"],
         "bookId": data["bookId"],
-        "split_path": data["split_path"],
+        # "split_path": data["split_path"],
         "image_str": data["image_str"],
     }
     return queue_message
@@ -124,7 +123,7 @@ def get_pdfigcap_queue_msg(data):
 def get_check_ptm_queue_msg(data):
     queue_msg = {
         "bookId": data["bookId"],
-        "split_path": data["split_path"],
+        # "split_path": data["split_path"],
         "page_num": data.get("page_num", None),
     }
     return queue_msg
@@ -203,21 +202,14 @@ if __name__ == "__main__":
     try:
         # # # store all books from aws to book_details collection before running
         # store_book_details()
-        books = book_details.find({})
+        books = book_details.find({"status": "not_extracted"}).limit(10)
         for book in books:
-            if book["status"] == "yet_extracted":
-                if book["book"].endswith(".pdf"):
-                    print(book["book"])
-                    send_to_queue("pdf_processing_queue", book)
-                else:
-                    pdf_error.insert_one(
-                        {
-                            "bookId": book["book_id"],
-                            "book": book["bookId"],
-                            "error": "not a pdf file",
-                        }
-                    )
-                    print("skipping this book as it not a pdf file")
+            if book["book"].endswith(".pdf"):
+                print(book["book"])
+                send_to_queue("pdf_processing_queue", book)
+            else:
+                error_queue('', book["bookId"], "File extension not .pdf")
+                print("skipping this book as it not a pdf file")
 
     except KeyboardInterrupt:
         pass

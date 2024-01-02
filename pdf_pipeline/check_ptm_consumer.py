@@ -59,12 +59,12 @@ def check_ptm_status(ch, method, properties, body):
     print("hello pmt called")
     message = json.loads(body)
     bookId = message["bookId"]
-    book_path = message["split_path"]
+    # book_path = message["split_path"]
     page_num = message["page_num"]  # can be None if request comes from pdfigcapx
     try:
         page_data = check_ptm(page_num, bookId)
         if page_data:
-            page_data["split_path"] = book_path
+            # page_data["split_path"] = book_path
             process_page(page_data)
         else:
             print(
@@ -78,7 +78,7 @@ def check_ptm_status(ch, method, properties, body):
             "error": str(e),
             "line_number": traceback.extract_tb(e.__traceback__)[-1].lineno,
         }
-        error_queue(book_path, bookId, error)
+        error_queue('', bookId, error)
     finally:
         print("message ack sent")
         ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -135,6 +135,11 @@ def process_page(process_page_data):
     num_other_pages = book_data.get("num_other_pages", [])
     num_text_pages = book_data.get("num_text_pages", [])
     print(results)
+    queue_msg = {
+        "image_path": image_path,
+        "page_num": page_num,
+        "bookId": bookId,
+    }
     # send pages to text_pages if page has only text.
     if (
         not results
@@ -143,63 +148,39 @@ def process_page(process_page_data):
             block["type"] in ["Table", "Figure", "Equation"] for block in results
         )
     ):
-        text_pages_queue_msg = {
-            "image_path": image_path,
-            "page_num": page_num,
-            "bookId": bookId,
-        }
         if page_num not in num_text_pages:
             book_details.find_one_and_update(
                 {"bookId": bookId}, {"$addToSet": {"num_text_pages": page_num}}
             )
-            send_to_queue("text_pages_queue", text_pages_queue_msg)
+            send_to_queue("text_pages_queue", queue_msg)
 
     elif not any(block["type"] in ["Table", "Figure"] for block in results):
-        nougat_queue_msg = {
-            "image_path": image_path,
-            "page_num": page_num,
-            "bookId": bookId,
-        }
         if page_num not in num_nougat_pages:
             book_details.find_one_and_update(
                 {"bookId": bookId},
                 {
                     "$addToSet": {
-                        "nougat_pages": nougat_queue_msg,
+                        "nougat_pages": queue_msg,
                         "num_nougat_pages": page_num,
                     }
                 },
             )
-            split_id = calculate_split_id(nougat_queue_msg)
-            nougat_queue_msg["split_id"] = split_id
-            send_to_queue("nougat_queue", nougat_queue_msg)
+            split_id = calculate_split_id(queue_msg)
+            queue_msg["split_id"] = split_id
+            send_to_queue("nougat_queue", queue_msg)
 
     elif any(block["type"] == "Equation" for block in results):
-        latex_ocr_queue_msg = {
-            "results": results,
-            "image_path": image_path,
-            "bookId": bookId,
-            "page_num": page_num,
-            # "is_figure_present": is_figure_present,
-        }
         if page_num not in num_latex_pages:
             book_details.find_one_and_update(
                 {"bookId": bookId}, {"$addToSet": {"num_latex_pages": page_num}}
             )
-            send_to_queue("latex_ocr_queue", latex_ocr_queue_msg)
+            send_to_queue("latex_ocr_queue", queue_msg)
     else:
-        other_pages_queue_msg = {
-            "results": results,
-            "image_path": image_path,
-            "bookId": bookId,
-            "page_num": page_num,
-            # "is_figure_present": is_figure_present,
-        }
         if page_num not in num_other_pages:
             book_details.find_one_and_update(
                 {"bookId": bookId}, {"$addToSet": {"num_other_pages": page_num}}
             )
-            send_to_queue("other_pages_queue", other_pages_queue_msg)
+            send_to_queue("other_pages_queue", queue_msg)
     book_data = book_details.find_one({"bookId": bookId})
     total_pages_in_book = book_data["num_pages"]
     num_nougat_pages = len(book_data.get("num_nougat_pages", []))

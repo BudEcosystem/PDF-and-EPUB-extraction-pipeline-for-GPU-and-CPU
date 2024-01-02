@@ -31,13 +31,13 @@ def mathformuladetection_layout(ch, method, properties, body):
     message = json.loads(body)
     image_path = message["image_path"]
     page_num = message["page_num"]
-    book_path = message["split_path"]
+    # book_path = message["split_path"]
     bookId = message["bookId"]
     image_str = message["image_str"]
     print(f"Received message for {image_path}")
     queue_msg = {
         "bookId": bookId,
-        "split_path": book_path,
+        # "split_path": book_path,
         "page_num": page_num
     }
     try:
@@ -89,7 +89,7 @@ def mathformuladetection_layout(ch, method, properties, body):
             "error": str(e),
             "line_number":traceback.extract_tb(e.__traceback__)[-1].lineno
         }
-        error_queue(book_path, bookId, error)
+        error_queue('', bookId, error)
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
