@@ -12,11 +12,11 @@ sys.path.append("pdf_extraction_pipeline")
 from utils import (
     timeit,
     get_mongo_collection,
-    split_pdf,
+    # split_pdf,
     download_book_from_aws,
     generate_image_str,
-    find_split_path,
-    get_page_num_from_split_path,
+    # find_split_path,
+    # get_page_num_from_split_path,
     get_rabbitmq_connection,
     get_channel,
 )
@@ -29,7 +29,6 @@ channel = get_channel(connection)
 
 book_details = get_mongo_collection("book_details")
 figure_caption = get_mongo_collection("figure_caption")
-pdf_error = get_mongo_collection("pdf_error")
 
 
 @timeit
@@ -62,31 +61,38 @@ def process_book(ch, method, properties, body):
             )
 
         # split book into batches
-        split_book_paths = []
+        # split_book_paths = []
+        num_pages = None
         if book_data:
-            split_book_paths = book_data.get("split_book_paths", [])
+            # split_book_paths = book_data.get("split_book_paths", [])
             num_pages = book_data.get("num_pages", None)
-        if not split_book_paths:
+        # if not split_book_paths:
+        if not num_pages:
             try:
                 book = PdfReader(book_path)
             except Exception as e:
                 print("error while reading pdf file", e)
-                pdf_error.insert_one(
-                    {"bookId": book_id, "book": book_name, "error": str(e)}
-                )
+                error = {
+                    "consumer": QUEUE_NAME,
+                    "consumer_message": message,
+                    "error": str(e),
+                    "line_number": traceback.extract_tb(e.__traceback__)[-1].lineno,
+                }
+                error_queue(book_name, book_id, error)
                 return
             num_pages = len(book.pages)
-            split_book_paths = split_pdf(book_id, book_path)
+            # split_book_paths = split_pdf(book_id, book_path)
             # save in book_details
             book_details.update_one(
                 {"bookId": book_id},
                 {
                     "$set": {
-                        "split_book_paths": split_book_paths,
+                        # "split_book_paths": split_book_paths,
                         "num_pages": num_pages,
                     }
                 },
             )
+
         book_folder = os.path.join(*book_path.split("/")[:-1])
         print(f"{book_name} has total {num_pages} page")
 
@@ -114,8 +120,9 @@ def process_book(ch, method, properties, body):
 
         pdf_book = fitz.open(book_path)
         for page_num in range(1, num_pages + 1):
-            split_path = find_split_path(split_book_paths, page_num)
-            process_page(page_num, pdf_book, book_folder, split_path)
+            # split_path = find_split_path(split_book_paths, page_num)
+            # process_page(page_num, pdf_book, book_folder, split_path)
+            process_page(page_num, pdf_book, book_folder)
     except Exception as e:
         print(traceback.format_exc())
         error = {
@@ -130,7 +137,8 @@ def process_book(ch, method, properties, body):
 
 
 @timeit
-def process_page(page_num, pdf_book, book_folder, split_path):
+# def process_page(page_num, pdf_book, book_folder, split_path):
+def process_page(page_num, pdf_book, book_folder):
     book_id = book_folder.split("/")[-1]
     # pdf_book is zero indexed, therefore subtract 1
     page_image = pdf_book[page_num - 1]
@@ -144,7 +152,7 @@ def process_page(page_num, pdf_book, book_folder, split_path):
     queue_msg = {
         "page_num": page_num,
         "bookId": book_id,
-        "split_path": split_path,
+        # "split_path": split_path,
         "image_path": absolute_image_path,
         "image_str": generate_image_str(book_id, absolute_image_path),
     }
