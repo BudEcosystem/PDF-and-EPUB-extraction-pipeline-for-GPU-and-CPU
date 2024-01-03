@@ -44,7 +44,7 @@ def send_to_queue(queue_name, data):
         queue_msg = get_pdf_processing_queue_msg(data)
     elif queue_name == "pdfigcapx_queue":
         queue_msg = get_pdfigcap_queue_msg(data)
-    elif queue_name in ["publaynet_queue", "table_bank_queue", "mfd_queue"]:
+    elif queue_name in ["publaynet_queue", "table_bank_queue", "mfd_queue", "ptm_queue"]:
         queue_msg = get_layout_queue_msg(data)
     elif queue_name == "check_ptm_completion_queue":
         queue_msg = get_check_ptm_queue_msg(data)

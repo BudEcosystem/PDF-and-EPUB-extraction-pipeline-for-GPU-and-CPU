@@ -2,8 +2,8 @@
 # type: ignore
 import json
 import sys
-import traceback
 sys.path.append("pdf_extraction_pipeline")
+import traceback
 from pdf_producer import send_to_queue, error_queue
 import layoutparser as lp
 from utils import (
@@ -14,12 +14,21 @@ from utils import (
     get_channel
 )
 
-QUEUE_NAME = 'mfd_queue'
+QUEUE_NAME = "ptm_queue"
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
-mfd_pages = get_mongo_collection('mfd_pages')
+ptm_pages = get_mongo_collection('ptm_pages')
+
+
+publaynet_model = lp.Detectron2LayoutModel('lp://PubLayNet/mask_rcnn_X_101_32x8d_FPN_3x/config',
+                                 extra_config=["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],
+                                 label_map= {0: "Text", 1: "Title", 2: "List", 3: "Table", 4: "Figure"})
+
+tablebank_model = lp.Detectron2LayoutModel('lp://TableBank/faster_rcnn_R_50_FPN_3x/config',
+                                 extra_config=["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],
+                                 label_map={0: "Table"})
 
 mathformuladetection_model= lp.Detectron2LayoutModel(
                             config_path ="lp://MFD/faster_rcnn_R_50_FPN_3x/config",
@@ -27,7 +36,7 @@ mathformuladetection_model= lp.Detectron2LayoutModel(
                             extra_config=["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8] )
 
 @timeit
-def mathformuladetection_layout(ch, method, properties, body):
+def ptm_layout(ch, method, properties, body):
     message = json.loads(body)
     image_path = message["image_path"]
     page_num = message["page_num"]
@@ -41,24 +50,48 @@ def mathformuladetection_layout(ch, method, properties, body):
         "page_num": page_num
     }
     try:
-        existing_page = mfd_pages.find_one({
+        existing_page = ptm_pages.find_one({
             "bookId": bookId,
             "pages.page_num": page_num
         })
         if existing_page:
             send_to_queue('check_ptm_completion_queue', queue_msg)
-            return 
+            return
         image = read_image_from_str(image_str)
-        image = image[..., ::-1]
+        image = image[..., ::-1] 
+        publaynet_layouts = publaynet_model.detect(image)
+        tablebank_layouts = tablebank_model.detect(image)
         mathformuladetection_layoutds = mathformuladetection_model.detect(image)
         layout_blocks = []
+        for item in publaynet_layouts:
+            if item.type != "Table":
+                output_item = {
+                    "x_1": item.block.x_1,
+                    "y_1": item.block.y_1,
+                    "x_2": item.block.x_2,
+                    "y_2": item.block.y_2,
+                    "type": item.type,
+                    "image_path": image_path
+                }
+                layout_blocks.append(output_item)
+        for item in tablebank_layouts:  
+            output_item = {
+                "x_1": item.block.x_1,
+                "y_1": item.block.y_1,
+                "x_2": item.block.x_2,
+                "y_2": item.block.y_2,
+                'type': item.type,
+                "image_path": image_path
+            }
+            layout_blocks.append(output_item)
         for item in mathformuladetection_layoutds:  
             output_item = {
                 "x_1": item.block.x_1,
                 "y_1": item.block.y_1,
                 "x_2": item.block.x_2,
                 "y_2": item.block.y_2,
-                'type': item.type
+                "type": item.type,
+                "image_path": image_path
             }
             layout_blocks.append(output_item)
         book_page_data = {
@@ -67,9 +100,9 @@ def mathformuladetection_layout(ch, method, properties, body):
             'status': 'done',
             'result': layout_blocks
         }
-        existing_book = mfd_pages.find_one({"bookId": bookId})
+        existing_book = ptm_pages.find_one({"bookId": bookId})
         if existing_book:
-            mfd_pages.update_one(
+            ptm_pages.update_one(
                 {"_id": existing_book["_id"]},
                 {"$push": {"pages": book_page_data}}
             )
@@ -78,7 +111,7 @@ def mathformuladetection_layout(ch, method, properties, body):
                 "bookId": bookId,
                 "pages": [book_page_data]
             }
-            mfd_pages.insert_one(new_book_document)
+            ptm_pages.insert_one(new_book_document)
         send_to_queue('check_ptm_completion_queue', queue_msg)
     except Exception as e:
         print(traceback.format_exc())
@@ -94,20 +127,22 @@ def mathformuladetection_layout(ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
-def consume_mfd_queue():
-    channel.basic_qos(prefetch_count=1, global_qos=False)
 
+def consume_publaynet_queue():
+    channel.basic_qos(prefetch_count=1, global_qos=False)
+    # Declare the queue
     channel.queue_declare(queue=QUEUE_NAME)
+
     # Set up the callback function for handling messages from the queue
-    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=mathformuladetection_layout)
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=ptm_layout)
 
     print(f' [*] Waiting for messages on {QUEUE_NAME}. To exit, press CTRL+C')
     channel.start_consuming()
-   
+
 
 if __name__ == "__main__":
     try:
-        consume_mfd_queue()
+        consume_publaynet_queue()
     except KeyboardInterrupt:
         pass
     finally:

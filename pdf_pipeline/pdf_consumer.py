@@ -156,9 +156,10 @@ def process_page(page_num, pdf_book, book_folder):
         "image_path": absolute_image_path,
         "image_str": generate_image_str(book_id, absolute_image_path),
     }
-    send_to_queue("publaynet_queue", queue_msg)
-    send_to_queue("table_bank_queue", queue_msg)
-    send_to_queue("mfd_queue", queue_msg)
+    # send_to_queue("publaynet_queue", queue_msg)
+    # send_to_queue("table_bank_queue", queue_msg)
+    # send_to_queue("mfd_queue", queue_msg)
+    send_to_queue("ptm_queue", queue_msg)
 
 
 def consume_pdf_processing_queue():

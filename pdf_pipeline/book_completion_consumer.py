@@ -53,18 +53,36 @@ def book_complete(ch, method, properties, body):
         book_det = book_details.find_one({"bookId": bookId})
         book_name = book_det["book"]
         book_path = book_det["book_path"]
-        other_pages_document = other_pages.find_one({"bookId": bookId})
-        latex_pages_document = latex_pages.find_one({"bookId": bookId})
-        text_pages_document = text_pages.find_one({"bookId": bookId})
-        other_pages_result = (
-            other_pages_document.get("pages", []) if other_pages_document else []
-        )
-        latex_pages_result = (
-                latex_pages_document.get("pages", []) if latex_pages_document else []
-        )
-        text_pages_result = (
-            text_pages_document.get("pages", []) if text_pages_document else []
-        )
+
+        other_pages_result = []
+        for doc in other_pages.find({"bookId": bookId}):
+            doc_result = doc.get("pages", [])
+            if doc_result:
+                other_pages_result.extend(doc_result)
+        latex_pages_result = []
+        for doc in latex_pages.find({"bookId": bookId}):
+            doc_result = doc.get("pages", [])
+            if doc_result:
+                latex_pages_result.extend(doc_result)
+        text_pages_result = []
+        for doc in text_pages.find({"bookId": bookId}):
+            doc_result = doc.get("pages", [])
+            if doc_result:
+                text_pages_result.extend(doc_result)
+        
+        # other_pages_document = other_pages.find_one({"bookId": bookId})
+        # latex_pages_document = latex_pages.find_one({"bookId": bookId})
+        # text_pages_document = text_pages.find_one({"bookId": bookId})
+        # other_pages_result = (
+        #     other_pages_document.get("pages", []) if other_pages_document else []
+        # )
+        # latex_pages_result = (
+        #         latex_pages_document.get("pages", []) if latex_pages_document else []
+        # )
+        # text_pages_result = (
+        #     text_pages_document.get("pages", []) if text_pages_document else []
+        # )
+        
         other_pages_result = get_unique_pages(other_pages_result)
         latex_pages_result = get_unique_pages(latex_pages_result)
         text_pages_result = get_unique_pages(text_pages_result)

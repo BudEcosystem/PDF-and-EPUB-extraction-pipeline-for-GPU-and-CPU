@@ -19,7 +19,7 @@ QUEUE_NAME = "table_bank_queue"
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
-table_bank_pages=get_mongo_collection('table_bank_pages')
+table_bank_pages = get_mongo_collection('table_bank_pages')
 
 tablebank_model = lp.Detectron2LayoutModel('lp://TableBank/faster_rcnn_R_50_FPN_3x/config',
                                  extra_config=["MODEL.ROI_HEADS.SCORE_THRESH_TEST", 0.8],

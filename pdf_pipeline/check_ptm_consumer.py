@@ -21,10 +21,11 @@ connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
 book_details = get_mongo_collection("book_details")
-figure_caption = get_mongo_collection("figure_caption")
-publaynet_pages = get_mongo_collection("publaynet_pages")
-table_bank_pages = get_mongo_collection("table_bank_pages")
-mfd_pages = get_mongo_collection("mfd_pages")
+# figure_caption = get_mongo_collection("figure_caption")
+# publaynet_pages = get_mongo_collection("publaynet_pages")
+# table_bank_pages = get_mongo_collection("table_bank_pages")
+# mfd_pages = get_mongo_collection("mfd_pages")
+ptm_pages = get_mongo_collection('ptm_pages')
 
 # def get_fig_data(bookId, book_path):
 #     fig_done = False
@@ -37,16 +38,21 @@ mfd_pages = get_mongo_collection("mfd_pages")
 #     return fig_done, fig
 
 
-def get_ptm_data(layout_name, bookId, page_num):
+# def get_ptm_data(layout_name, bookId, page_num):
+def get_ptm_data(bookId, page_num):
     layout_done = False
     find_data = {"bookId": bookId, "pages.page_num": page_num}
     data = None
-    if layout_name == "publaynet":
-        data = publaynet_pages.find_one(find_data)
-    elif layout_name == "table_bank":
-        data = table_bank_pages.find_one(find_data)
-    elif layout_name == "mfd":
-        data = mfd_pages.find_one(find_data)
+    # if layout_name == "publaynet":
+    #     data = publaynet_pages.find_one(find_data)
+    # elif layout_name == "table_bank":
+    #     data = table_bank_pages.find_one(find_data)
+    # elif layout_name == "mfd":
+    #     data = mfd_pages.find_one(find_data)
+    
+    # even if multiple layout blocks get inserted in db 
+    # still the one with correct page num will be fetched
+    data = ptm_pages.find_one(find_data)
     if data:
         layout_done = True
         data = list(filter(lambda x: x["page_num"] == page_num, data["pages"]))
@@ -86,22 +92,29 @@ def check_ptm_status(ch, method, properties, body):
 
 def check_ptm(page_no, bookId):
     process_page_data = None
-    publaynet_done, publaynet_data = get_ptm_data("publaynet", bookId, page_no)
-    table_bank_done, table_bank_data = get_ptm_data("table_bank", bookId, page_no)
-    mfd_done, mfd_data = get_ptm_data("mfd", bookId, page_no)
-    if publaynet_done and table_bank_done and mfd_done:
-        publaynet_page_results = publaynet_data["result"]
-        table_bank_page_results = table_bank_data["result"]
-        mfd_page_results = mfd_data["result"]
-        page_results = (
-            publaynet_page_results + table_bank_page_results + mfd_page_results
-        )
-        image_path = publaynet_data["image_path"]
+
+    # publaynet_done, publaynet_data = get_ptm_data("publaynet", bookId, page_no)
+    # table_bank_done, table_bank_data = get_ptm_data("table_bank", bookId, page_no)
+    # mfd_done, mfd_data = get_ptm_data("mfd", bookId, page_no)
+    ptm_done, ptm_data = get_ptm_data(bookId, page_no)
+    
+    # if publaynet_done and table_bank_done and mfd_done:
+    if ptm_done:
+        # publaynet_page_results = publaynet_data["result"]
+        # table_bank_page_results = table_bank_data["result"]
+        # mfd_page_results = mfd_data["result"]
+        # page_results = (
+        #     publaynet_page_results + table_bank_page_results + mfd_page_results
+        # )
+        # image_path = publaynet_data["image_path"]
+        image_path = ptm_data["image_path"]
+        page_results = ptm_data["result"]
         if not page_results:
             page_results = [{"image_path": image_path}]
-        else:
-            for each in page_results:
-                each["image_path"] = image_path
+        # added image_path in layout blocks ptm_consumer
+        # else:
+        #     for each in page_results:
+        #         each["image_path"] = image_path
         process_page_data = {
             "page_num": page_no,
             "results": page_results,

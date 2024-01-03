@@ -18,6 +18,7 @@ mfd_pages = get_mongo_collection('mfd_pages')
 nougat_pages = get_mongo_collection('nougat_pages')
 latex_pages = get_mongo_collection('latex_pages')
 other_pages = get_mongo_collection('other_pages')
+ptm_pages = get_mongo_collection('ptm_pages')
 
 # delete wrong tables
 def delete_wrong_tables():
@@ -180,6 +181,7 @@ def clean_db(bookId):
     table_bank_pages.delete_one({"bookId": bookId})
     mfd_pages.delete_one({"bookId": bookId})
     figure_caption.delete_many({"bookId": bookId})
+    ptm_pages.delete_many({"bookId": bookId})
     # table_collection.delete_many({"bookId": bookId})
 
 
