@@ -174,12 +174,12 @@ def remove_matching_documents():
 
 def clean_db(bookId):
     book_images.delete_many({"bookId": bookId})
-    nougat_pages.delete_one({"bookId": bookId})
-    latex_pages.delete_one({"bookId": bookId})
-    other_pages.delete_one({"bookId": bookId})
-    publaynet_pages.delete_one({"bookId": bookId})
-    table_bank_pages.delete_one({"bookId": bookId})
-    mfd_pages.delete_one({"bookId": bookId})
+    nougat_pages.delete_many({"bookId": bookId})
+    latex_pages.delete_many({"bookId": bookId})
+    other_pages.delete_many({"bookId": bookId})
+    publaynet_pages.delete_many({"bookId": bookId})
+    table_bank_pages.delete_many({"bookId": bookId})
+    mfd_pages.delete_many({"bookId": bookId})
     figure_caption.delete_many({"bookId": bookId})
     ptm_pages.delete_many({"bookId": bookId})
     # table_collection.delete_many({"bookId": bookId})
