@@ -185,8 +185,31 @@ def clean_db(bookId):
 
 if __name__=='__main__':
     # delete_wrong_tables()
+
+    #############################################
+    # To clean db for fully extracted books
+    #############################################
     # for book in book_details.find({"status": "extracted"}):
     #     bookId = book["bookId"]
+    #     clean_db(bookId)
+
+    #############################################
+    # To clean db for partially extracted books
+    #############################################
+    # for book in book_details.find({"bookId": {"$in": ["14a51624d9e943df986d4823c9b72936", "61776d86a35a49acb26a4f69b9d65b88"]}}):
+    #     bookId = book["bookId"]
+    #     if book["status"] == "processing":
+    #         doc_keys = book.keys()
+    #         desired_keys = ["_id", "bookId", "book", "status"]
+    #         book_details.update_one(
+    #             {"bookId": bookId},
+    #             {
+    #                 "$set": {
+    #                     "status": "not_extracted"
+    #                 },
+    #                 "$unset": {key: "" for key in doc_keys if key not in desired_keys}
+    #             }
+    #         )
     #     clean_db(bookId)
     pass
 
