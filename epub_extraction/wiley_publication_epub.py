@@ -28,9 +28,10 @@ s3_base_url = "https://bud-datalake.s3.ap-southeast-1.amazonaws.com"
 
 
 db = mongo_init("epub_testing")
-oct_toc = db.oct_toc
+db2 = mongo_init("epub_wiley2")
+oct_toc = db2.oct_toc
 oct_no_toc = db.oct_no_toc
-oct_chapters = db.oct_chapters
+oct_chapters = db2.oct_chapters
 files_with_error = db.files_with_error
 extracted_books = db.extracted_books
 publisher_collection = db.publishers
@@ -434,10 +435,10 @@ for book in books:
 print("total books", len(books))
 print("total extracted", len(extracted))
 print("total books with figure tag",len(book_with_figure_tags))
-# f=open('wiley_aws_books_with_figure','w')
-# f.write(str(book_with_figure_tags))
+f=open('wiley_aws_books_with_figure','w')
+f.write(str(book_with_figure_tags))
 print("total books with out figure tag",len(book_with_figure_tags))
-# f=open('wiley_aws_books_without_figure','w')
-# f.write(str(books_with_out_figure_tags)
+f=open('wiley_aws_books_without_figure','w')
+f.write(str(books_with_out_figure_tags))
 
 # get_html_from_epub("/home/bud-data-extraction/datapipeline/Books/Oct29-Wiley/9780470317235.epub")
