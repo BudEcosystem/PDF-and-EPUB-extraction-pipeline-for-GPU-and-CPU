@@ -9,6 +9,7 @@ import pymongo
 from PyPDF2 import PdfWriter, PdfReader
 from uuid import uuid4
 from dotenv import load_dotenv
+
 # sonali: depenedncy for utils currently commented out
 import base64
 import numpy as np
@@ -20,40 +21,48 @@ RABBITMQ_PORT = int(os.getenv("RABBITMQ_PORT"))
 RABBITMQ_USERNAME = os.getenv("RABBITMQ_USERNAME")
 RABBITMQ_PASSWORD = os.getenv("RABBITMQ_PASSWORD")
 
-aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
-aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
-aws_region = os.environ['AWS_REGION']
-bucket_name = os.environ['AWS_BUCKET_NAME']
-folder_name=os.environ['BOOK_FOLDER_NAME']
+aws_access_key_id = os.environ["AWS_ACCESS_KEY_ID"]
+aws_secret_access_key = os.environ["AWS_SECRET_ACCESS_KEY"]
+aws_region = os.environ["AWS_REGION"]
+bucket_name = os.environ["AWS_BUCKET_NAME"]
+folder_name = os.environ["BOOK_FOLDER_NAME"]
 
-mongo_connection_string = os.environ['DATABASE_URL']
-mongo_db_name = os.environ['MONGO_DB']
+mongo_connection_string = os.environ["DATABASE_URL"]
+mongo_db_name = os.environ["MONGO_DB"]
 
-pdf_batch_size = int(os.environ['PDF_BATCH_SIZE'])
+pdf_batch_size = int(os.environ["PDF_BATCH_SIZE"])
 
 # Create an S3 client
-s3 = boto3.client('s3',
+s3 = boto3.client(
+    "s3",
     aws_access_key_id=aws_access_key_id,
     aws_secret_access_key=aws_secret_access_key,
-    region_name=aws_region)
+    region_name=aws_region,
+)
+
 
 def timeit(func):
     """
     Keeps track of the time taken by a function to execute.
     """
+
     @wraps(func)
     def timeit_wrapper(*args, **kwargs):
         start_time = time.perf_counter()
         result = func(*args, **kwargs)
         end_time = time.perf_counter()
         total_time = end_time - start_time
-        print(f'Function {func.__name__} Took {total_time:.4f} seconds')
+        print(f"Function {func.__name__} Took {total_time:.4f} seconds")
         return result
+
     return timeit_wrapper
 
+
 def get_rabbitmq_connection():
-    credentials = pika.PlainCredentials(username=RABBITMQ_USERNAME, password=RABBITMQ_PASSWORD)
-    
+    credentials = pika.PlainCredentials(
+        username=RABBITMQ_USERNAME, password=RABBITMQ_PASSWORD
+    )
+
     # Specify the credentials in the connection parameters
     connection_params = pika.ConnectionParameters(
         host=RABBITMQ_HOST,
@@ -61,41 +70,46 @@ def get_rabbitmq_connection():
         # Replace with the appropriate port
         heartbeat=0,
         credentials=credentials,
-        connection_attempts=3
+        connection_attempts=3,
     )
     return pika.BlockingConnection(connection_params)
+
 
 def get_channel(connection):
     return connection.channel()
 
+
+@timeit
 def crop_image(block, imagepath, id):
     """
     Function to crop the image based on the bounding box coordinates.
     """
-    x1, y1, x2, y2 = block['x_1'], block['y_1'], block['x_2'], block['y_2']
+    x1, y1, x2, y2 = block["x_1"], block["y_1"], block["x_2"], block["y_2"]
     img = cv2.imread(imagepath)
     # Expand the bounding box by 5 pixels on every side
-    x1-=5
-    y1-=5
-    x2+=5
-    y2+=5
+    x1 -= 5
+    y1 -= 5
+    x2 += 5
+    y2 += 5
 
     # Ensure the coordinates are within the image boundaries
-    x1=max(0,x1)
-    y1=max(0,y1)
-    x2=min(img.shape[1],x2)
-    y2=min(img.shape[0],y2)
+    x1 = max(0, x1)
+    y1 = max(0, y1)
+    x2 = min(img.shape[1], x2)
+    y2 = min(img.shape[0], y2)
 
-    #crop the expanded bounding box
-    bbox = img[int(y1):int(y2), int(x1):int(x2)]
+    # crop the expanded bounding box
+    bbox = img[int(y1) : int(y2), int(x1) : int(x2)]
     cropped_image_path = os.path.abspath(f"cropped_{id}.png")
-    cv2.imwrite(cropped_image_path,bbox)
+    cv2.imwrite(cropped_image_path, bbox)
 
     return cropped_image_path
 
+
 def generate_unique_id():
-    """ generate unique id """
+    """generate unique id"""
     return uuid4().hex
+
 
 @timeit
 def download_book_from_aws(book_id, book_name):
@@ -104,26 +118,27 @@ def download_book_from_aws(book_id, book_name):
     """
     local_path = None
     try:
-        print('AWS book download >> ', book_name)
+        print("AWS book download >> ", book_name)
         book_folder = os.path.join(folder_name, book_id)
         os.makedirs(book_folder, exist_ok=True)
         local_path = os.path.join(book_folder, f"{book_id}.pdf")
         # book-set-2/123/123.pdf
-        file_key = f'{folder_name}/{book_name}'
+        file_key = f"{folder_name}/{book_name}"
         response = s3.get_object(Bucket=bucket_name, Key=file_key)
-        pdf_data = response['Body'].read()
-        with open(local_path, 'wb') as f:
+        pdf_data = response["Body"].read()
+        with open(local_path, "wb") as f:
             f.write(pdf_data)
     except Exception as e:
         print("An error occurred:", e)
     return local_path
+
 
 def get_page_num_from_split_path(split_path):
     """
     Function is used to get book_id, from_page and to_page from book path
     """
     # book-set-2/123/splits/123_0_1-30.pdf
-    parts = split_path.split('/')
+    parts = split_path.split("/")
     if len(parts) > 1:
         # it means input if filename and not complete path
         # 123_0_1-30.pdf
@@ -138,19 +153,20 @@ def get_page_num_from_split_path(split_path):
     to_page = int(page_nums[-1])
     return book_id, split_id, from_page, to_page
 
+
 @timeit
 def split_pdf(book_id, local_path):
     """
     Function used to split the pdf into individual pages.
     """
     # book-set-2/123/123.pdf
-    print('Splitting pdf >> ', local_path)
-    book_split_folder = os.path.join(folder_name, book_id, 'splits')
+    print("Splitting pdf >> ", local_path)
+    book_split_folder = os.path.join(folder_name, book_id, "splits")
     os.makedirs(book_split_folder, exist_ok=True)
     # book-set-2/123/splits
     print("split folder  >>> ", book_split_folder)
 
-    with open(local_path, 'rb') as f:
+    with open(local_path, "rb") as f:
         inputpdf = PdfReader(f)
         output_file_paths = []
         total_num_pages = len(inputpdf.pages)
@@ -159,9 +175,9 @@ def split_pdf(book_id, local_path):
             print("Splitting pdf into batches")
             for i in range(0, total_num_pages, pdf_batch_size):
                 output = PdfWriter()
-                from_page = i+1
+                from_page = i + 1
                 to_page = from_page
-                for page in inputpdf.pages[i:i+pdf_batch_size]:
+                for page in inputpdf.pages[i : i + pdf_batch_size]:
                     output.add_page(page)
                     to_page += 1
                 file_path = f"{book_split_folder}/{book_id}_{int(i/pdf_batch_size)}_{from_page}-{to_page-1}.pdf"
@@ -181,12 +197,14 @@ def split_pdf(book_id, local_path):
             output_file_paths.append(file_path)
         return output_file_paths
 
+
 def get_mongo_client():
     """
     Function to get the mongo client.
     """
     mongo_client = pymongo.MongoClient(mongo_connection_string)
     return mongo_client
+
 
 def get_mongo_collection(collection_name):
     """
@@ -197,51 +215,60 @@ def get_mongo_collection(collection_name):
     collection = db[collection_name]
     return collection
 
+
+@timeit
 def read_image_from_str(image_str):
     image_bytes = base64.b64decode(image_str)
     image_np_array = np.frombuffer(image_bytes, np.uint8)
     image = cv2.imdecode(image_np_array, cv2.IMREAD_COLOR)
     return image
 
+
+@timeit
 def generate_image_str(book_id, image_path, save=True):
     # book-set-2/123/pages/page_1.jpg
     image_str = None
     filename = os.path.basename(image_path)
-    page_num = os.path.splitext(filename)[0].split('_')[-1]
-    book_images_collection = get_mongo_collection('book_images')
+    page_num = os.path.splitext(filename)[0].split("_")[-1]
+    book_images_collection = get_mongo_collection("book_images")
     book_image = book_images_collection.find_one(
         {"bookId": book_id, "page_num": page_num}
     )
     if book_image:
-        image_str = book_image.get('image_str', '')
+        image_str = book_image.get("image_str", "")
         if not image_str:
-            with open(image_path, 'rb') as img:
+            with open(image_path, "rb") as img:
                 img_data = img.read()
-            image_str = base64.b64encode(img_data).decode('utf-8')
+            image_str = base64.b64encode(img_data).decode("utf-8")
             if save:
                 book_images_collection.update_one(
                     {"bookId": book_id, "page_num": page_num},
-                    {"$set": {"image_str": image_str, "image_path": image_path}}
+                    {"$set": {"image_str": image_str, "image_path": image_path}},
                 )
     else:
-        with open(image_path, 'rb') as img:
+        with open(image_path, "rb") as img:
             img_data = img.read()
-        image_str = base64.b64encode(img_data).decode('utf-8')
+        image_str = base64.b64encode(img_data).decode("utf-8")
         if save:
-            book_images_collection.insert_one({
-                "bookId": book_id,
-                "page_num": page_num,
-                "image_str": image_str,
-                "image_path": image_path
-            })
+            book_images_collection.insert_one(
+                {
+                    "bookId": book_id,
+                    "page_num": page_num,
+                    "image_str": image_str,
+                    "image_path": image_path,
+                }
+            )
     return image_str
 
+
+@timeit
 def create_image_from_str(image_str):
     image_data = base64.b64decode(image_str)
-    image_path=f"{generate_unique_id()}.jpg"
-    with open(image_path, 'wb') as img:
+    image_path = f"{generate_unique_id()}.jpg"
+    with open(image_path, "wb") as img:
         img.write(image_data)
     return image_path
+
 
 def find_split_path(split_paths, page_num):
     for split_path in split_paths:
@@ -249,8 +276,10 @@ def find_split_path(split_paths, page_num):
         if page_num >= fp and page_num <= tp:
             return split_path
 
-def upload_to_aws_s3(image_path, image_id): 
-    image_folder_name = os.environ['AWS_PDF_IMAGE_UPLOAD_FOLDER']
+
+@timeit
+def upload_to_aws_s3(image_path, image_id):
+    image_folder_name = os.environ["AWS_PDF_IMAGE_UPLOAD_FOLDER"]
     s3_key = f"{image_folder_name}/{image_id}.png"
     # Upload the image to the specified S3 bucket
     s3.upload_file(image_path, bucket_name, s3_key)
@@ -259,20 +288,19 @@ def upload_to_aws_s3(image_path, image_id):
     return image_url
 
 
-if __name__ == '__main__':
-    BOOK_ID = '123'
-    BOOK = 'output_2.pdf'
+if __name__ == "__main__":
+    BOOK_ID = "123"
+    BOOK = "output_2.pdf"
     BOOKS = [
-        'Evidence-Based Critical Care - Robert C Hyzy.pdf',
-        'Evidence-Based Interventions for Children with Challenging Behavior - Kathleen Hague Armstrong- Julia A Ogg- Ashley N Sundman-Wheat- Audra St John Walsh.pdf',
-        'Evidence-Based Practice in Clinical Social Work - James W Drisko- Melissa D Grady.pdf',
-        'Evolutionary Thinking in Medicine - Alexandra Alvergne- Crispin Jenkinson- Charlotte Faurie.pdf',
-        'Exam Survival Guide: Physical Chemistry - Jochen Vogt.pdf'
-        ]
+        "Evidence-Based Critical Care - Robert C Hyzy.pdf",
+        "Evidence-Based Interventions for Children with Challenging Behavior - Kathleen Hague Armstrong- Julia A Ogg- Ashley N Sundman-Wheat- Audra St John Walsh.pdf",
+        "Evidence-Based Practice in Clinical Social Work - James W Drisko- Melissa D Grady.pdf",
+        "Evolutionary Thinking in Medicine - Alexandra Alvergne- Crispin Jenkinson- Charlotte Faurie.pdf",
+        "Exam Survival Guide: Physical Chemistry - Jochen Vogt.pdf",
+    ]
     BOOK = "Witnessing Torture - Alexandra S Moore- Elizabeth Swanson.pdf"
     # file_local_path = download_book_from_aws(BOOK_ID, BOOK)
     # split_local_paths = split_pdf(BOOK_ID, file_local_path)
     # print(split_local_paths)
     # connection = get_rabbitmq_connection()
     # print("RabbitMQ connection established")
-
