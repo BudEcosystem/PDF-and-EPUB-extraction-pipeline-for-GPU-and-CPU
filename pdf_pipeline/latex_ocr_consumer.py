@@ -55,10 +55,10 @@ def extract_latex_pages(ch, method, properties, body):
         latex_pages.find_one_and_update(
             {
                 "bookId": bookId,
-                "pages": {"$not": {"$elemMatch": {"page_num": page_obj["page_num"]}}}
+                "pages": {"$not": {"$elemMatch": {"page_num": page_obj["page_num"]}}},
             },
             {"$addToSet": {"pages": page_obj}},
-            upsert=True
+            upsert=True,
         )
         # document = latex_pages.find_one({"bookId": bookId})
         # if document:
@@ -87,6 +87,7 @@ def extract_latex_pages(ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
+@timeit
 def process_page(page, bookId):
     page_obj = {}
     results = page["results"]
@@ -109,6 +110,7 @@ def process_page(page, bookId):
     return page_obj
 
 
+@timeit
 def sort_text_blocks_and_extract_data(blocks, image_path, bookId, page_num):
     page_content = ""
     figures = []

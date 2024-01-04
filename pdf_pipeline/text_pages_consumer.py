@@ -46,10 +46,10 @@ def extract_text(ch, method, properties, body):
         text_pages.find_one_and_update(
             {
                 "bookId": bookId,
-                "pages": {"$not": {"$elemMatch": {"page_num": page_obj["page_num"]}}}
+                "pages": {"$not": {"$elemMatch": {"page_num": page_obj["page_num"]}}},
             },
             {"$addToSet": {"pages": page_obj}},
-            upsert=True
+            upsert=True,
         )
         # document = text_pages.find_one({"bookId": bookId})
         # if document:
@@ -78,6 +78,7 @@ def extract_text(ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
+@timeit
 def process_page(page, bookId):
     page_obj = {}
     page_num = page["page_num"]
