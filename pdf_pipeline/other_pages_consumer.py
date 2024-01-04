@@ -33,9 +33,11 @@ channel = get_channel(connection)
 
 book_details = get_mongo_collection("book_details")
 other_pages = get_mongo_collection("other_pages")
-index_info = other_pages.list_indexes()
-if not index_info:
-    other_pages.create_index(["bookId", "pages.page_num"], background=True)
+index_name = "index_bookId_pageNo"
+indexes_info = other_pages.list_indexes()
+index_exists = any(index_info["name"] == index_name for index_info in indexes_info)
+if not index_exists:
+    other_pages.create_index(["bookId", "pages.page_num"], name=index_name, background=True)
 
 
 @timeit

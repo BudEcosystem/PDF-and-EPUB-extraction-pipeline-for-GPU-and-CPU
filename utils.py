@@ -231,9 +231,11 @@ def generate_image_str(book_id, image_path, save=True):
     filename = os.path.basename(image_path)
     page_num = os.path.splitext(filename)[0].split("_")[-1]
     book_images_collection = get_mongo_collection("book_images")
+    index_name = "index_bookId_pageNo"
     indexes_info = book_images_collection.list_indexes()
-    if not indexes_info:
-        book_images_collection.create_index(["bookId", "page_num"], background=True)
+    index_exists = any(index_info["name"] == index_name for index_info in indexes_info)
+    if not index_exists:
+        book_images_collection.create_index(["bookId", "page_num"], name=index_name, background=True)
     book_image = book_images_collection.find_one(
         {"bookId": book_id, "page_num": page_num}
     )

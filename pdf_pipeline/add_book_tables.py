@@ -19,6 +19,7 @@ mfd_pages = get_mongo_collection("mfd_pages")
 nougat_pages = get_mongo_collection("nougat_pages")
 latex_pages = get_mongo_collection("latex_pages")
 other_pages = get_mongo_collection("other_pages")
+text_pages = get_mongo_collection("text_pages")
 ptm_pages = get_mongo_collection("ptm_pages")
 
 
@@ -194,10 +195,11 @@ def clean_db(bookId):
     nougat_pages.delete_many({"bookId": bookId})
     latex_pages.delete_many({"bookId": bookId})
     other_pages.delete_many({"bookId": bookId})
-    publaynet_pages.delete_many({"bookId": bookId})
-    table_bank_pages.delete_many({"bookId": bookId})
-    mfd_pages.delete_many({"bookId": bookId})
-    figure_caption.delete_many({"bookId": bookId})
+    text_pages.delete_many({"bookId": bookId})
+    # publaynet_pages.delete_many({"bookId": bookId})
+    # table_bank_pages.delete_many({"bookId": bookId})
+    # mfd_pages.delete_many({"bookId": bookId})
+    # figure_caption.delete_many({"bookId": bookId})
     ptm_pages.delete_many({"bookId": bookId})
     # table_collection.delete_many({"bookId": bookId})
 

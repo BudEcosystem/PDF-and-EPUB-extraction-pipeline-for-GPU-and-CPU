@@ -19,9 +19,11 @@ connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
 books = get_mongo_collection("book_set_2")
-index_info = books.list_indexes()
-if not index_info:
-    books.create_index("bookId", background=True)
+index_name = "index_bookId"
+indexes_info = books.list_indexes()
+index_exists = any(index_info["name"] == index_name for index_info in indexes_info)
+if not index_exists:
+    books.create_index("bookId", name=index_name, background=True)
 
 book_details = get_mongo_collection("book_details")
 nougat_pages = get_mongo_collection("nougat_pages")
