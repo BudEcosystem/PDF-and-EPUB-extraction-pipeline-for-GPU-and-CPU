@@ -30,7 +30,8 @@ def extract_page_table(ch, method, properties, body):
     message = json.loads(body)
     tableId = message["tableId"]
     data = message["data"]
-    image_data_base64 = data["img"]
+    # image_data_base64 = data["img"]
+    image_path = data["img"]
     bookId = message["bookId"]
     page_num = message["page_num"]
 
@@ -44,7 +45,7 @@ def extract_page_table(ch, method, properties, body):
         existing_table = table_collection.find_one({"bookId": bookId, "tableId": tableId})
         if existing_table:
             return
-        image_path = create_image_from_str(image_data_base64)
+        # image_path = create_image_from_str(image_data_base64)
         table_data = process_book_page(image_path, tableId)
         if table_data:
             table_collection.insert_one({

@@ -154,7 +154,7 @@ def process_page(page_num, pdf_book, book_folder):
         "bookId": book_id,
         # "split_path": split_path,
         "image_path": absolute_image_path,
-        "image_str": generate_image_str(book_id, absolute_image_path),
+        # "image_str": generate_image_str(book_id, absolute_image_path),
     }
     # send_to_queue("publaynet_queue", queue_msg)
     # send_to_queue("table_bank_queue", queue_msg)

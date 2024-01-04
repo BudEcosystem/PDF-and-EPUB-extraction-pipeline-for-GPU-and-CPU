@@ -62,7 +62,8 @@ def process_table(table_block, image_path, bookId, page_num):
     table_image_path = os.path.abspath(f"cropped_{tableId}.png")
     cv2.imwrite(table_image_path, cropped_image)
     output = f"{{{{table:{tableId}}}}}"
-    data = {"img": generate_image_str(bookId, table_image_path, save=False)}
+    # data = {"img": generate_image_str(bookId, table_image_path, save=False)}
+    data = {"img": table_image_path}
     bud_table_msg = {
         "tableId": tableId,
         "data": data,

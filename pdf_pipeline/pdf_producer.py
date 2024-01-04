@@ -110,7 +110,7 @@ def get_layout_queue_msg(data):
         "page_num": data["page_num"],
         "bookId": data["bookId"],
         # "split_path": data["split_path"],
-        "image_str": data["image_str"],
+        # "image_str": data["image_str"],
     }
     return queue_message
 

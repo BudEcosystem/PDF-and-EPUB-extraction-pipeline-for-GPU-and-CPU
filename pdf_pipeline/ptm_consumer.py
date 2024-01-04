@@ -2,6 +2,7 @@
 # type: ignore
 import json
 import sys
+import cv2
 sys.path.append("pdf_extraction_pipeline")
 import traceback
 from pdf_producer import send_to_queue, error_queue
@@ -47,7 +48,7 @@ def ptm_layout(ch, method, properties, body):
     page_num = message["page_num"]
     # book_path = message["split_path"]
     bookId = message["bookId"]
-    image_str = message["image_str"]
+    # image_str = message["image_str"]
     print(f"Received message for {image_path}")
     queue_msg = {
         "bookId": bookId,
@@ -62,7 +63,8 @@ def ptm_layout(ch, method, properties, body):
         if existing_page:
             send_to_queue('check_ptm_completion_queue', queue_msg)
             return
-        image = read_image_from_str(image_str)
+        # image = read_image_from_str(image_str)
+        image = cv2.imread(image_path)
         image = image[..., ::-1] 
         publaynet_layouts = publaynet_model.detect(image)
         tablebank_layouts = tablebank_model.detect(image)

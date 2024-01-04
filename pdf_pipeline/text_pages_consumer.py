@@ -88,9 +88,9 @@ def process_page(page, bookId):
     page_obj = {}
     page_num = page["page_num"]
     # is_figure_present = page["is_figure_present"]
-    image_str = generate_image_str(bookId, page["image_path"])
-    new_image_path = create_image_from_str(image_str)
-    # new_image_path = page["image_path"]
+    # image_str = generate_image_str(bookId, page["image_path"])
+    # new_image_path = create_image_from_str(image_str)
+    new_image_path = page["image_path"]
 
     image_data = Image.open(new_image_path)
     page_content = pytesseract.image_to_string(image_data)
@@ -102,7 +102,7 @@ def process_page(page, bookId):
         "figures": [],
         "equations": [],
     }
-    os.remove(new_image_path)
+    # os.remove(new_image_path)
     return page_obj
 
 
