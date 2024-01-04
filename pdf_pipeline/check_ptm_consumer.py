@@ -21,11 +21,10 @@ connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
 book_details = get_mongo_collection("book_details")
-# figure_caption = get_mongo_collection("figure_caption")
-# publaynet_pages = get_mongo_collection("publaynet_pages")
-# table_bank_pages = get_mongo_collection("table_bank_pages")
-# mfd_pages = get_mongo_collection("mfd_pages")
 ptm_pages = get_mongo_collection('ptm_pages')
+index_info = ptm_pages.list_indexes()
+if not index_info:
+    ptm_pages.create_index(["bookId", "pages.page_num"], background=True)
 
 # def get_fig_data(bookId, book_path):
 #     fig_done = False

@@ -20,6 +20,9 @@ connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
 ptm_pages = get_mongo_collection('ptm_pages')
+index_info = ptm_pages.list_indexes()
+if not index_info:
+    ptm_pages.create_index(["bookId", "pages.page_num"], background=True)
 
 
 publaynet_model = lp.Detectron2LayoutModel('lp://PubLayNet/mask_rcnn_X_101_32x8d_FPN_3x/config',
