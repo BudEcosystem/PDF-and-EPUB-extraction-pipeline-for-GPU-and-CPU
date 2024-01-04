@@ -92,8 +92,9 @@ def process_page(page, bookId):
     results = page["results"]
     page_num = page["page_num"]
     # is_figure_present = page["is_figure_present"]
-    image_str = generate_image_str(bookId, page["image_path"])
-    new_image_path = create_image_from_str(image_str)
+    # image_str = generate_image_str(bookId, page["image_path"])
+    # new_image_path = create_image_from_str(image_str)
+    new_image_path = page["image_path"]
 
     page_content, figures = sort_text_blocks_and_extract_data(
         results, new_image_path, bookId, page_num
