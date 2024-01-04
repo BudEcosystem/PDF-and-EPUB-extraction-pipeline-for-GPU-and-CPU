@@ -3,7 +3,9 @@ import regex as re
 import cv2
 import pytesseract
 from PIL import Image
-from pix2tex.cli import LatexOCR
+from rapid_latex_ocr import LatexOCR
+
+# from pix2tex.cli import LatexOCR
 from latext import latex_to_text
 from utils import (
     generate_unique_id,
@@ -14,7 +16,9 @@ from utils import (
 )
 from pdf_producer import send_to_queue
 
-latex_model = LatexOCR()
+model = LatexOCR()
+
+# latex_model = LatexOCR()
 
 # def get_fig_caption(block, image_path):
 #     caption = ""
@@ -31,6 +35,7 @@ latex_model = LatexOCR()
 #     if os.path.exists(block_image_path):
 #         os.remove(block_image_path)
 # return caption/
+
 
 @timeit
 def process_table(table_block, image_path, bookId, page_num):
@@ -86,6 +91,7 @@ def process_table(table_block, image_path, bookId, page_num):
 #         os.remove(figure_image_path)
 #     return output, figure
 
+
 @timeit
 def process_publaynet_figure(figure_block, image_path):
     print("publaynet figure")
@@ -101,6 +107,7 @@ def process_publaynet_figure(figure_block, image_path):
         os.remove(figure_image_path)
     return output, figure
 
+
 @timeit
 def process_text(text_block, image_path):
     textId = generate_unique_id()
@@ -111,6 +118,7 @@ def process_text(text_block, image_path):
     if os.path.exists(cropped_image_path):
         os.remove(cropped_image_path)
     return output
+
 
 @timeit
 def process_title(title_block, image_path):
@@ -123,6 +131,7 @@ def process_title(title_block, image_path):
         os.remove(cropped_image_path)
     return output
 
+
 @timeit
 def process_list(list_block, image_path):
     list_id = generate_unique_id()
@@ -134,22 +143,28 @@ def process_list(list_block, image_path):
         os.remove(cropped_image_path)
     return output
 
+
 @timeit
 def process_equation(equation_block, image_path):
     equation_id = generate_unique_id()
     equation_image_path = crop_image(equation_block, image_path, equation_id)
     output = f"{{{{equation:{equation_id}}}}}"
-    img = Image.open(equation_image_path)
+    # img = Image.open(equation_image_path)
     latex_text = ""
+    res = ""
     try:
-        latex_text = latex_model(img)
+        # latex_text = latex_model(img)
+        with open(equation_image_path, "rb") as f:
+            data = f.read()
+        res, elapse = model(data)
     except Exception as e:
         print("error while extracting equation using latex ocr", e)
-    text_to_speech = latext_to_text_to_speech(latex_text)
+    text_to_speech = latext_to_text_to_speech(res)
     equation = {"id": equation_id, "text": latex_text, "text_to_speech": text_to_speech}
     if os.path.exists(equation_image_path):
         os.remove(equation_image_path)
     return output, equation
+
 
 @timeit
 def latext_to_text_to_speech(text):
