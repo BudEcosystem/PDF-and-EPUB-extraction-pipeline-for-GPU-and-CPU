@@ -231,21 +231,25 @@ def generate_image_str(book_id, image_path, save=True):
     filename = os.path.basename(image_path)
     page_num = os.path.splitext(filename)[0].split("_")[-1]
     book_images_collection = get_mongo_collection("book_images")
+    indexes_info = book_images_collection.list_indexes()
+    if not indexes_info:
+        book_images_collection.create_index(["bookId", "page_num"], background=True)
     book_image = book_images_collection.find_one(
         {"bookId": book_id, "page_num": page_num}
     )
-    if book_image:
+    if book_image and save:
+        print(" generate_image getting from db")
         image_str = book_image.get("image_str", "")
         if not image_str:
             with open(image_path, "rb") as img:
                 img_data = img.read()
             image_str = base64.b64encode(img_data).decode("utf-8")
-            if save:
-                book_images_collection.update_one(
-                    {"bookId": book_id, "page_num": page_num},
-                    {"$set": {"image_str": image_str, "image_path": image_path}},
-                )
+            book_images_collection.update_one(
+                {"bookId": book_id, "page_num": page_num},
+                {"$set": {"image_str": image_str, "image_path": image_path}},
+            )
     else:
+        print(" generate_image not getting from db")
         with open(image_path, "rb") as img:
             img_data = img.read()
         image_str = base64.b64encode(img_data).decode("utf-8")
