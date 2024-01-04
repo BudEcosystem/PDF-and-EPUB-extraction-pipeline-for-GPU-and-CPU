@@ -68,21 +68,22 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
                 image_paths = [image_path]
             else:
                 image_paths = [page["image_path"] for page in nougat_pages]
-            local_image_paths = []
-            for img_path in image_paths:
-                # will return image_str form db
-                image_str = generate_image_str(bookId, img_path)
-                local_image_paths.append(create_image_from_str(image_str))
-                # pages_extracted += 1
+            # local_image_paths = []
+            # for img_path in image_paths:
+            #     # will return image_str form db
+            #     image_str = generate_image_str(bookId, img_path)
+            #     local_image_paths.append(create_image_from_str(image_str))
+            #     # pages_extracted += 1
 
             pdf_path = os.path.abspath(f"{generate_unique_id()}.pdf")
             with open(pdf_path, "wb") as f_pdf:
-                f_pdf.write(img2pdf.convert(local_image_paths))
+                # f_pdf.write(img2pdf.convert(local_image_paths))
+                f_pdf.write(img2pdf.convert(image_paths))
 
             # clean up local images created for pdf creation
-            for img_path in local_image_paths:
-                abs_path = os.path.abspath(img_path)
-                os.remove(abs_path)
+            # for img_path in local_image_paths:
+            #     abs_path = os.path.abspath(img_path)
+            #     os.remove(abs_path)
 
             if not page_present_in_split:
                 page_nums = [page_num]
