@@ -25,7 +25,17 @@ ptm_pages = get_mongo_collection("ptm_pages")
 
 # delete wrong tables
 def delete_wrong_tables():
-    for document in book_set_2.find():
+    # for document in book_set_2.find():
+    for document in book_set_2.find({
+        "bookId": {
+            "$in": [
+                '13d86bfa32fd4fbe88023aa54d7c2bbc',
+                '14a51624d9e943df986d4823c9b72936',
+                '54bb794c5f1843e8bb35bf6208b54bfa',
+                'a7a681f35c5540c9aff28e556f0f2e6f'
+            ]
+        }
+    }):
         print(f"BookId :: {document['bookId']}")
         for page in document["pages"]:
             page_num = page["page_num"]
@@ -201,7 +211,7 @@ def clean_db(bookId):
     # mfd_pages.delete_many({"bookId": bookId})
     # figure_caption.delete_many({"bookId": bookId})
     ptm_pages.delete_many({"bookId": bookId})
-    # table_collection.delete_many({"bookId": bookId})
+    table_collection.delete_many({"bookId": bookId})
 
 
 if __name__ == "__main__":
@@ -211,13 +221,28 @@ if __name__ == "__main__":
     # To clean db for fully extracted books
     #############################################
     # for book in book_details.find({"status": "extracted"}):
-    #     bookId = book["bookId"]
-    #     clean_db(bookId)
+    for book in book_details.find({
+        "bookId": {
+            "$in": [
+                '13d86bfa32fd4fbe88023aa54d7c2bbc',
+                '14a51624d9e943df986d4823c9b72936',
+                '54bb794c5f1843e8bb35bf6208b54bfa',
+                'a7a681f35c5540c9aff28e556f0f2e6f'
+            ]
+        }
+    }):
+        bookId = book["bookId"]
+        clean_db(bookId)
 
     #############################################
     # To clean db for partially extracted books
     #############################################
-    # for book in book_details.find({"bookId": {"$in": ["14a51624d9e943df986d4823c9b72936", "61776d86a35a49acb26a4f69b9d65b88"]}}):
+    # for book in book_details.find({"bookId": {"$in": [
+    #     "54283de6ba64477fbfcdd024b75977d1",
+    #     "83c9ed88aedd484da3cf022983fc1a65",
+    #     "a1d7d2b5eeb04805b6c284a9de3706e7",
+    #     "6692536cac904bd394e27301623dc35a"
+    # ]}}):
     #     bookId = book["bookId"]
     #     if book["status"] == "processing":
     #         doc_keys = book.keys()
