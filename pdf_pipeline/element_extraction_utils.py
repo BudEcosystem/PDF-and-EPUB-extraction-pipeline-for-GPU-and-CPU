@@ -71,8 +71,8 @@ def process_table(table_block, image_path, bookId, page_num):
         "bookId": bookId,
     }
     send_to_queue("bud_table_extraction_queue", bud_table_msg)
-    if os.path.exists(table_image_path):
-        os.remove(table_image_path)
+    # if os.path.exists(table_image_path):
+    #     os.remove(table_image_path)
     return output
 
 
