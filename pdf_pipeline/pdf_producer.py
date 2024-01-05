@@ -170,7 +170,8 @@ def error_queue(book_path, bookId, error):
     channel.basic_publish(
         exchange="", routing_key=queue_name, body=json.dumps(error_queue)
     )
-    del error["consumer_message"]
+    if isinstance(error, dict):
+        del error["consumer_message"]
     print(f" [x] Sent {error} sent to {queue_name}")
     connection.close()
 
@@ -207,7 +208,7 @@ if __name__ == "__main__":
     try:
         # # # store all books from aws to book_details collection before running
         # store_book_details()
-        books = book_details.find({"status": "not_extracted"}).limit(2)
+        books = book_details.find({"status": "not_extracted"}).limit(4)
         # books = book_details.find({"bookId": {"$in": ["14a51624d9e943df986d4823c9b72936", "61776d86a35a49acb26a4f69b9d65b88"]}})
         for book in books:
             if book["book"].endswith(".pdf"):
