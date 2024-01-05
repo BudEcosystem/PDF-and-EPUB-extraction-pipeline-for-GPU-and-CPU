@@ -1,22 +1,24 @@
 import os
 import regex as re
 import cv2
+from dotenv import load_dotenv
 import pytesseract
 from PIL import Image
-from rapid_latex_ocr import LatexOCR
+# from rapid_latex_ocr import LatexOCR
 
-# from pix2tex.cli import LatexOCR
+from pix2tex.cli import LatexOCR
 from latext import latex_to_text
 from utils import (
     generate_unique_id,
-    generate_image_str,
+    # generate_image_str,
     upload_to_aws_s3,
     crop_image,
     timeit,
 )
 from pdf_producer import send_to_queue
 
-model = LatexOCR()
+load_dotenv()
+# model = LatexOCR()
 
 # latex_model = LatexOCR()
 
@@ -35,6 +37,26 @@ model = LatexOCR()
 #     if os.path.exists(block_image_path):
 #         os.remove(block_image_path)
 # return caption/
+
+
+class LatexOCRConfig:
+    def __init__(
+        self,
+        config="settings/config.yaml",
+        checkpoint="checkpoints/weights.pth",
+        no_cuda=True,
+        no_resize=False,
+    ):
+        self.config = config
+        self.checkpoint = checkpoint
+        self.no_cuda = no_cuda
+        self.no_resize = no_resize
+
+
+# # Create an instance of LatexOCRConfig
+config_instance = LatexOCRConfig(no_cuda=os.environ["NO_CUDA"])
+
+model = LatexOCR(arguments=config_instance)
 
 
 @timeit
@@ -150,18 +172,18 @@ def process_equation(equation_block, image_path):
     equation_id = generate_unique_id()
     equation_image_path = crop_image(equation_block, image_path, equation_id)
     output = f"{{{{equation:{equation_id}}}}}"
-    # img = Image.open(equation_image_path)
-    # latex_text = ""
-    res = ""
+    img = Image.open(equation_image_path)
+    latex_text = ""
+    # res = ""
     try:
-        # latex_text = latex_model(img)
-        with open(equation_image_path, "rb") as f:
-            data = f.read()
-        res, elapse = model(data)
+        latex_text = model(img)
+        # with open(equation_image_path, "rb") as f:
+        #     data = f.read()
+        # res, elapse = model(data)
     except Exception as e:
         print("error while extracting equation using latex ocr", e)
-    text_to_speech = latext_to_text_to_speech(res)
-    equation = {"id": equation_id, "text": res, "text_to_speech": text_to_speech}
+    text_to_speech = latext_to_text_to_speech(latex_text)
+    equation = {"id": equation_id, "text": latex_text, "text_to_speech": text_to_speech}
     if os.path.exists(equation_image_path):
         os.remove(equation_image_path)
     return output, equation
