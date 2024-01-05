@@ -38,6 +38,7 @@ load_dotenv()
 #         os.remove(block_image_path)
 # return caption/
 
+LATEX_NO_CUDA = os.getenv("LATEX_NO_CUDA") == "true"
 
 class LatexOCRConfig:
     def __init__(
@@ -54,7 +55,7 @@ class LatexOCRConfig:
 
 
 # # Create an instance of LatexOCRConfig
-config_instance = LatexOCRConfig(no_cuda=os.environ["NO_CUDA"])
+config_instance = LatexOCRConfig(no_cuda=LATEX_NO_CUDA)
 
 model = LatexOCR(arguments=config_instance)
 
