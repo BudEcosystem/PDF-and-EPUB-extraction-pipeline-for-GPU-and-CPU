@@ -1,7 +1,6 @@
 # pylint: disable=all
 # type: ignore
 import sys
-sys.path.append("pdf_extraction_pipeline")
 from utils import timeit
 import os
 import requests
@@ -9,11 +8,9 @@ import img2pdf
 import traceback
 import json
 from dotenv import load_dotenv
-from pdf_producer import send_to_queue, error_queue
+from pdf_pipeline.pdf_producer import send_to_queue, error_queue
 from utils import (
     get_mongo_collection,
-    create_image_from_str,
-    generate_image_str,
     generate_unique_id,
     get_rabbitmq_connection,
     get_channel

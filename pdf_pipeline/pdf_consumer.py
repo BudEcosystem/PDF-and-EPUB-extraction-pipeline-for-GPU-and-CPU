@@ -1,26 +1,20 @@
 # pylint: disable=all
 # type: ignore
 import json
-import sys
 import os
 import traceback
 from PyPDF2 import PdfReader
 import fitz
 from datetime import datetime
 
-sys.path.append("pdf_extraction_pipeline")
 from utils import (
     timeit,
     get_mongo_collection,
-    # split_pdf,
     download_book_from_aws,
-    generate_image_str,
-    # find_split_path,
-    # get_page_num_from_split_path,
     get_rabbitmq_connection,
     get_channel,
 )
-from pdf_producer import send_to_queue, error_queue
+from pdf_pipeline.pdf_producer import send_to_queue, error_queue
 
 QUEUE_NAME = "pdf_processing_queue"
 
@@ -152,13 +146,8 @@ def process_page(page_num, pdf_book, book_folder):
     queue_msg = {
         "page_num": page_num,
         "bookId": book_id,
-        # "split_path": split_path,
         "image_path": absolute_image_path,
-        # "image_str": generate_image_str(book_id, absolute_image_path),
     }
-    # send_to_queue("publaynet_queue", queue_msg)
-    # send_to_queue("table_bank_queue", queue_msg)
-    # send_to_queue("mfd_queue", queue_msg)
     send_to_queue("ptm_queue", queue_msg)
 
 

@@ -1,15 +1,12 @@
 # pylint: disable=all
 # type: ignore
 import json
-import sys
 import cv2
-sys.path.append("pdf_extraction_pipeline")
 import traceback
-from pdf_producer import send_to_queue, error_queue
+from pdf_pipeline.pdf_producer import send_to_queue, error_queue
 import layoutparser as lp
 from utils import (
     timeit,
-    read_image_from_str,
     get_mongo_collection,
     get_rabbitmq_connection,
     get_channel

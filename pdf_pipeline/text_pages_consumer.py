@@ -1,12 +1,9 @@
 # pylint: disable=all
 # type: ignore
 import traceback
-import sys
 import pytesseract
 from PIL import Image
 
-sys.path.append("pdf_extraction_pipeline/code")
-sys.path.append("pdf_extraction_pipeline")
 import os
 import re
 from utils import (
@@ -14,11 +11,9 @@ from utils import (
     get_mongo_collection,
     get_rabbitmq_connection,
     get_channel,
-    generate_image_str,
-    create_image_from_str,
 )
 import json
-from pdf_producer import send_to_queue, error_queue
+from pdf_pipeline.pdf_producer import send_to_queue, error_queue
 
 QUEUE_NAME = "text_pages_queue"
 

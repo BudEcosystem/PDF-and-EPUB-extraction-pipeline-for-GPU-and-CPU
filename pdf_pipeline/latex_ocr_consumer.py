@@ -1,23 +1,17 @@
 # pylint: disable=all
 # type: ignore
 import traceback
-import sys
 
-sys.path.append("pdf_extraction_pipeline/code")
-sys.path.append("pdf_extraction_pipeline")
-import os
 import re
 from utils import (
     timeit,
-    create_image_from_str,
-    generate_image_str,
     get_mongo_collection,
     get_rabbitmq_connection,
     get_channel,
 )
 import json
-from pdf_producer import send_to_queue, error_queue
-from element_extraction_utils import (
+from pdf_pipeline.pdf_producer import send_to_queue, error_queue
+from pdf_pipeline.element_extraction_utils import (
     process_table,
     # process_figure,
     process_publaynet_figure,

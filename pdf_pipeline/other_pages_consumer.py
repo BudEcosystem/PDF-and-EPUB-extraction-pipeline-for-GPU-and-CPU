@@ -1,25 +1,19 @@
 # pylint: disable=all
 # type: ignore
 import traceback
-import sys
 
-sys.path.append("pdf_extraction_pipeline/code")
-sys.path.append("pdf_extraction_pipeline")
 import os
 import re
 from utils import (
     timeit,
-    create_image_from_str,
-    generate_image_str,
     get_mongo_collection,
     get_rabbitmq_connection,
     get_channel,
 )
 import json
-from pdf_producer import send_to_queue, error_queue
-from element_extraction_utils import (
+from pdf_pipeline.pdf_producer import send_to_queue, error_queue
+from pdf_pipeline.element_extraction_utils import (
     process_table,
-    # process_figure,
     process_publaynet_figure,
     process_text,
     process_title,
@@ -64,17 +58,6 @@ def extract_other_pages(ch, method, properties, body):
             {"$addToSet": {"pages": page_obj}},
             upsert=True,
         )
-        # document = other_pages.find_one({"bookId": bookId})
-        # if document:
-        #     other_pages.update_one(
-        #         {"_id": document["_id"]}, {"$push": {"pages": page_obj}}
-        #     )
-        # else:
-        #     new_book_document = {"bookId": bookId, "pages": [page_obj]}
-        #     other_pages.insert_one(new_book_document)
-        # book_details.find_one_and_update(
-        #     {"bookId": bookId}, {"$inc": {"num_pages_done": 1}}
-        # )
         send_to_queue("book_completion_queue", bookId)
     except Exception as e:
         print(traceback.format_exc())
@@ -96,9 +79,6 @@ def process_page(page, bookId):
     page_obj = {}
     results = page["results"]
     page_num = page["page_num"]
-    # is_figure_present = page["is_figure_present"]
-    # image_str = generate_image_str(bookId, page["image_path"])
-    # new_image_path = create_image_from_str(image_str)
     new_image_path = page["image_path"]
 
     page_content, figures = sort_text_blocks_and_extract_data(

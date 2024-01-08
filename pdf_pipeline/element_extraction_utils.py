@@ -1,42 +1,20 @@
 import os
-import regex as re
 import cv2
 from dotenv import load_dotenv
 import pytesseract
 from PIL import Image
-# from rapid_latex_ocr import LatexOCR
 
 from pix2tex.cli import LatexOCR
 from latext import latex_to_text
 from utils import (
     generate_unique_id,
-    # generate_image_str,
     upload_to_aws_s3,
     crop_image,
     timeit,
 )
-from pdf_producer import send_to_queue
+from pdf_pipeline.pdf_producer import send_to_queue
 
 load_dotenv()
-# model = LatexOCR()
-
-# latex_model = LatexOCR()
-
-# def get_fig_caption(block, image_path):
-#     caption = ""
-#     image_id = generate_unique_id()
-#     block_image_path = crop_image(block, image_path, image_id)
-#     # extraction of text from cropped image using pytesseract
-#     image = Image.open(block_image_path)
-#     text = pytesseract.image_to_string(image)
-#     text = re.sub(r'\s+', ' ', text).strip()
-#     pattern = r"(Fig\.|Figure)\s+\d+"
-#     match = re.search(pattern, text)
-#     if match:
-#         caption = text
-#     if os.path.exists(block_image_path):
-#         os.remove(block_image_path)
-# return caption/
 
 LATEX_NO_CUDA = os.getenv("LATEX_NO_CUDA") == "true"
 

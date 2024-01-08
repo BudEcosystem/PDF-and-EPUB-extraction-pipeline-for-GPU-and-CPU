@@ -1,8 +1,6 @@
 # pylint: disable=all
 # type: ignore
-import sys
 
-sys.path.append("pdf_extraction_pipeline")
 import json
 from dotenv import load_dotenv
 import os
@@ -219,7 +217,7 @@ if __name__ == "__main__":
             else:
                 error_queue("", book["bookId"], "File extension not .pdf")
                 print("skipping this book as it not a pdf file")
-            if count == 4:
+            if count == 1:
                 break
 
     except KeyboardInterrupt:

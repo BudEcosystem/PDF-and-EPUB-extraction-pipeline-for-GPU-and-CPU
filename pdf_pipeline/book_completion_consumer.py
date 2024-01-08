@@ -1,18 +1,16 @@
 # pylint: disable=all
 # type: ignore
 from dotenv import load_dotenv
-import sys
 import traceback
 import shutil
 
-sys.path.append("pdf_extraction_pipeline")
 from utils import timeit
 
 load_dotenv()
 import os
 import json
 from datetime import datetime
-from pdf_producer import error_queue
+from pdf_pipeline.pdf_producer import error_queue
 from utils import get_mongo_collection, get_rabbitmq_connection, get_channel
 
 connection = get_rabbitmq_connection()
