@@ -208,15 +208,19 @@ if __name__ == "__main__":
     try:
         # # # store all books from aws to book_details collection before running
         # store_book_details()
-        books = book_details.find({"status": "not_extracted"}).limit(4)
+        books = book_details.find({"status": "not_extracted"})
         # books = book_details.find({"bookId": {"$in": ["14a51624d9e943df986d4823c9b72936", "61776d86a35a49acb26a4f69b9d65b88"]}})
+        count = 0
         for book in books:
             if book["book"].endswith(".pdf"):
                 print(book["book"])
                 send_to_queue("pdf_processing_queue", book)
+                count += 1
             else:
                 error_queue("", book["bookId"], "File extension not .pdf")
                 print("skipping this book as it not a pdf file")
+            if count == 4:
+                break
 
     except KeyboardInterrupt:
         pass
