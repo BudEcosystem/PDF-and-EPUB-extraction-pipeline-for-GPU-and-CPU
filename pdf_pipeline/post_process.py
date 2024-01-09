@@ -94,6 +94,9 @@ if __name__ == "__main__":
     for book in book_details.find({"status": "post_process"}):
         bookId = book["bookId"]
         clean_db(bookId)
+        book_details.update_one(
+            {"bookId": bookId}, 
+            {"$set": {"status": "extracted"}})
 
     #############################################
     # To clean db for partially extracted books
