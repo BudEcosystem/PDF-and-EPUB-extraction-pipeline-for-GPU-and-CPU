@@ -112,7 +112,6 @@ pip install package_name
 ```
 
 
-
 DOCKER commands:
 cd pdf_extraction_pipeline
 sudo docker build --build-arg YOUR_ENV=dev -t pdf-pipeline .
@@ -131,4 +130,12 @@ Nougat Consumer
 cd bud-nougat
 sudo docker run -it -d -p 8503:8503 --gpus all nougat_api_server
 sudo docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' <container id or name>
+
+
+1. Update env files, Dockerfile and gpu_docker_compose - volumes path, replicas, device_count
+2. Build images - nougat_api_server and pdf_pipeline
+3. Update pdf_producer.py count
+4. sudo docker compose -f gpu_docker_compose.yml up -d
+
+
 
