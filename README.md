@@ -129,6 +129,10 @@ sudo docker run -v $(pwd):/src --rm --gpus all -it pdf-pipeline:latest python3 -
 
 Nougat Consumer
 cd bud-nougat
+sudo docker build -t nougat_api_server .
 sudo docker run -it -d -p 8503:8503 --gpus all nougat_api_server
 sudo docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' <container id or name>
 
+
+Docker Compose 
+sudo docker compose -f gpu_docker_compose.yml -d
