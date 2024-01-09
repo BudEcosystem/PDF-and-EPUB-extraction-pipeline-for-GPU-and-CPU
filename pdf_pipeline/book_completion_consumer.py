@@ -140,7 +140,7 @@ def book_complete(ch, method, properties, body):
             current_time = datetime.now().strftime("%H:%M:%S")
             book_details.update_one(
                 {"bookId": bookId},
-                {"$set": {"status": "extracted", "end_time": current_time}},
+                {"$set": {"status": "post_process", "end_time": current_time}},
             )
             book_folder = os.path.dirname(book_path)
             if os.path.exists(book_folder):

@@ -1,0 +1,152 @@
+version: '3.8'
+
+services:
+  nougat_api_server:
+    image: nougat_api_server:latest
+    ports:
+      - "8503:8503"
+    networks:
+      - my_network
+    healthcheck:
+      test: wget --no-verbose -O /dev/null --tries=1 http://localhost:8503/ || exit 1
+      interval: 1s
+      timeout: 5s
+      start_period: 30s
+    deploy:
+      replicas: 1
+      resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                count: 1
+                capabilities: [gpu]
+  
+  producer:
+    image: pdf-pipeline:latest
+    command: python3 -m pdf_pipeline.pdf_producer
+    networks:
+      - my_network
+    volumes:
+      - my_volume:/src
+
+  consumer:
+    image: pdf-pipeline:latest
+    command: python3 -m pdf_pipeline.pdf_consumer
+    networks:
+      - my_network
+    volumes:
+      - my_volume:/src
+    deploy:
+      replicas: 2
+
+  ptm:
+    image: pdf-pipeline:latest
+    command: python3 -m pdf_pipeline.ptm_consumer
+    networks:
+      - my_network
+    volumes:
+      - my_volume:/src
+    deploy:
+      replicas: 2
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  check_ptm:
+    image: pdf-pipeline:latest
+    command: python3 -m pdf_pipeline.check_ptm_consumer
+    networks:
+      - my_network
+    volumes:
+      - my_volume:/src
+    deploy:
+      replicas: 2
+
+  other_pages:
+    image: pdf-pipeline:latest
+    command: python3 -m pdf_pipeline.other_pages_consumer
+    networks:
+      - my_network
+    volumes:
+      - my_volume:/src
+    deploy:
+      replicas: 2
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  text_pages:
+    image: pdf-pipeline:latest
+    command: python3 -m pdf_pipeline.text_pages_consumer
+    networks:
+      - my_network
+    volumes:
+      - my_volume:/src
+    deploy:
+      replicas: 2
+
+  latex_pages:
+    image: pdf-pipeline:latest
+    command: python3 -m pdf_pipeline.latex_ocr_consumer
+    networks:
+      - my_network
+    volumes:
+      - my_volume:/src
+    deploy:
+      replicas: 1
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  nougat_pages:
+    image: pdf-pipeline:latest
+    command: python3 -m pdf_pipeline.nougat_consumer "http://nougat_api_server:8503/predict/"
+    networks:
+      - my_network
+    volumes:
+      - my_volume:/src
+    depends_on:
+      nougat_api_server:
+        condition: service_healthy
+    deploy:
+      replicas: 1
+
+  bud_ocr:
+    image: pdf-pipeline:latest
+    command: python3 -m pdf_pipeline.bud_ocr_consumer
+    networks:
+      - my_network
+    volumes:
+      - my_volume:/src
+    deploy:
+      replicas: 1
+
+  book_completion:
+    image: pdf-pipeline:latest
+    command: python3 -m pdf_pipeline.book_completion_consumer
+    networks:
+      - my_network
+    volumes:
+      - my_volume:/src
+    deploy:
+      replicas: 1
+
+volumes:
+  my_volume:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/home/azureuser/prakash/pdf_extraction'
+
+networks:
+  my_network:

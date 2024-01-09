@@ -22,14 +22,9 @@ ptm_pages = get_mongo_collection("ptm_pages")
 
 # delete wrong tables
 def delete_wrong_tables():
-    # for document in book_set_2.find():
-    for document in book_set_2.find({
-        "bookId": {
-            "$in": [
-                '89f12b7590ef4e6f90ed8fbc3433d86a'
-            ]
-        }
-    }):
+    for book in book_details.find({"status": "post_process"}):
+        bookId = book["bookId"]
+        document = book_set_2.find_one({"bookId": bookId})
         print(f"BookId :: {document['bookId']}")
         for page in document["pages"]:
             page_num = page["page_num"]
@@ -96,14 +91,7 @@ if __name__ == "__main__":
     #############################################
     # To clean db for fully extracted books
     #############################################
-    # for book in book_details.find({"status": "extracted"}):
-    for book in book_details.find({
-        "bookId": {
-            "$in": [
-                '89f12b7590ef4e6f90ed8fbc3433d86a'
-            ]
-        }
-    }):
+    for book in book_details.find({"status": "post_process"}):
         bookId = book["bookId"]
         clean_db(bookId)
 
