@@ -1,0 +1,16 @@
+book-set-2
+.gitignore
+code/
+__pycache__/
+docker-compose.yml
+example.env
+flowChart.png
+process_pdf.py
+model_loader.py
+requirements.txt
+pdf_pipeline/mfd_consumer.py
+pdf_pipeline/pdfigcapx_consumer.py
+pdf_pipeline/publaynet_consumer.py
+pdf_pipeline/table_bank_consumer.py
+pdf_pipeline/Readme.md
+pdf_pipeline/test_producer.py

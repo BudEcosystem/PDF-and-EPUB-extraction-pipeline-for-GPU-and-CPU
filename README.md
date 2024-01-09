@@ -110,3 +110,25 @@ install required package by using following command
 ```bash
 pip install package_name
 ```
+
+
+
+DOCKER commands:
+cd pdf_extraction_pipeline
+sudo docker build --build-arg YOUR_ENV=dev -t pdf-pipeline .
+sudo docker run -v $(pwd):/src -it -d —gpu all pdf-pipeline python3 -m pdf_pipeline.pdf_producer
+sudo docker run -v $(pwd):/src --rm --gpus all -it pdf-pipeline:latest python3 -m pdf_pipeline.pdf_consumer
+sudo docker run -v $(pwd):/src --rm --gpus all -it pdf-pipeline:latest python3 -m pdf_pipeline.ptm_consumer
+sudo docker run -v $(pwd):/src --rm --gpus all -it pdf-pipeline:latest python3 -m pdf_pipeline.check_ptm_consumer
+sudo docker run -v $(pwd):/src --rm --gpus all -it pdf-pipeline:latest python3 -m pdf_pipeline.other_pages_consumer
+sudo docker run -v $(pwd):/src --rm --gpus all -it pdf-pipeline:latest python3 -m pdf_pipeline.text_pages_consumer
+sudo docker run -v $(pwd):/src --rm --gpus all -it pdf-pipeline:latest python3 -m pdf_pipeline.book_completion_consumer
+sudo docker run -v $(pwd):/src --rm --gpus all -it pdf-pipeline:latest python3 -m pdf_pipeline.bud_ocr_consumer
+sudo docker run -v $(pwd):/src --rm --gpus all -it pdf-pipeline:latest python3 -m pdf_pipeline.latex_ocr_consumer
+sudo docker run -v $(pwd):/src --rm --gpus all -it pdf-pipeline:latest python3 -m pdf_pipeline.nougat_consumer "http://172.17.0.2:8503/predict/"
+
+Nougat Consumer
+cd bud-nougat
+sudo docker run -it -d -p 8503:8503 --gpus all nougat_api_server
+sudo docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' <container id or name>
+
