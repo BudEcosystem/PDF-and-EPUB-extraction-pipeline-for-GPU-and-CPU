@@ -7,6 +7,8 @@ services:
       - "8503:8503"
     networks:
       - my_network
+    volumes:
+      - /home/azureuser/prakash/bud-nougat:/bud-nougat
     healthcheck:
       test: wget --no-verbose -O /dev/null --tries=1 http://localhost:8503/ || exit 1
       interval: 1s
@@ -29,7 +31,7 @@ services:
     networks:
       - my_network
     volumes:
-      -  /home/azureuser/prakash/pdf_extraction_pipeline:/src
+      - /home/azureuser/prakash/pdf_extraction_pipeline:/src
 
   consumer:
     image: pdf-pipeline:latest
@@ -40,7 +42,7 @@ services:
     volumes:
       -  /home/azureuser/prakash/pdf_extraction_pipeline:/src
     deploy:
-      replicas: 2
+      replicas: 4
 
   ptm:
     image: pdf-pipeline:latest
