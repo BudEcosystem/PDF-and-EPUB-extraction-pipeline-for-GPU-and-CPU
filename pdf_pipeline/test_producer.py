@@ -1,27 +1,29 @@
-import sys
+# import sys
 
-sys.path.append("pdf_extraction_pipeline")
+# sys.path.append("pdf_extraction_pipeline")
 import json
 from utils import get_rabbitmq_connection, get_channel, get_mongo_collection
 
 error_collection = get_mongo_collection("error_collection")
 
 
-def nougat_pdf_queue_test(queue_name, results, bookname, bookId):
+def nougat_pdf_queue_test(bookId, page_num, split_num, image_path, queue_name="nougat_queue"):
     connection = get_rabbitmq_connection()
     channel = get_channel(connection)
     nougat_pdf_queue_message = {
-        "queue": queue_name,
-        "results": results,
-        "bookname": bookname,
+        "results": None,
+        "is_figure_present": None,
         "bookId": bookId,
+        "page_num": page_num,
+        "splits": split_num,
+        "image_path": image_path
     }
 
     channel.queue_declare(queue=queue_name)
     channel.basic_publish(
         exchange="", routing_key=queue_name, body=json.dumps(nougat_pdf_queue_message)
     )
-    print(f" [x] Sent {bookname} ({bookId}) to {queue_name}")
+    print(f" [x] Sent {bookId} to {queue_name}")
     connection.close()
 
 
@@ -39,7 +41,7 @@ def nougat_pdf_queue_test_bc_test(queue_name):
     channel.basic_publish(
         exchange="", routing_key=queue_name, body=json.dumps(nougat_pdf_queue_message)
     )
-    print(f" [x] Sent bc_test")
+    print(" [x] Sent bc_test")
     connection.close()
 
 
@@ -95,7 +97,7 @@ def pdfigcapx_queue():
 if __name__ == "__main__":
     try:
         # bookname = "output_123.pdf"
-        bookId = "fd58567c83c34a5cad2971178290ab05"
+        bookId = "d451b0398df04aeaa95c73c6982c82f5"
         # results = [
         #     {"image_path": "/home/azureuser/prakash2/output_123/page_10.jpg", "page_num": "10"},
         #     {"image_path": "/home/azureuser/prakash2/output_123/page_11.jpg", "page_num": "11"},
@@ -105,6 +107,6 @@ if __name__ == "__main__":
         # nougat_pdf_queue_test("nougat_pdf_queue_test", results, bookname, bookId)
         # nougat_pdf_queue_test_bc_test('book_completion_queue')
         # re_queue_error(bookId)
-        pdfigcapx_queue()
+        nougat_pdf_queue_test(bookId, 398, None, "book-set-2/d451b0398df04aeaa95c73c6982c82f5/pages/page_398.jpg")
     except KeyboardInterrupt:
         pass
