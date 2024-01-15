@@ -73,6 +73,7 @@ def process_book(ch, method, properties, body):
                     "line_number": traceback.extract_tb(e.__traceback__)[-1].lineno,
                 }
                 error_queue(book_name, book_id, error)
+                ch.basic_ack(delivery_tag=method.delivery_tag)
                 return
             num_pages = len(book.pages)
             # split_book_paths = split_pdf(book_id, book_path)
@@ -89,29 +90,8 @@ def process_book(ch, method, properties, body):
 
         book_folder = os.path.join(*book_path.split("/")[:-1])
         print(f"{book_name} has total {num_pages} page")
-
-        # if len(split_book_paths) > 1:
-        #     queue_data = {"bookId": book_id}
-        #     for split_path in split_book_paths:
-        #         _, _, from_page, to_page = get_page_num_from_split_path(split_path)
-        #         queue_data["split_path"] = split_path
-        #         queue_data["from_page"] = from_page
-        #         queue_data["to_page"] = to_page
-        #         send_to_queue('pdfigcapx_queue', queue_data)
-        # else:
-        #     split_path = split_book_paths[0]
-        #     _, _, from_page, to_page = get_page_num_from_split_path(split_path)
-        #     figure_caption.find_one_and_update(
-        #         {"bookId": book_id, "split_path": split_path},
-        #         {"$set": {
-        #             "pages": {},
-        #             "status": "failed",
-        #             "from_page": from_page,
-        #             "to_page": to_page
-        #         }},
-        #         upsert=True
-        #     )
-
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+        
         pdf_book = fitz.open(book_path)
         for page_num in range(1, num_pages + 1):
             # split_path = find_split_path(split_book_paths, page_num)
@@ -126,8 +106,9 @@ def process_book(ch, method, properties, body):
             "line_number": traceback.extract_tb(e.__traceback__)[-1].lineno,
         }
         error_queue(book_name, book_id, error)
-    finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
+    # finally:
+    #     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
 @timeit
