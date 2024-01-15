@@ -217,7 +217,7 @@ if __name__ == "__main__":
             else:
                 error_queue("", book["bookId"], "File extension not .pdf")
                 print("skipping this book as it not a pdf file")
-            if count == 1:
+            if count == 4:
                 break
 
     except KeyboardInterrupt:

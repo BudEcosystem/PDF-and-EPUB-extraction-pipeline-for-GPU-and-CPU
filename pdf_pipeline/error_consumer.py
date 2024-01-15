@@ -1,8 +1,8 @@
 # pylint: disable=all
 # type: ignore
-import sys
-sys.path.append("pdf_extraction_pipeline/code")
-sys.path.append("pdf_extraction_pipeline")
+# import sys
+# sys.path.append("pdf_extraction_pipeline/code")
+# sys.path.append("pdf_extraction_pipeline")
 import json
 from utils import get_mongo_collection, get_rabbitmq_connection, get_channel
 

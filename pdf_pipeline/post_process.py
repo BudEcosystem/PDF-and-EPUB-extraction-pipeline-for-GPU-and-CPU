@@ -85,12 +85,7 @@ def clean_db(bookId):
     table_collection.delete_many({"bookId": bookId})
 
 
-if __name__ == "__main__":
-    delete_wrong_tables()
-
-    #############################################
-    # To clean db for fully extracted books
-    #############################################
+def clean_post_process():
     for book in book_details.find({"status": "post_process"}):
         bookId = book["bookId"]
         clean_db(bookId)
@@ -98,24 +93,35 @@ if __name__ == "__main__":
             {"bookId": bookId}, 
             {"$set": {"status": "extracted"}})
 
+
+def clean_processing():
+    for book in book_details.find({"status": "processing"}):
+        bookId = book["bookId"]
+        if book["status"] == "processing":
+            doc_keys = book.keys()
+            desired_keys = ["_id", "bookId", "book", "status"]
+            book_details.update_one(
+                {"bookId": bookId},
+                {
+                    "$set": {
+                        "status": "not_extracted"
+                    },
+                    "$unset": {key: "" for key in doc_keys if key not in desired_keys}
+                }
+            )
+        clean_db(bookId)
+
+
+if __name__ == "__main__":
+    delete_wrong_tables()
+
+    #############################################
+    # To clean db for fully extracted books
+    #############################################
+    clean_post_process()
+
     #############################################
     # To clean db for partially extracted books
     #############################################
-    # for book in book_details.find({"bookId": {"$in": [
-    #     "89f12b7590ef4e6f90ed8fbc3433d86a"
-    # ]}}):
-    #     bookId = book["bookId"]
-    #     if book["status"] == "processing":
-    #         doc_keys = book.keys()
-    #         desired_keys = ["_id", "bookId", "book", "status"]
-    #         book_details.update_one(
-    #             {"bookId": bookId},
-    #             {
-    #                 "$set": {
-    #                     "status": "not_extracted"
-    #                 },
-    #                 "$unset": {key: "" for key in doc_keys if key not in desired_keys}
-    #             }
-    #         )
-    #     clean_db(bookId)
+    # clean_processing()
     pass
