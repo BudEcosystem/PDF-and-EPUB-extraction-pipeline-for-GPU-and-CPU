@@ -79,6 +79,22 @@ def send_to_queue(queue_name, data):
     connection.close()
 
 
+# def get_all_books_names(bucket_name, folder_name):
+#     """
+#     Get all books names from aws s3 bucket
+
+#     Args:
+#         bucket_name (str): The name of the AWS S3 bucket.
+#         folder_name (str): The name of the folder within the bucket.
+
+#     Returns:
+#         list: A list of dictionaries representing the contents (objects) in the specified folder.
+#     """
+#     contents = s3.list_objects_v2(Bucket=bucket_name, Prefix=folder_name)
+#     pdf_file_names = [obj["Key"] for obj in contents.get("Contents", [])]
+#     book_names = [file_name.split("/")[1] for file_name in pdf_file_names]
+#     return book_names
+
 def get_all_books_names(bucket_name, folder_name):
     """
     Get all books names from aws s3 bucket
@@ -90,10 +106,30 @@ def get_all_books_names(bucket_name, folder_name):
     Returns:
         list: A list of dictionaries representing the contents (objects) in the specified folder.
     """
-    contents = s3.list_objects_v2(Bucket=bucket_name, Prefix=folder_name)
-    pdf_file_names = [obj["Key"] for obj in contents.get("Contents", [])]
-    book_names = [file_name.split("/")[1] for file_name in pdf_file_names]
-    return book_names
+    s3 = boto3.client('s3')
+    all_books = []
+
+    # Initial request to list objects
+    response = s3.list_objects_v2(Bucket=bucket_name, Prefix=folder_name)
+    
+    while True:
+        # Extract book names from the current page of results
+        pdf_file_names = [obj["Key"] for obj in response.get("Contents", [])]
+        book_names = [file_name.split("/")[1] for file_name in pdf_file_names]
+        all_books.extend(book_names)
+
+        # Check if there are more objects to retrieve
+        if not response.get('IsTruncated', False):
+            break
+
+        # Set ContinuationToken for the next page of results
+        response = s3.list_objects_v2(
+            Bucket=bucket_name,
+            Prefix=folder_name,
+            ContinuationToken=response['NextContinuationToken']
+        )
+
+    return all_books
 
 
 def get_pdf_processing_queue_msg(book):
@@ -175,29 +211,20 @@ def error_queue(book_path, bookId, error):
 
 
 def store_book_details():
-    #     books= get_all_books_names(bucket_name, folder_name + '/')
-    #     books=books[127:]
-    #     books=["Guide to Competitive Programming - Antti Laaksonen.pdf","Guide to Computer Network Security - Joseph Migga Kizza.pdf","Guide to Discrete Mathematics - Gerard O'Regan.pdf","Guide to Scientific Computing in C++ - Joe Pitt-Francis- Jonathan Whiteley.pdf","Handbook of Consumer Finance Research - Jing Jian Xiao.pdf","Handbook of Disaster Research - Havidan Rodriguez- Enrico L Quarantelli- Russell Dynes.pdf","Handbook of Evolutionary Research in Archaeology - Anna Marie Prentiss.pdf","Handbook of LGBT Elders - Debra A Harley- Pamela B Teaster.pdf","Handbook of Marriage and the Family - Gary W Peterson- Kevin R Bush.pdf","Handbook of Quantitative Criminology - Alex R Piquero- David Weisburd.pdf","Handbook of the Life Course - Jeylan T Mortimer- Michael J Shanahan.pdf","International Business Management - Kamal Fatehi- Jeongho Choi.pdf","International Humanitarian Action - Hans-Joachim Heintze- Pierre Thielbörger.pdf","International Perspectives on Psychotherapy - Stefan G Hofmann.pdf","International Trade Theory and Policy - Giancarlo Gandolfo.pdf","Internet of Things From Hype to Reality - Ammar Rayes- Samer Salam.pdf","Introduction to Data Science - Laura Igual- Santi Seguí.pdf","Introduction to Deep Learning - Sandro Skansi.pdf","Introduction to Electronic Commerce and Social Commerce - Efraim Turban- Judy Whiteside- David King- Jon Outland.pdf","Introduction to Evolutionary Computing - AE Eiben- JE Smith.pdf","Introduction to Formal Philosophy - Sven Ove Hansson- Vincent F Hendricks.pdf","Introduction to General Relativity - Cosimo Bambi.pdf","Introduction to Law - Jaap Hage- Antonia Waltermann- Bram Akkermans.pdf",
-    # "Introduction to Mathematica® for Physicists - Andrey Grozin.pdf","Introduction to Parallel Computing - Roman Trobec- Boštjan Slivnik- Patricio Bulić- Borut Robič.pdf","Introduction to Partial Differential Equations - David Borthwick.pdf","Introduction to Programming with Fortran - Ian Chivers- Jane Sleightholme.pdf","Introduction to Smooth Manifolds - John Lee.pdf",
-    # "Introduction to Statistics and Data Analysis  - Christian Heumann- Michael Schomaker-  Shalabh.pdf","Introduction to Time Series and Forecasting - Peter J Brockwell- Richard A Davis.pdf"
-    # ,"Introductory Quantum Mechanics - Paul R Berman.pdf","Introductory Statistics with R - Peter Dalgaard.pdf","Introductory Time Series with R - Paul SP Cowpertwait- Andrew V Metcalfe.pdf",
-    # "Knowledge Management - Klaus North- Gita Kumta.pdf","Language Across the Curriculum & CLIL in English as an Additional Language (EAL) Contexts - Angel MY Lin.pdf"]
-    # books = ["output_3.pdf"]
-    # books = [
-    #     "Writing for Publication - Mary Renck Jalongo- Olivia N Saracho.pdf",
-    #     "Witnessing Torture - Alexandra S Moore- Elizabeth Swanson.pdf",
-    #     "Understanding Statistics Using R - Randall Schumacker- Sara Tomek.pdf",
-    # ]
     books = get_all_books_names(bucket_name, folder_name + "/")
     print(len(books))
     for book in books:
-        doc = book_details.find_one({"book": book})
-        doc2 = sequentially_extracted_books.find_one({"book": book})
+        # doc = book_details.find_one({"book": book})
+        # doc2 = sequentially_extracted_books.find_one({"book": book})
+        doc = False
+        doc2 = False
         if not doc and not doc2:
+            ext = book.split(".")[-1]
             book_data = {
                 "bookId": generate_unique_id(),
                 "book": book,
                 "status": "not_extracted",
+                "type": ext
             }
             book_details.insert_one(book_data)
 
@@ -206,7 +233,7 @@ if __name__ == "__main__":
     try:
         # # # store all books from aws to book_details collection before running
         # store_book_details()
-        books = book_details.find({"status": "not_extracted"})
+        books = book_details.find({"status": "not_extracted", "type": "pdf"})
         # books = book_details.find({"bookId": {"$in": ["14a51624d9e943df986d4823c9b72936", "61776d86a35a49acb26a4f69b9d65b88"]}})
         count = 0
         for book in books:
@@ -217,7 +244,7 @@ if __name__ == "__main__":
             else:
                 error_queue("", book["bookId"], "File extension not .pdf")
                 print("skipping this book as it not a pdf file")
-            if count == 4:
+            if count == 54:
                 break
 
     except KeyboardInterrupt:

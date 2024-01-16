@@ -16,7 +16,7 @@ from utils import get_mongo_collection, get_rabbitmq_connection, get_channel
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
-books = get_mongo_collection("book_set_2")
+books = get_mongo_collection("libgen_data")
 index_name = "index_bookId"
 indexes_info = books.list_indexes()
 index_exists = any(index_info["name"] == index_name for index_info in indexes_info)
@@ -74,19 +74,6 @@ def book_complete(ch, method, properties, body):
             if doc_result:
                 text_pages_result.extend(doc_result)
         
-        # other_pages_document = other_pages.find_one({"bookId": bookId})
-        # latex_pages_document = latex_pages.find_one({"bookId": bookId})
-        # text_pages_document = text_pages.find_one({"bookId": bookId})
-        # other_pages_result = (
-        #     other_pages_document.get("pages", []) if other_pages_document else []
-        # )
-        # latex_pages_result = (
-        #         latex_pages_document.get("pages", []) if latex_pages_document else []
-        # )
-        # text_pages_result = (
-        #     text_pages_document.get("pages", []) if text_pages_document else []
-        # )
-        
         other_pages_result = get_unique_pages(other_pages_result)
         latex_pages_result = get_unique_pages(latex_pages_result)
         text_pages_result = get_unique_pages(text_pages_result)
@@ -100,15 +87,7 @@ def book_complete(ch, method, properties, body):
         if (num_pages_done + num_nougat_pages_done) >= num_pages:
             book_completed = True
         if book_completed:
-            # other_pages_document = other_pages.find_one({"bookId": bookId})
             nougat_pages_document = nougat_pages.find_one({"bookId": bookId})
-            # latex_pages_document = latex_pages.find_one({"bookId": bookId})
-            # text_pages_document = text_pages.find_one({"bookId": bookId})
-
-            # Initialize lists to hold pages from each document
-            # other_pages_result = (
-            #     other_pages_document.get("pages", []) if other_pages_document else []
-            # )
             nougat_pages_result = []
             nougat_pages_result_dict = (
                 nougat_pages_document.get("pages", []) if nougat_pages_document else []
@@ -117,13 +96,6 @@ def book_complete(ch, method, properties, body):
                 nougat_pages_result = [
                     result for _, result in nougat_pages_result_dict.items()
                 ]
-            # latex_pages_result = (
-            #     latex_pages_document.get("pages", []) if latex_pages_document else []
-            # )
-            # text_pages_result = (
-            #     text_pages_document.get("pages", []) if text_pages_document else []
-            # )
-
             all_pages = (
                 other_pages_result
                 + nougat_pages_result

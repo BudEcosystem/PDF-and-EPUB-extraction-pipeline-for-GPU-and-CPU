@@ -4,7 +4,7 @@ services:
   nougat_api_server:
     image: nougat_api_server:latest
     ports:
-      - "8403-8404:8503"
+      - "8403-8406:8503"
     networks:
       - my_network
     volumes:
@@ -15,12 +15,12 @@ services:
       timeout: 5s
       start_period: 30s
     deploy:
-      replicas: 2
+      replicas: 4
       resources:
           reservations:
             devices:
               - driver: nvidia
-                device_ids: ['3', '4']
+                device_ids: ['0', '2', '3']
                 capabilities: [gpu]
   
   producer:
@@ -51,7 +51,7 @@ services:
       # nougat_api_server_2:
         # condition: service_healthy
     deploy:
-      replicas: 4
+      replicas: 8
 
   ptm:
     image: pdf-pipeline:latest
@@ -67,12 +67,12 @@ services:
       # nougat_api_server_2:
       #   condition: service_healthy
     deploy:
-      replicas: 4
+      replicas: 12
       resources:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['3', '4']
+              device_ids: ['0', '2', '3']
               capabilities: [gpu]
 
   check_ptm:
@@ -89,7 +89,7 @@ services:
       # nougat_api_server_2:
       #   condition: service_healthy
     deploy:
-      replicas: 4
+      replicas: 8
 
   other_pages:
     image: pdf-pipeline:latest
@@ -105,12 +105,12 @@ services:
       # nougat_api_server_2:
       #   condition: service_healthy
     deploy:
-      replicas: 2
+      replicas: 4
       resources:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['3', '4']
+              device_ids: ['0', '2', '3']
               capabilities: [gpu]
 
   text_pages:
@@ -127,7 +127,7 @@ services:
       # nougat_api_server_2:
       #   condition: service_healthy
     deploy:
-      replicas: 2
+      replicas: 8
 
   latex_pages:
     image: pdf-pipeline:latest
@@ -143,12 +143,12 @@ services:
       # nougat_api_server_2:
       #   condition: service_healthy
     deploy:
-      replicas: 2
+      replicas: 4
       resources:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['3', '4']
+              device_ids: ['0', '2', '3']
               capabilities: [gpu]
 
   nougat_pages:
@@ -163,7 +163,7 @@ services:
       nougat_api_server:
         condition: service_healthy
     deploy:
-      replicas: 2
+      replicas: 4
 
   bud_ocr:
     image: pdf-pipeline:latest
@@ -195,7 +195,7 @@ services:
       # nougat_api_server_2:
       #   condition: service_healthy
     deploy:
-      replicas: 2
+      replicas: 6
 
 # volumes:
 #   my_volume:
