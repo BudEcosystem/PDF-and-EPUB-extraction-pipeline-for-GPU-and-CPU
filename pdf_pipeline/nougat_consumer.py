@@ -129,7 +129,7 @@ def get_nougat_extraction(pdf_path, data):
         data = response.json()
         return data
     else:
-        return None
+        raise Exception("Out of memory")
 
 def consume_nougat_pdf_queue():
     channel.basic_qos(prefetch_count=1, global_qos=False)

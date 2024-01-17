@@ -5,6 +5,8 @@
 /pdf_pipeline/__pycache__
 latex_images
 book-set-2
+libgen_data
+*.png
 *.pdf
 math_latex/node_modules
 
