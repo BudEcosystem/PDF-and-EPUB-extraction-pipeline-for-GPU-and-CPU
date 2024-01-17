@@ -1,8 +1,7 @@
 
-from dotenv import load_dotenv
 import re
-import uuid
 from utils import get_mongo_collection
+from pdf_pipeline.pdf_producer import send_to_queue
 
 
 book_set_2 = get_mongo_collection("libgen_data")
@@ -145,8 +144,28 @@ def get_nougat_not_extracted():
         ns = bd['nougat_splits']
         nps = np['pages']
         ne = [num for num in bd['num_nougat_pages'] if str(num) not in nps]
-        print(f"BookId : {bookId}")
-        print(f"not extracted : {ne}")
+        if ne:
+            processing_nougat_split = bd["processing_nougat_split"]
+            last_split_id = processing_nougat_split[-1]
+            for page_num in ne:
+                ns[last_split_id].append({
+                    "bookId": bookId,
+                    "page_num": page_num,
+                    "image_path": f"/src/libgen_data/{bookId}/pages/page_{page_num}.jpg"
+                })
+            book_details.update_one(
+                {"bookId": bookId},
+                {"$set": {"nougat_splits": ns},
+                "$pull": {"processing_nougat_split": last_split_id}}
+            )
+            send_to_queue("nougat_queue", {
+                "bookId": bookId,
+                "page_num": ne[0],
+                "image_path": f"/src/libgen_data/{bookId}/pages/page_{ne[0]}.jpg"
+            })
+            print(f"BookId : {bookId}")
+            print(f"not extracted : {ne}")
+
 
 if __name__ == "__main__":
     # get_nougat_not_extracted()
