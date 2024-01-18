@@ -22,22 +22,22 @@ book_set_2_dup = get_mongo_collection("book_set_2_dup")
 
 # delete wrong tables
 def delete_wrong_tables():
-    for book in book_details.find({"status": "post_process"}):
+    for book in book_details.find({"status": "post_process"}).limit(50):
         bookId = book["bookId"]
         document = book_set_2.find_one({"bookId": bookId})
         print(f"BookId :: {document['bookId']}")
         for page in document["pages"]:
             page_num = page["page_num"]
-            print(f"page number :: {page_num}")
+            # print(f"page number :: {page_num}")
             text = page["text"]
             if text:
                 # Search for the pattern '{{table:someid}}'
                 matches = re.findall(r"\{\{table:(\w+)\}\}", text)
-                print(f"Matches :: {matches}")
+                # print(f"Matches :: {matches}")
                 if matches:
                     for table_id in matches:
                         # table_id = int(table_id_match, 16)
-                        print(f"Table ID :: {table_id}")
+                        # print(f"Table ID :: {table_id}")
                         table_present = False
                         table_details = table_collection.find_one({"tableId": table_id})
                         if table_details:
@@ -60,7 +60,7 @@ def delete_wrong_tables():
                         ):
                             # Replace the pattern with an empty string
                             text = text.replace(f"{{{{table:{table_id}}}}}", "")
-                            print(text)
+                            # print(text)
                             # Update the text field in the current page
                             book_set_2.update_one(
                                 {"_id": document["_id"], "pages.page_num": page_num},
@@ -86,8 +86,9 @@ def clean_db(bookId):
 
 
 def clean_post_process():
-    for book in book_details.find({"status": "post_process"}):
+    for book in book_details.find({"status": "post_process"}).limit(50):
         bookId = book["bookId"]
+        print(bookId)
         clean_db(bookId)
         book_details.update_one(
             {"bookId": bookId}, 
@@ -141,30 +142,31 @@ def get_nougat_not_extracted():
         bookId = book["bookId"]
         bd = book_details.find_one({"bookId": bookId})
         np = nougat_pages.find_one({"bookId": bookId})
-        ns = bd['nougat_splits']
-        nps = np['pages']
-        ne = [num for num in bd['num_nougat_pages'] if str(num) not in nps]
-        if ne:
-            processing_nougat_split = bd["processing_nougat_split"]
-            last_split_id = processing_nougat_split[-1]
-            for page_num in ne:
-                ns[last_split_id].append({
+        ns = bd.get('nougat_splits', {})
+        if np:
+            nps = np.get('pages', [])
+            ne = [num for num in bd['num_nougat_pages'] if str(num) not in nps]
+            if ne:
+                processing_nougat_split = bd["processing_nougat_split"]
+                last_split_id = processing_nougat_split[-1]
+                for page_num in ne:
+                    ns[last_split_id].append({
+                        "bookId": bookId,
+                        "page_num": page_num,
+                        "image_path": f"/src/libgen_data/{bookId}/pages/page_{page_num}.jpg"
+                    })
+                book_details.update_one(
+                    {"bookId": bookId},
+                    {"$set": {"nougat_splits": ns},
+                    "$pull": {"processing_nougat_split": last_split_id}}
+                )
+                send_to_queue("nougat_queue", {
                     "bookId": bookId,
-                    "page_num": page_num,
-                    "image_path": f"/src/libgen_data/{bookId}/pages/page_{page_num}.jpg"
+                    "page_num": ne[0],
+                    "image_path": f"/src/libgen_data/{bookId}/pages/page_{ne[0]}.jpg"
                 })
-            book_details.update_one(
-                {"bookId": bookId},
-                {"$set": {"nougat_splits": ns},
-                "$pull": {"processing_nougat_split": last_split_id}}
-            )
-            send_to_queue("nougat_queue", {
-                "bookId": bookId,
-                "page_num": ne[0],
-                "image_path": f"/src/libgen_data/{bookId}/pages/page_{ne[0]}.jpg"
-            })
-            print(f"BookId : {bookId}")
-            print(f"not extracted : {ne}")
+                print(f"BookId : {bookId}")
+                print(f"not extracted : {ne}")
 
 
 if __name__ == "__main__":

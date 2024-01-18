@@ -4,7 +4,7 @@ services:
   nougat_api_server:
     image: nougat_api_server:latest
     ports:
-      - "8403-8406:8503"
+      - "8403-8405:8503"
     networks:
       - my_network
     volumes:
@@ -15,12 +15,12 @@ services:
       timeout: 5s
       start_period: 30s
     deploy:
-      replicas: 4
+      replicas: 3
       resources:
           reservations:
             devices:
               - driver: nvidia
-                device_ids: ['0', '2', '3']
+                device_ids: ['0', '1', '2']
                 capabilities: [gpu]
   
   producer:
@@ -72,7 +72,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['0', '2', '3']
+              device_ids: ['0', '1', '2']
               capabilities: [gpu]
 
   check_ptm:
@@ -110,7 +110,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['0', '2', '3']
+              device_ids: ['0', '1', '2']
               capabilities: [gpu]
 
   text_pages:
@@ -143,12 +143,12 @@ services:
       # nougat_api_server_2:
       #   condition: service_healthy
     deploy:
-      replicas: 4
+      replicas: 3
       resources:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['0', '2', '3']
+              device_ids: ['0', '1', '2']
               capabilities: [gpu]
 
   nougat_pages:
@@ -195,7 +195,7 @@ services:
       # nougat_api_server_2:
       #   condition: service_healthy
     deploy:
-      replicas: 6
+      replicas: 4
 
 # volumes:
 #   my_volume:

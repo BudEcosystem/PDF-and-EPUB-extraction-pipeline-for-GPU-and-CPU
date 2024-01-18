@@ -52,7 +52,7 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
         page_present_in_split = True
         if page_num:
             page_present_in_split = any(page['page_num'] == page_num for page in nougat_pages)
-        if len(nougat_pages) == NOUGAT_BATCH_SIZE or process_remaining_pages or \
+        if len(nougat_pages) >= NOUGAT_BATCH_SIZE or process_remaining_pages or \
             not page_present_in_split:
             if split_id in book.get('processing_nougat_split', []) and page_present_in_split:
                 return

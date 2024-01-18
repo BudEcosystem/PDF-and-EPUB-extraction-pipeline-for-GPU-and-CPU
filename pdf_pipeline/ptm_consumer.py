@@ -11,7 +11,6 @@ from utils import (
     get_rabbitmq_connection,
     get_channel
 )
-
 QUEUE_NAME = "ptm_queue"
 
 connection = get_rabbitmq_connection()
@@ -61,14 +60,35 @@ def ptm_layout(ch, method, properties, body):
             send_to_queue('check_ptm_completion_queue', queue_msg)
             return
         # image = read_image_from_str(image_str)
-        image = cv2.imread(image_path)
-        image = image[..., ::-1] 
-        publaynet_layouts = publaynet_model.detect(image)
-        tablebank_layouts = tablebank_model.detect(image)
-        mathformuladetection_layoutds = mathformuladetection_model.detect(image)
         layout_blocks = []
-        for item in publaynet_layouts:
-            if item.type != "Table":
+        try:
+            image = cv2.imread(image_path)
+            image = image[..., ::-1] 
+            publaynet_layouts = publaynet_model.detect(image)
+            tablebank_layouts = tablebank_model.detect(image)
+            mathformuladetection_layoutds = mathformuladetection_model.detect(image)
+            for item in publaynet_layouts:
+                if item.type != "Table":
+                    output_item = {
+                        "x_1": item.block.x_1,
+                        "y_1": item.block.y_1,
+                        "x_2": item.block.x_2,
+                        "y_2": item.block.y_2,
+                        "type": item.type,
+                        "image_path": image_path
+                    }
+                    layout_blocks.append(output_item)
+            for item in tablebank_layouts:  
+                output_item = {
+                    "x_1": item.block.x_1,
+                    "y_1": item.block.y_1,
+                    "x_2": item.block.x_2,
+                    "y_2": item.block.y_2,
+                    'type': item.type,
+                    "image_path": image_path
+                }
+                layout_blocks.append(output_item)
+            for item in mathformuladetection_layoutds:  
                 output_item = {
                     "x_1": item.block.x_1,
                     "y_1": item.block.y_1,
@@ -78,26 +98,8 @@ def ptm_layout(ch, method, properties, body):
                     "image_path": image_path
                 }
                 layout_blocks.append(output_item)
-        for item in tablebank_layouts:  
-            output_item = {
-                "x_1": item.block.x_1,
-                "y_1": item.block.y_1,
-                "x_2": item.block.x_2,
-                "y_2": item.block.y_2,
-                'type': item.type,
-                "image_path": image_path
-            }
-            layout_blocks.append(output_item)
-        for item in mathformuladetection_layoutds:  
-            output_item = {
-                "x_1": item.block.x_1,
-                "y_1": item.block.y_1,
-                "x_2": item.block.x_2,
-                "y_2": item.block.y_2,
-                "type": item.type,
-                "image_path": image_path
-            }
-            layout_blocks.append(output_item)
+        except cv2.error as excep:
+            print(excep)
         book_page_data = {
             'page_num': page_num,
             'image_path': image_path,
