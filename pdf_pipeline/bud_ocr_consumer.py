@@ -46,10 +46,12 @@ def extract_page_table(ch, method, properties, body):
                 "bookId": bookId,
                 "tableId": tableId,
                 "page_num": page_num,
-                "table_data": table_data
+                "table_data": table_data[0]
             })
         else:
             print(f"Table with id: {tableId} not extracted")
+        if table_data is None:
+            raise Exception("table not extracted - possibly API error")
         image_path = os.path.abspath(image_path)
         if os.path.exists(image_path):
             os.remove(image_path)

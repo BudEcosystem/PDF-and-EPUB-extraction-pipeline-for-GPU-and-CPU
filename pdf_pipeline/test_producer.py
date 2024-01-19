@@ -94,10 +94,30 @@ def pdfigcapx_queue():
         )
 
 
+def requeue_error(error_filter=None):
+    for book in error_collection.find():
+        bookId = book["bookId"]
+        errors = book["errors"]
+        if error_filter:
+            errors = list(filter(lambda x: x["consumer"]==error_filter, errors))
+        if errors:
+            connection = get_rabbitmq_connection()
+            channel = get_channel(connection)
+            for error in errors:
+                queue_name = error["consumer"]
+                channel.queue_declare(queue=queue_name)
+                queue_message = error["consumer_message"]
+                channel.basic_publish(
+                    exchange="", routing_key=queue_name, body=json.dumps(queue_message)
+                )
+                print(f" [x] Sent error to requeue to {queue_name}")
+            error_collection.delete_one({"bookId": bookId})
+            connection.close()
+
 if __name__ == "__main__":
     try:
         # bookname = "output_123.pdf"
-        bookId = "d451b0398df04aeaa95c73c6982c82f5"
+        # bookId = "d451b0398df04aeaa95c73c6982c82f5"
         # results = [
         #     {"image_path": "/home/azureuser/prakash2/output_123/page_10.jpg", "page_num": "10"},
         #     {"image_path": "/home/azureuser/prakash2/output_123/page_11.jpg", "page_num": "11"},
@@ -107,6 +127,7 @@ if __name__ == "__main__":
         # nougat_pdf_queue_test("nougat_pdf_queue_test", results, bookname, bookId)
         # nougat_pdf_queue_test_bc_test('book_completion_queue')
         # re_queue_error(bookId)
-        nougat_pdf_queue_test(bookId, 398, None, "book-set-2/d451b0398df04aeaa95c73c6982c82f5/pages/page_398.jpg")
+        # nougat_pdf_queue_test(bookId, 398, None, "book-set-2/d451b0398df04aeaa95c73c6982c82f5/pages/page_398.jpg")
+        requeue_error("bud_table_extraction_queue")
     except KeyboardInterrupt:
         pass

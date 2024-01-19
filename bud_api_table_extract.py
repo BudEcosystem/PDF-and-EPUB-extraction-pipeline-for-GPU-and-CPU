@@ -82,6 +82,7 @@ def process_book_page(image_path, tableId):
         data = response.json()
         tables = extract_table_results(data)
         caption = find_closest_results_for_table_caption(data)
+        result_tables = []
         for idx, table_data in enumerate(tables):
             caption = caption[idx] if idx < len(caption) else ""
             if should_skip_table(table_data):
@@ -90,14 +91,14 @@ def process_book_page(image_path, tableId):
             rows = [row for row in table_data]
             if not re.match(r'^Table\s+\d+', caption):
                 caption = ""
-            table_data = {
+            result_tables.append({
                 "id": tableId,
                 "caption": caption,
                 "data": {
                     "rows": rows
                 }
-            }
-            return table_data
+            })
+        return result_tables
     else:
         print('API request failed with status code:', response.status_code)
         return None
