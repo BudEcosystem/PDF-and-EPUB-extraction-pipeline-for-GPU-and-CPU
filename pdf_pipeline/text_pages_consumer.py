@@ -51,6 +51,12 @@ def extract_text(ch, method, properties, body):
             {"$addToSet": {"pages": page_obj}},
             upsert=True,
         )
+        # text_pages.insert_one(
+        #     {
+        #         "bookId": bookId,
+        #         "pages": [page_obj]
+        #     }
+        # )
         # document = text_pages.find_one({"bookId": bookId})
         # if document:
         #     text_pages.update_one(

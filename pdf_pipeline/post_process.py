@@ -1,5 +1,6 @@
 
 import re
+import pymongo
 from utils import get_mongo_collection
 from pdf_pipeline.pdf_producer import send_to_queue
 
@@ -22,11 +23,14 @@ book_set_2_dup = get_mongo_collection("book_set_2_dup")
 
 # delete wrong tables
 def delete_wrong_tables():
-    for book in book_details.find({"status": "post_process"}).limit(50):
+    error_ids = []
+    for book in book_details.find({"status": "post_process"}).limit(40):
         bookId = book["bookId"]
         document = book_set_2.find_one({"bookId": bookId})
         print(f"BookId :: {document['bookId']}")
         for page in document["pages"]:
+            if bookId in error_ids:
+                continue
             page_num = page["page_num"]
             # print(f"page number :: {page_num}")
             text = page["text"]
@@ -43,13 +47,17 @@ def delete_wrong_tables():
                         if table_details:
                             table_data = table_details.get("table_data", {})
                             if table_data:
-                                book_set_2.update_one(
-                                    {
-                                        "_id": document["_id"],
-                                        "pages.page_num": page_num,
-                                    },
-                                    {"$addToSet": {"pages.$.tables": table_data}},
-                                )
+                                try:
+                                    book_set_2.update_one(
+                                        {
+                                            "_id": document["_id"],
+                                            "pages.page_num": page_num,
+                                        },
+                                        {"$addToSet": {"pages.$.tables": table_data}},
+                                    )
+                                except pymongo.errors.WriteError:
+                                    error_ids.append(bookId)
+                                    continue
                                 table_present = True
                         # Check if the tableId is present in the tables array
                         if not table_present and (
@@ -68,6 +76,12 @@ def delete_wrong_tables():
                                     "$set": {"pages.$.text": text},
                                 },
                             )
+        if bookId in error_ids:
+            continue
+        clean_db(bookId)
+        book_details.update_one(
+            {"bookId": bookId}, 
+            {"$set": {"status": "extracted"}})
     print("Text replacement completed.")
 
 
@@ -86,7 +100,7 @@ def clean_db(bookId):
 
 
 def clean_post_process():
-    for book in book_details.find({"status": "post_process"}).limit(50):
+    for book in book_details.find({"status": "post_process"}).limit(40):
         bookId = book["bookId"]
         print(bookId)
         clean_db(bookId)
@@ -169,15 +183,47 @@ def get_nougat_not_extracted():
                 print(f"not extracted : {ne}")
 
 
+def calculate_time_taken_for_books():
+    from datetime import datetime
+    st_time = None
+    end_time = None
+    count = 0
+    total_pages = 0
+    datetime_format = "%d-%m-%Y %H:%M:%S"
+    for book in book_details.find({"time_taken": {"$exists": True}}):
+        # print(count)
+        # print(book["bookId"])
+        total_pages += book["num_pages"]
+        if st_time is None:
+            st_time = book["start_time"]
+        if end_time is None:
+            end_time = book["end_time"]
+        sto = datetime.strptime(st_time, datetime_format)
+        eto = datetime.strptime(end_time, datetime_format)
+        bsto = datetime.strptime(book["start_time"], datetime_format)
+        beto = datetime.strptime(book["end_time"], datetime_format)
+        if bsto <= sto:
+            st_time = bsto.strftime(datetime_format)
+        if beto >= eto:
+            end_time = beto.strftime(datetime_format)
+        count += 1
+    total_sec = (datetime.strptime(end_time, datetime_format) - datetime.strptime(st_time, datetime_format)).total_seconds()
+    print("total books extracted >>> ", count)
+    print("total pages extracted >>> ", total_pages)
+    print("total time taken >>> ", total_sec)
+    print("books extracted per min >>> ", (total_sec/60)/count)
+    print("time taken to extract 1 page >>> ", total_pages/total_sec)
+
 if __name__ == "__main__":
     # get_nougat_not_extracted()
     remove_duplicates()
-    delete_wrong_tables()
+    for i in range(0,5):
+        delete_wrong_tables()
 
     #############################################
     # To clean db for fully extracted books
     #############################################
-    clean_post_process()
+    # clean_post_process()
 
     #############################################
     # To clean db for partially extracted books

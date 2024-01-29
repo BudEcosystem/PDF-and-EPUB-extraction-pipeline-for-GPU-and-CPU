@@ -36,7 +36,7 @@ def process_book(ch, method, properties, body):
         if book_data and book_data["status"] == "processing":
             raise Exception("Book is already being processed")
 
-        current_time = datetime.now().strftime("%H:%M:%S")
+        current_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
         print(current_time)
         book_details.update_one(
             {"bookId": book_id},
@@ -84,6 +84,7 @@ def process_book(ch, method, properties, body):
                     "$set": {
                         # "split_book_paths": split_book_paths,
                         "num_pages": num_pages,
+                        # "check_accuracy": True
                     }
                 },
             )
@@ -120,6 +121,7 @@ def process_page(page_num, pdf_book, book_folder):
     page_images_folder_path = os.path.join(book_folder, "pages")
     os.makedirs(page_images_folder_path, exist_ok=True)
     book_image = page_image.get_pixmap(matrix=fitz.Matrix(300 / 72, 300 / 72))
+    # book_image = page_image.get_pixmap()
     image_path = os.path.join(page_images_folder_path, f"page_{page_num}.jpg")
     if not os.path.exists(image_path):
         book_image.save(image_path)

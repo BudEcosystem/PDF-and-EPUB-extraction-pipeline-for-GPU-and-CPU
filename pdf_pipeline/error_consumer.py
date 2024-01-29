@@ -10,6 +10,7 @@ connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
 error_collection = get_mongo_collection('error_collection')
+book_details = get_mongo_collection('book_details')
 
 def store_errors(ch, method, properties, body):
     try:
@@ -17,7 +18,27 @@ def store_errors(ch, method, properties, body):
         bookId = message["bookId"]
         error = message["error"]
         error_doc = error_collection.find_one({"bookId": bookId})
-        if error_doc:
+        consumer = error["consumer"]
+        print(bookId)
+        print(consumer)
+        if consumer == "pdf_processing_queue" and error["error"] == "Book is already being processed":
+            pass
+        elif consumer == "book_completion_queue":
+            pass
+        elif consumer == "pdf_processing_queue":
+            doc_keys = ["start_time", "book_path"]
+            book_details.update_one(
+                {"bookId": bookId},
+                {
+                    "$set": {
+                        "status": "errored",
+                        "error": error["error"]
+                    },
+                    "$unset": {key: "" for key in doc_keys}
+                }
+            )
+            print(f"Updated status of existing document for bookId: {bookId}")
+        elif error_doc:
             # If the document exists, update the errors array
             error_collection.update_one(
                 {'bookId': bookId},

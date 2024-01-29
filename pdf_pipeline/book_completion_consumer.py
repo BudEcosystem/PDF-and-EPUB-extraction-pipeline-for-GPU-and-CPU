@@ -109,10 +109,13 @@ def book_complete(ch, method, properties, body):
                 "pages": sorted_pages,
             }
             books.insert_one(new_document)
-            current_time = datetime.now().strftime("%H:%M:%S")
+            current_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+            start_time = datetime.strptime(book_det["start_time"], "%d-%m-%Y %H:%M:%S")
+            end_time = datetime.strptime(current_time, "%d-%m-%Y %H:%M:%S")
+            total_time_taken = (end_time - start_time).total_seconds()
             book_details.update_one(
                 {"bookId": bookId},
-                {"$set": {"status": "post_process", "end_time": current_time}},
+                {"$set": {"status": "post_process", "end_time": current_time, "time_taken": total_time_taken}},
             )
             book_folder = os.path.dirname(book_path)
             if os.path.exists(book_folder):
