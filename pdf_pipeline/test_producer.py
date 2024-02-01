@@ -128,6 +128,6 @@ if __name__ == "__main__":
         # nougat_pdf_queue_test_bc_test('book_completion_queue')
         # re_queue_error(bookId)
         # nougat_pdf_queue_test(bookId, 398, None, "book-set-2/d451b0398df04aeaa95c73c6982c82f5/pages/page_398.jpg")
-        requeue_error("ptm_queue")
+        requeue_error("text_pages_queue")
     except KeyboardInterrupt:
         pass

@@ -50,13 +50,19 @@ def extract_other_pages(ch, method, properties, body):
             send_to_queue("book_completion_queue", bookId)
             return
         page_obj = process_page(message, bookId)
-        other_pages.find_one_and_update(
+        # other_pages.find_one_and_update(
+        #     {
+        #         "bookId": bookId,
+        #         "pages": {"$not": {"$elemMatch": {"page_num": page_obj["page_num"]}}},
+        #     },
+        #     {"$addToSet": {"pages": page_obj}},
+        #     upsert=True,
+        # )
+        other_pages.insert_one(
             {
                 "bookId": bookId,
-                "pages": {"$not": {"$elemMatch": {"page_num": page_obj["page_num"]}}},
-            },
-            {"$addToSet": {"pages": page_obj}},
-            upsert=True,
+                "pages": [page_obj]
+            }
         )
         send_to_queue("book_completion_queue", bookId)
     except Exception as e:

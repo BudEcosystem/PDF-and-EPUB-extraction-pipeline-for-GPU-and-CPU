@@ -3,6 +3,7 @@
 from dotenv import load_dotenv
 import traceback
 import shutil
+import bson
 
 from utils import timeit
 
@@ -16,7 +17,7 @@ from utils import get_mongo_collection, get_rabbitmq_connection, get_channel
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
 
-books = get_mongo_collection("libgen_data")
+books = get_mongo_collection("libgen_data_2")
 index_name = "index_bookId"
 indexes_info = books.list_indexes()
 index_exists = any(index_info["name"] == index_name for index_info in indexes_info)
@@ -31,6 +32,9 @@ book_images = get_mongo_collection("book_images")
 text_pages = get_mongo_collection("text_pages")
 
 QUEUE_NAME = "book_completion_queue"
+
+MAX_BSON_SIZE = 16777216  # 16MB
+BOOK_SPLIT_SIZE = 1000
 
 
 def get_unique_pages(original_list):
@@ -108,14 +112,30 @@ def book_complete(ch, method, properties, body):
                 "book": book_name,
                 "pages": sorted_pages,
             }
-            books.insert_one(new_document)
+            document_size = len(bson.BSON.encode(new_document))
+            splits = 1
+            if document_size >= MAX_BSON_SIZE:
+                # make extracted book splits
+                # Split the 'pages' array into batches
+                page_batches = [sorted_pages[i:i + BOOK_SPLIT_SIZE] for i in range(0, len(sorted_pages), BOOK_SPLIT_SIZE)]
+                splits = len(page_batches)
+                for i, batch in enumerate(page_batches):
+                    batch_doc = {
+                        "bookId": bookId,
+                        "book": book_name,
+                        "split_order": i + 1,
+                        "pages": batch
+                    }
+                    books.insert_one(batch_doc)
+            else:
+                books.insert_one(new_document)
             current_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
             start_time = datetime.strptime(book_det["start_time"], "%d-%m-%Y %H:%M:%S")
             end_time = datetime.strptime(current_time, "%d-%m-%Y %H:%M:%S")
             total_time_taken = (end_time - start_time).total_seconds()
             book_details.update_one(
                 {"bookId": bookId},
-                {"$set": {"status": "post_process", "end_time": current_time, "time_taken": total_time_taken}},
+                {"$set": {"status": "post_process", "end_time": current_time, "time_taken": total_time_taken, "splits": splits}},
             )
             book_folder = os.path.dirname(book_path)
             if os.path.exists(book_folder):

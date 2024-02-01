@@ -43,20 +43,20 @@ def extract_text(ch, method, properties, body):
             send_to_queue("book_completion_queue", bookId)
             return
         page_obj = process_page(message, bookId)
-        text_pages.find_one_and_update(
-            {
-                "bookId": bookId,
-                "pages": {"$not": {"$elemMatch": {"page_num": page_obj["page_num"]}}},
-            },
-            {"$addToSet": {"pages": page_obj}},
-            upsert=True,
-        )
-        # text_pages.insert_one(
+        # text_pages.find_one_and_update(
         #     {
         #         "bookId": bookId,
-        #         "pages": [page_obj]
-        #     }
+        #         "pages": {"$not": {"$elemMatch": {"page_num": page_obj["page_num"]}}},
+        #     },
+        #     {"$addToSet": {"pages": page_obj}},
+        #     upsert=True,
         # )
+        text_pages.insert_one(
+            {
+                "bookId": bookId,
+                "pages": [page_obj]
+            }
+        )
         # document = text_pages.find_one({"bookId": bookId})
         # if document:
         #     text_pages.update_one(

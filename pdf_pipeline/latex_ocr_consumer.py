@@ -51,13 +51,19 @@ def extract_latex_pages(ch, method, properties, body):
             send_to_queue("book_completion_queue", bookId)
             return
         page_obj = process_page(message, bookId)
-        latex_pages.find_one_and_update(
+        # latex_pages.find_one_and_update(
+        #     {
+        #         "bookId": bookId,
+        #         "pages": {"$not": {"$elemMatch": {"page_num": page_obj["page_num"]}}},
+        #     },
+        #     {"$addToSet": {"pages": page_obj}},
+        #     upsert=True,
+        # )
+        latex_pages.insert_one(
             {
                 "bookId": bookId,
-                "pages": {"$not": {"$elemMatch": {"page_num": page_obj["page_num"]}}},
-            },
-            {"$addToSet": {"pages": page_obj}},
-            upsert=True,
+                "pages": [page_obj]
+            }
         )
         # document = latex_pages.find_one({"bookId": bookId})
         # if document:

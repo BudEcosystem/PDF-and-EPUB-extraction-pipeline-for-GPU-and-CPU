@@ -4,8 +4,8 @@ import pymongo
 from utils import get_mongo_collection
 from pdf_pipeline.pdf_producer import send_to_queue
 
-
-book_set_2 = get_mongo_collection("libgen_data")
+libgen_data = get_mongo_collection("libgen_data")
+book_set_2 = get_mongo_collection("libgen_data_2")
 book_images = get_mongo_collection("book_images")
 table_collection = get_mongo_collection("table_collection")
 book_details = get_mongo_collection("book_details")
@@ -26,56 +26,57 @@ def delete_wrong_tables():
     error_ids = []
     for book in book_details.find({"status": "post_process"}).limit(40):
         bookId = book["bookId"]
-        document = book_set_2.find_one({"bookId": bookId})
-        print(f"BookId :: {document['bookId']}")
-        for page in document["pages"]:
-            if bookId in error_ids:
-                continue
-            page_num = page["page_num"]
-            # print(f"page number :: {page_num}")
-            text = page["text"]
-            if text:
-                # Search for the pattern '{{table:someid}}'
-                matches = re.findall(r"\{\{table:(\w+)\}\}", text)
-                # print(f"Matches :: {matches}")
-                if matches:
-                    for table_id in matches:
-                        # table_id = int(table_id_match, 16)
-                        # print(f"Table ID :: {table_id}")
-                        table_present = False
-                        table_details = table_collection.find_one({"tableId": table_id})
-                        if table_details:
-                            table_data = table_details.get("table_data", {})
-                            if table_data:
-                                try:
-                                    book_set_2.update_one(
-                                        {
-                                            "_id": document["_id"],
-                                            "pages.page_num": page_num,
-                                        },
-                                        {"$addToSet": {"pages.$.tables": table_data}},
-                                    )
-                                except pymongo.errors.WriteError:
-                                    error_ids.append(bookId)
-                                    continue
-                                table_present = True
-                        # Check if the tableId is present in the tables array
-                        if not table_present and (
-                            not any(
-                                table.get("id", "") == table_id
-                                for table in page["tables"]
-                            )
-                        ):
-                            # Replace the pattern with an empty string
-                            text = text.replace(f"{{{{table:{table_id}}}}}", "")
-                            # print(text)
-                            # Update the text field in the current page
-                            book_set_2.update_one(
-                                {"_id": document["_id"], "pages.page_num": page_num},
-                                {
-                                    "$set": {"pages.$.text": text},
-                                },
-                            )
+        for document in book_set_2.find({"bookId": bookId}):
+            print(f"BookId :: {document['bookId']}")
+            for page in document["pages"]:
+                if bookId in error_ids:
+                    continue
+                page_num = page["page_num"]
+                # print(f"page number :: {page_num}")
+                text = page["text"]
+                if text:
+                    # Search for the pattern '{{table:someid}}'
+                    matches = re.findall(r"\{\{table:(\w+)\}\}", text)
+                    # print(f"Matches :: {matches}")
+                    if matches:
+                        for table_id in matches:
+                            # table_id = int(table_id_match, 16)
+                            # print(f"Table ID :: {table_id}")
+                            table_present = False
+                            table_details = table_collection.find_one({"tableId": table_id})
+                            if table_details:
+                                table_data = table_details.get("table_data", {})
+                                if table_data:
+                                    try:
+                                        book_set_2.update_one(
+                                            {
+                                                "_id": document["_id"],
+                                                "pages.page_num": page_num,
+                                            },
+                                            {"$addToSet": {"pages.$.tables": table_data}},
+                                        )
+                                    except pymongo.errors.WriteError:
+                                        print("continuing pymongo write error")
+                                        error_ids.append(bookId)
+                                        continue
+                                    table_present = True
+                            # Check if the tableId is present in the tables array
+                            if not table_present and (
+                                not any(
+                                    table.get("id", "") == table_id
+                                    for table in page["tables"]
+                                )
+                            ):
+                                # Replace the pattern with an empty string
+                                text = text.replace(f"{{{{table:{table_id}}}}}", "")
+                                # print(text)
+                                # Update the text field in the current page
+                                book_set_2.update_one(
+                                    {"_id": document["_id"], "pages.page_num": page_num},
+                                    {
+                                        "$set": {"pages.$.text": text},
+                                    },
+                                )
         if bookId in error_ids:
             continue
         clean_db(bookId)
@@ -138,7 +139,12 @@ def duplicate_collection():
 def remove_duplicates():
     # Aggregate duplicates
     pipeline = [
-        {"$group": {"_id": "$bookId", "duplicates": {"$addToSet": "$_id"}, "count": {"$sum": 1}}},
+        {"$group": {
+            "_id": {"bookId": "$bookId", "split_order": {"$ifNull": ["$split_order", None]}},
+            "duplicates": {"$addToSet": "$_id"},
+            "count": {"$sum": 1}
+            }
+        },
         {"$match": {"count": {"$gt": 1}}}
     ]
     duplicates = list(book_set_2.aggregate(pipeline))

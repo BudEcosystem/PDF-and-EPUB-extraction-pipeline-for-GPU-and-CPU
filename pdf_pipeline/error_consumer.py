@@ -23,7 +23,7 @@ def store_errors(ch, method, properties, body):
         print(consumer)
         if consumer == "pdf_processing_queue" and error["error"] == "Book is already being processed":
             pass
-        elif consumer == "book_completion_queue":
+        elif consumer == "book_completion_queue" and not error["error"].startswith("BSON document too large"):
             pass
         elif consumer == "pdf_processing_queue":
             doc_keys = ["start_time", "book_path"]
