@@ -114,7 +114,7 @@ pip install package_name
 
 DOCKER commands:
 cd pdf_extraction_pipeline
-sudo docker build --build-arg YOUR_ENV=dev -t pdf-pipeline .
+sudo docker build --build-arg YOUR_ENV=dev --build-arg GIT_TOKEN=<token> -t pdf-pipeline .
 sudo docker run -v $(pwd):/src -it -d —gpu all pdf-pipeline python3 -m pdf_pipeline.pdf_producer
 sudo docker run -v $(pwd):/src --rm --gpus all -it pdf-pipeline:latest python3 -m pdf_pipeline.pdf_consumer
 sudo docker run -v $(pwd):/src --rm --gpus all -it pdf-pipeline:latest python3 -m pdf_pipeline.ptm_consumer
