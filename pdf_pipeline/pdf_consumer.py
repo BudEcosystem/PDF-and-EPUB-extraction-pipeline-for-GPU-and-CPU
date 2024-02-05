@@ -24,6 +24,7 @@ channel = get_channel(connection)
 book_details = get_mongo_collection("book_details")
 figure_caption = get_mongo_collection("figure_caption")
 
+PTM_BATCH_SIZE = int(os.environ["PTM_BATCH_SIZE"])
 
 @timeit
 def process_book(ch, method, properties, body):
@@ -94,10 +95,23 @@ def process_book(ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)
         
         pdf_book = fitz.open(book_path)
-        for page_num in range(1, num_pages + 1):
-            # split_path = find_split_path(split_book_paths, page_num)
-            # process_page(page_num, pdf_book, book_folder, split_path)
-            process_page(page_num, pdf_book, book_folder)
+        # for page_num in range(1, num_pages + 1):
+        #     # split_path = find_split_path(split_book_paths, page_num)
+        #     # process_page(page_num, pdf_book, book_folder, split_path)
+        #     process_page(page_num, pdf_book, book_folder)
+
+        book_id = book_folder.split("/")[-1]
+        page_images_folder_path = os.path.join(book_folder, "pages")
+        os.makedirs(page_images_folder_path, exist_ok=True)
+        for i in range(0, num_pages, PTM_BATCH_SIZE):
+            page_nums = list(range(i+1, i + PTM_BATCH_SIZE + 1))
+            image_paths, page_numbers = process_pages(page_nums, pdf_book.pages(i, i+PTM_BATCH_SIZE), page_images_folder_path)
+            queue_msg = {
+                "page_num": page_numbers,
+                "bookId": book_id,
+                "image_path": image_paths,
+            }
+            send_to_queue("ptm_queue", queue_msg)
     except Exception as e:
         print(traceback.format_exc())
         error = {
@@ -110,6 +124,20 @@ def process_book(ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)
     # finally:
     #     ch.basic_ack(delivery_tag=method.delivery_tag)
+
+def process_pages(page_nums, pdf_book, page_images_folder_path):
+    image_paths = []
+    page_numbers = []
+    for i, pdf_page in enumerate(pdf_book):
+        page_num = page_nums[i]
+        page_numbers.append(page_num)
+        img_path = os.path.join(page_images_folder_path, f"page_{page_num}.png")
+        book_image = pdf_page.get_pixmap(dpi=300)
+        if not os.path.exists(img_path):
+            book_image.pil_save(img_path)
+        absolute_image_path = os.path.abspath(img_path)
+        image_paths.append(absolute_image_path)
+    return image_paths, page_numbers
 
 
 @timeit

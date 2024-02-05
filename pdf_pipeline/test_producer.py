@@ -5,6 +5,7 @@ import json
 from utils import get_rabbitmq_connection, get_channel, get_mongo_collection
 
 error_collection = get_mongo_collection("error_collection")
+book_details = get_mongo_collection("book_details")
 
 
 def nougat_pdf_queue_test(bookId, page_num, split_num, image_path, queue_name="nougat_queue"):
@@ -103,10 +104,19 @@ def requeue_error(error_filter=None):
         if errors:
             connection = get_rabbitmq_connection()
             channel = get_channel(connection)
+            split_ids = []
             for error in errors:
                 queue_name = error["consumer"]
-                channel.queue_declare(queue=queue_name)
                 queue_message = error["consumer_message"]
+                if queue_name == "nougat_queue":
+                    split_id = queue_message.get("split_id", None)
+                    if split_id and split_id not in split_ids:
+                        book_details.find_one_and_update(
+                            {"bookId": bookId},
+                            {"$pull": {"processing_nougat_split": split_id}}
+                        )
+                        split_ids.append(split_id)
+                channel.queue_declare(queue=queue_name)
                 channel.basic_publish(
                     exchange="", routing_key=queue_name, body=json.dumps(queue_message)
                 )
@@ -128,6 +138,6 @@ if __name__ == "__main__":
         # nougat_pdf_queue_test_bc_test('book_completion_queue')
         # re_queue_error(bookId)
         # nougat_pdf_queue_test(bookId, 398, None, "book-set-2/d451b0398df04aeaa95c73c6982c82f5/pages/page_398.jpg")
-        requeue_error("text_pages_queue")
+        requeue_error("nougat_queue")
     except KeyboardInterrupt:
         pass

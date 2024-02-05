@@ -13,7 +13,8 @@ from utils import (
     get_mongo_collection,
     generate_unique_id,
     get_rabbitmq_connection,
-    get_channel
+    get_channel,
+    get_unique_pages
 )
 
 load_dotenv()
@@ -93,10 +94,15 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
             _ = get_nougat_extraction(pdf_path, api_data)
             if os.path.exists(pdf_path):
                 os.remove(pdf_path)
-            n_pages = nougat_pages_collection.find_one({"bookId": bookId})
-            pages = n_pages.get('pages', {})
+            n_pages = nougat_pages_collection.find({"bookId": bookId})
+            pages = []
+            for np_doc in n_pages:
+                pgs = np_doc.get('pages', [])
+                if pgs:
+                    pages.extend(pgs)
+            pages = get_unique_pages(pages)
             if pages:
-                pages_extracted = len(list(pages.keys()))
+                pages_extracted = len(pages)
                 book_details.find_one_and_update(
                     {"bookId": bookId},
                     {

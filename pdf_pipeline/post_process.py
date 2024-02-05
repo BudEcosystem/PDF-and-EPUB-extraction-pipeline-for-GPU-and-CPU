@@ -173,7 +173,7 @@ def get_nougat_not_extracted():
                     ns[last_split_id].append({
                         "bookId": bookId,
                         "page_num": page_num,
-                        "image_path": f"/src/libgen_data/{bookId}/pages/page_{page_num}.jpg"
+                        "image_path": f"/src/libgen_data/{bookId}/pages/page_{page_num}.png"
                     })
                 book_details.update_one(
                     {"bookId": bookId},
@@ -183,7 +183,7 @@ def get_nougat_not_extracted():
                 send_to_queue("nougat_queue", {
                     "bookId": bookId,
                     "page_num": ne[0],
-                    "image_path": f"/src/libgen_data/{bookId}/pages/page_{ne[0]}.jpg"
+                    "image_path": f"/src/libgen_data/{bookId}/pages/page_{ne[0]}.png"
                 })
                 print(f"BookId : {bookId}")
                 print(f"not extracted : {ne}")
@@ -219,6 +219,7 @@ def calculate_time_taken_for_books():
     print("total time taken >>> ", total_sec)
     print("books extracted per min >>> ", (total_sec/60)/count)
     print("time taken to extract 1 page >>> ", total_pages/total_sec)
+
 
 if __name__ == "__main__":
     # get_nougat_not_extracted()

@@ -12,7 +12,7 @@ import os
 import json
 from datetime import datetime
 from pdf_pipeline.pdf_producer import error_queue
-from utils import get_mongo_collection, get_rabbitmq_connection, get_channel
+from utils import get_mongo_collection, get_rabbitmq_connection, get_channel, get_unique_pages
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
@@ -36,16 +36,6 @@ QUEUE_NAME = "book_completion_queue"
 MAX_BSON_SIZE = 16777216  # 16MB
 BOOK_SPLIT_SIZE = 1000
 
-
-def get_unique_pages(original_list):
-    unique_values = set()
-    result_list = []
-    if original_list:
-        for item in original_list:
-            if (item['page_num'] not in unique_values):
-                unique_values.add(item['page_num'])
-                result_list.append(item)
-    return result_list
 
 @timeit
 def book_complete(ch, method, properties, body):
@@ -91,15 +81,28 @@ def book_complete(ch, method, properties, body):
         if (num_pages_done + num_nougat_pages_done) >= num_pages:
             book_completed = True
         if book_completed:
-            nougat_pages_document = nougat_pages.find_one({"bookId": bookId})
+            # nougat_pages_document = nougat_pages.find_one({"bookId": bookId})
             nougat_pages_result = []
-            nougat_pages_result_dict = (
-                nougat_pages_document.get("pages", []) if nougat_pages_document else []
-            )
-            if nougat_pages_result_dict:
-                nougat_pages_result = [
-                    result for _, result in nougat_pages_result_dict.items()
-                ]
+            # nougat_pages_result_dict = (
+            #     nougat_pages_document.get("pages", []) if nougat_pages_document else []
+            # )
+            # if nougat_pages_result_dict:
+            #     nougat_pages_result = [
+            #         result for _, result in nougat_pages_result_dict.items()
+            #     ]
+            for doc in nougat_pages.find({"bookId": bookId}):
+                doc_result = doc.get("pages", [])
+                if doc_result:
+                    if isinstance(doc_result, list):
+                        nougat_pages_result.extend(doc_result)
+                    else:
+                        pages_result = [
+                            result for _, result in doc_result.items()
+                        ]
+                        nougat_pages_result.extend(pages_result)
+
+
+            nougat_pages_result = get_unique_pages(nougat_pages_result)
             all_pages = (
                 other_pages_result
                 + nougat_pages_result

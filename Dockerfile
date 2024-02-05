@@ -5,6 +5,7 @@ RUN apt-get install -y python3.11
 RUN apt-get -y install python3-pip
 
 ARG YOUR_ENV
+ARG GIT_TOKEN
 
 ENV YOUR_ENV=${YOUR_ENV} \
   PYTHONFAULTHANDLER=1 \
@@ -19,12 +20,15 @@ ENV YOUR_ENV=${YOUR_ENV} \
 RUN pip3 install "poetry==$POETRY_VERSION"
 
 # change command to CUDA version of system
-RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
 # install pytesseract
+RUN apt-get update
 RUN apt install -y tesseract-ocr libtesseract-dev git libgl1-mesa-glx
 
-RUN pip3 install "git+https://github.com/facebookresearch/detectron2.git@v0.5#egg=detectron2"
+# RUN pip3 install "git+https://github.com/facebookresearch/detectron2.git@v0.5#egg=detectron2"
+
+# RUN pip3 install "git+https://${GIT_TOKEN}@github.com/DevBud-ai/docxtract.git"
 
 RUN mkdir src
 WORKDIR /src
@@ -33,6 +37,10 @@ COPY poetry.lock pyproject.toml /src/
 # Project initialization:
 RUN poetry config virtualenvs.create false \
     && poetry install $(test "$YOUR_ENV" == production && echo "--no-dev") --no-interaction --no-ansi
+
+# change command to CUDA version of system
+RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+RUN pip3 install --no-cache-dir "git+https://${GIT_TOKEN}@github.com/DevBud-ai/docxtract.git"
 
 # copy project files
 COPY . /src

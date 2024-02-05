@@ -6,6 +6,7 @@ import pika
 import cv2
 import boto3
 import pymongo
+import torch
 from PyPDF2 import PdfWriter, PdfReader
 from uuid import uuid4
 from dotenv import load_dotenv
@@ -295,6 +296,26 @@ def upload_to_aws_s3(image_path, image_id):
     image_url = f"https://{bucket_name}.s3.amazonaws.com/{s3_key}"
     return image_url
 
+
+def get_gpu_device_id():
+    if torch.cuda.is_available():
+        # Get the GPU device ID
+        device_id = torch.cuda.current_device()
+        return device_id
+    else:
+        print("GPU is not available.")
+        return None
+
+
+def get_unique_pages(original_list):
+    unique_values = set()
+    result_list = []
+    if original_list:
+        for item in original_list:
+            if (int(item['page_num']) not in unique_values):
+                unique_values.add(item['page_num'])
+                result_list.append(item)
+    return result_list
 
 if __name__ == "__main__":
     BOOK_ID = "123"
