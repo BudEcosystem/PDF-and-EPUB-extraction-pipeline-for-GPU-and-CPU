@@ -1,27 +1,27 @@
 version: '3.8'
 
 services:
-  nougat_api_server:
-    image: nougat_api_server:latest
-    ports:
-      - "8403-8405:8503"
-    networks:
-      - my_network
-    volumes:
-      - /home/developer/prakash/nougat:/bud-nougat
-    healthcheck:
-      test: wget --no-verbose -O /dev/null --tries=1 http://localhost:8503/ || exit 1
-      interval: 10s
-      timeout: 5s
-      start_period: 30s
-    deploy:
-      replicas: 3
-      resources:
-          reservations:
-            devices:
-              - driver: nvidia
-                device_ids: ['0', '1', '2']
-                capabilities: [gpu]
+  # nougat_api_server:
+  #   image: nougat_api_server:latest
+  #   ports:
+  #     - "8403-8405:8503"
+  #   networks:
+  #     - my_network
+  #   volumes:
+  #     - /home/developer/prakash/nougat:/bud-nougat
+  #   healthcheck:
+  #     test: wget --no-verbose -O /dev/null --tries=1 http://localhost:8503/ || exit 1
+  #     interval: 10s
+  #     timeout: 5s
+  #     start_period: 30s
+  #   deploy:
+  #     replicas: 3
+  #     resources:
+  #         reservations:
+  #           devices:
+  #             - driver: nvidia
+  #               device_ids: ['0', '1', '2']
+  #               capabilities: [gpu]
   
   # producer:
   #   image: pdf-pipeline:latest
@@ -45,9 +45,9 @@ services:
       - my_network
     volumes:
       - /home/developer/prakash/pdf_extraction_pipeline:/src
-    depends_on:
-      nougat_api_server:
-        condition: service_healthy
+    # depends_on:
+    #   nougat_api_server:
+    #     condition: service_healthy
       # nougat_api_server_2:
         # condition: service_healthy
     deploy:
@@ -61,9 +61,9 @@ services:
       - my_network
     volumes:
       - /home/developer/prakash/pdf_extraction_pipeline:/src
-    depends_on:
-      nougat_api_server:
-        condition: service_healthy
+    # depends_on:
+    #   nougat_api_server:
+    #     condition: service_healthy
       # nougat_api_server_2:
       #   condition: service_healthy
     deploy:
@@ -83,9 +83,9 @@ services:
       - my_network
     volumes:
       - /home/developer/prakash/pdf_extraction_pipeline:/src
-    depends_on:
-      nougat_api_server:
-        condition: service_healthy
+    # depends_on:
+    #   nougat_api_server:
+    #     condition: service_healthy
       # nougat_api_server_2:
       #   condition: service_healthy
     deploy:
@@ -105,9 +105,9 @@ services:
       - my_network
     volumes:
       - /home/developer/prakash/pdf_extraction_pipeline:/src
-    depends_on:
-      nougat_api_server:
-        condition: service_healthy
+    # depends_on:
+    #   nougat_api_server:
+    #     condition: service_healthy
       # nougat_api_server_2:
       #   condition: service_healthy
     deploy:
@@ -121,9 +121,9 @@ services:
       - my_network
     volumes:
       - /home/developer/prakash/pdf_extraction_pipeline:/src
-    depends_on:
-      nougat_api_server:
-        condition: service_healthy
+    # depends_on:
+    #   nougat_api_server:
+    #     condition: service_healthy
       # nougat_api_server_2:
       #   condition: service_healthy
     deploy:
@@ -143,9 +143,9 @@ services:
       - my_network
     volumes:
       - /home/developer/prakash/pdf_extraction_pipeline:/src
-    depends_on:
-      nougat_api_server:
-        condition: service_healthy
+    # depends_on:
+    #   nougat_api_server:
+    #     condition: service_healthy
       # nougat_api_server_2:
       #   condition: service_healthy
     deploy:
@@ -159,9 +159,9 @@ services:
       - my_network
     volumes:
       - /home/developer/prakash/pdf_extraction_pipeline:/src
-    depends_on:
-      nougat_api_server:
-        condition: service_healthy
+    # depends_on:
+    #   nougat_api_server:
+    #     condition: service_healthy
       # nougat_api_server_2:
       #   condition: service_healthy
     deploy:
@@ -176,16 +176,22 @@ services:
   nougat_pages:
     image: pdf-pipeline:latest
     working_dir: /src
-    command: python3 -m pdf_pipeline.nougat_consumer "http://nougat_api_server:8503/predict/"
+    command: python3 -m pdf_pipeline.nougat_consumer
     networks:
       - my_network
     volumes:
       - /home/developer/prakash/pdf_extraction_pipeline:/src
-    depends_on:
-      nougat_api_server:
-        condition: service_healthy
+    # depends_on:
+    #   nougat_api_server:
+    #     condition: service_healthy
     deploy:
-      replicas: 3
+      replicas: 4
+      resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                device_ids: ['2']
+                capabilities: [gpu]
 
   bud_ocr:
     image: pdf-pipeline:latest
@@ -195,9 +201,9 @@ services:
       - my_network
     volumes:
       - /home/developer/prakash/pdf_extraction_pipeline:/src
-    depends_on:
-      nougat_api_server:
-        condition: service_healthy
+    # depends_on:
+    #   nougat_api_server:
+    #     condition: service_healthy
       # nougat_api_server_2:
       #   condition: service_healthy
     deploy:
@@ -211,9 +217,9 @@ services:
       - my_network
     volumes:
       - /home/developer/prakash/pdf_extraction_pipeline:/src
-    depends_on:
-      nougat_api_server:
-        condition: service_healthy
+    # depends_on:
+    #   nougat_api_server:
+    #     condition: service_healthy
       # nougat_api_server_2:
       #   condition: service_healthy
     deploy:
