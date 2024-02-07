@@ -3,19 +3,25 @@
 import sys
 from utils import timeit
 import os
+import regex as re
 import requests
-import img2pdf
+# import img2pdf
 import traceback
 import json
 from dotenv import load_dotenv
+from PIL import Image
+Image.MAX_IMAGE_PIXELS = None
 from pdf_pipeline.pdf_producer import send_to_queue, error_queue
 from utils import (
     get_mongo_collection,
     generate_unique_id,
     get_rabbitmq_connection,
     get_channel,
-    get_unique_pages
+    get_unique_pages,
+    get_gpu_device_id
 )
+from docxtract import NougatOCRPipeline
+from pdf_pipeline.element_extraction_utils import latext_to_text_to_speech
 
 load_dotenv()
 
@@ -29,6 +35,12 @@ NOUGAT_BATCH_SIZE = int(os.environ["NOUGAT_BATCH_SIZE"])
 book_details = get_mongo_collection('book_details')
 nougat_pages_collection = get_mongo_collection('nougat_pages')
 
+device_id = get_gpu_device_id()
+
+pipe = NougatOCRPipeline.from_pretrained(
+        pretrained_model_name_or_path="small", device=f"cuda:{device_id}", precision="bf16"
+    )
+
 @timeit
 def extract_text_equation_with_nougat(ch, method, properties, body):
     message = json.loads(body)
@@ -40,7 +52,7 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
     try:
         process_remaining_pages = False
         book = book_details.find_one({"bookId": bookId})
-        if book["status"] == "extracted":
+        if book["status"] in ["extracted", "post_process"]:
             return
         nougat_splits = book['nougat_splits']
 
@@ -66,34 +78,30 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
                 image_paths = [image_path]
             else:
                 image_paths = [page["image_path"] for page in nougat_pages]
-            # local_image_paths = []
-            # for img_path in image_paths:
-            #     # will return image_str form db
-            #     image_str = generate_image_str(bookId, img_path)
-            #     local_image_paths.append(create_image_from_str(image_str))
-            #     # pages_extracted += 1
 
-            pdf_path = os.path.abspath(f"{generate_unique_id()}.pdf")
-            with open(pdf_path, "wb") as f_pdf:
-                # f_pdf.write(img2pdf.convert(local_image_paths))
-                f_pdf.write(img2pdf.convert(image_paths))
-
-            # clean up local images created for pdf creation
-            # for img_path in local_image_paths:
-            #     abs_path = os.path.abspath(img_path)
-            #     os.remove(abs_path)
+            # pdf_path = os.path.abspath(f"{generate_unique_id()}.pdf")
+            # with open(pdf_path, "wb") as f_pdf:
+            #     f_pdf.write(img2pdf.convert(image_paths))
 
             if not page_present_in_split:
                 page_nums = [page_num]
             else:
                 page_nums = [page["page_num"] for page in nougat_pages]
-            api_data = {
-                "bookId": bookId,
-                "page_nums": page_nums
-            }
-            _ = get_nougat_extraction(pdf_path, api_data)
-            if os.path.exists(pdf_path):
-                os.remove(pdf_path)
+            # api_data = {
+            #     "bookId": bookId,
+            #     "page_nums": page_nums
+            # }
+            # _ = get_nougat_extraction(pdf_path, api_data)
+            # if os.path.exists(pdf_path):
+            #     os.remove(pdf_path)
+            outputs = get_nougat_extraction_optimised(image_paths, page_nums)
+            for page_object in save_nougat_output(outputs, page_nums):
+                nougat_pages_collection.insert_one(
+                    {
+                        "bookId": bookId,
+                        "pages": [page_object]
+                    }
+                )
             n_pages = nougat_pages_collection.find({"bookId": bookId})
             pages = []
             for np_doc in n_pages:
@@ -123,19 +131,48 @@ def extract_text_equation_with_nougat(ch, method, properties, body):
         print("message ack")
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-
-
 @timeit
-def get_nougat_extraction(pdf_path, data):
-    global nougat_api_url
-    files = {'file': (pdf_path, open(pdf_path, 'rb'))}
-    response = requests.post(nougat_api_url, files=files, data=data, timeout=None)
+def get_nougat_extraction_optimised(image_paths, page_nums):
+    images = [Image.open(each) for each in image_paths]
+    outputs = pipe(images=images)
+    return outputs
 
-    if response.status_code == 200:
-        data = response.json()
-        return data
-    else:
-        raise Exception("Out of memory")
+def save_nougat_output(extractions, page_nums):
+    pattern = r'(\\\(.*?\\\)|\\\[.*?\\\])'
+    for i, page_content in enumerate(extractions):
+        page_equations = []
+        def replace_with_uuid(match):
+            equationId = generate_unique_id()
+            match_text = match.group()
+            text_to_speech = latext_to_text_to_speech(match_text)
+            page_equations.append({
+                'id': equationId,
+                'text': match_text,
+                'text_to_speech': text_to_speech
+            })
+            return f'{{{{equation:{equationId}}}}}'
+        page_content = re.sub(pattern, replace_with_uuid, page_content)
+        page_content = re.sub(r'\s+', ' ', page_content).strip()
+        page_object = {
+            "page_num": int(page_nums[i]),
+            "text": page_content,
+            "tables": [],
+            "figures": [],
+            "equations": page_equations
+        }
+        yield page_object
+
+# @timeit
+# def get_nougat_extraction(pdf_path, data):
+#     global nougat_api_url
+#     files = {'file': (pdf_path, open(pdf_path, 'rb'))}
+#     response = requests.post(nougat_api_url, files=files, data=data, timeout=None)
+
+#     if response.status_code == 200:
+#         data = response.json()
+#         return data
+#     else:
+#         raise Exception("Out of memory")
 
 def consume_nougat_pdf_queue():
     channel.basic_qos(prefetch_count=1, global_qos=False)
@@ -147,13 +184,11 @@ def consume_nougat_pdf_queue():
     print(f' [*] Waiting for messages on {QUEUE_NAME}. To exit, press CTRL+C')
     channel.start_consuming()
 
-    
-
 
 if __name__ == "__main__":
     try:
-        nougat_api_url = sys.argv[1]
-        print(f"Nougat consumer connected to {nougat_api_url}")
+        # nougat_api_url = sys.argv[1]
+        # print(f"Nougat consumer connected to {nougat_api_url}")
         consume_nougat_pdf_queue() 
     except KeyboardInterrupt:
         pass

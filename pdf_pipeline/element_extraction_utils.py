@@ -3,7 +3,7 @@ import cv2
 from dotenv import load_dotenv
 import pytesseract
 from PIL import Image
-
+Image.MAX_IMAGE_PIXELS = None
 from pix2tex.cli import LatexOCR
 from latext import latex_to_text
 from utils import (
@@ -156,9 +156,6 @@ def process_equation(equation_block, image_path):
     # res = ""
     try:
         latex_text = model(img)
-        # with open(equation_image_path, "rb") as f:
-        #     data = f.read()
-        # res, elapse = model(data)
     except Exception as e:
         print("error while extracting equation using latex ocr", e)
     text_to_speech = latext_to_text_to_speech(latex_text)
@@ -168,7 +165,7 @@ def process_equation(equation_block, image_path):
     return output, equation
 
 
-@timeit
+# @timeit
 def latext_to_text_to_speech(text):
     text = "${}$".format(text.lstrip("\\"))
     text_to_speech = latex_to_text(text)

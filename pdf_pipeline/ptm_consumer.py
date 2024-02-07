@@ -14,6 +14,7 @@ from utils import (
     get_channel,
     get_gpu_device_id
 )
+Image.MAX_IMAGE_PIXELS = None
 QUEUE_NAME = "ptm_queue"
 
 connection = get_rabbitmq_connection()

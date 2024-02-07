@@ -4,7 +4,7 @@ import traceback
 import pytesseract
 import PIL
 from PIL import Image
-
+Image.MAX_IMAGE_PIXELS = None
 import re
 from utils import (
     timeit,
