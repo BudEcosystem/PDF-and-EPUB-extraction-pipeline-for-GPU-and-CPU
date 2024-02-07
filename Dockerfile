@@ -40,8 +40,8 @@ RUN poetry config virtualenvs.create false \
 
 # change command to CUDA version of system
 RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-RUN pip3 install --no-cache-dir "git+https://${GIT_TOKEN}@github.com/DevBud-ai/docxtract.git"
-
+RUN pip3 install "git+https://${GIT_TOKEN}@github.com/DevBud-ai/docxtract.git"
+RUN pip3 install pillow==9.5.0
 # copy project files
 COPY . /src
 
