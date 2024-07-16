@@ -31,7 +31,9 @@ index_name = "index_bookId_pageNo"
 indexes_info = other_pages.list_indexes()
 index_exists = any(index_info["name"] == index_name for index_info in indexes_info)
 if not index_exists:
-    other_pages.create_index(["bookId", "pages.page_num"], name=index_name, background=True)
+    other_pages.create_index(
+        ["bookId", "pages.page_num"], name=index_name, background=True
+    )
 
 
 @timeit
@@ -58,12 +60,7 @@ def extract_other_pages(ch, method, properties, body):
         #     {"$addToSet": {"pages": page_obj}},
         #     upsert=True,
         # )
-        other_pages.insert_one(
-            {
-                "bookId": bookId,
-                "pages": [page_obj]
-            }
-        )
+        other_pages.insert_one({"bookId": bookId, "pages": [page_obj]})
         send_to_queue("book_completion_queue", bookId)
     except Exception as e:
         print(traceback.format_exc())

@@ -26,6 +26,7 @@ figure_caption = get_mongo_collection("figure_caption")
 
 PTM_BATCH_SIZE = int(os.environ["PTM_BATCH_SIZE"])
 
+
 @timeit
 def process_book(ch, method, properties, body):
     message = json.loads(body)
@@ -93,19 +94,25 @@ def process_book(ch, method, properties, body):
         book_folder = os.path.join(*book_path.split("/")[:-1])
         print(f"{book_name} has total {num_pages} page")
         ch.basic_ack(delivery_tag=method.delivery_tag)
-        
+
         pdf_book = fitz.open(book_path)
         # for page_num in range(1, num_pages + 1):
         #     # split_path = find_split_path(split_book_paths, page_num)
         #     # process_page(page_num, pdf_book, book_folder, split_path)
         #     process_page(page_num, pdf_book, book_folder)
 
-        book_id = book_folder.split("/")[-1]
-        page_images_folder_path = os.path.join(book_folder, "pages")
+        # book_id = book_folder.split("/")[-1]
+        page_images_folder_path = os.path.join(
+            book_folder, "pages", book_path.split("/")[-1].replace(".", "_")
+        )
         os.makedirs(page_images_folder_path, exist_ok=True)
         for i in range(0, num_pages, PTM_BATCH_SIZE):
-            page_nums = list(range(i+1, i + PTM_BATCH_SIZE + 1))
-            image_paths, page_numbers = process_pages(page_nums, pdf_book.pages(i, i+PTM_BATCH_SIZE), page_images_folder_path)
+            page_nums = list(range(i + 1, i + PTM_BATCH_SIZE + 1))
+            image_paths, page_numbers = process_pages(
+                page_nums,
+                pdf_book.pages(i, i + PTM_BATCH_SIZE),
+                page_images_folder_path,
+            )
             queue_msg = {
                 "page_num": page_numbers,
                 "bookId": book_id,
@@ -124,6 +131,7 @@ def process_book(ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)
     # finally:
     #     ch.basic_ack(delivery_tag=method.delivery_tag)
+
 
 def process_pages(page_nums, pdf_book, page_images_folder_path):
     image_paths = []

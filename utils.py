@@ -1,4 +1,5 @@
-""" This module contains the utility functions used in the pipeline. """
+"""This module contains the utility functions used in the pipeline."""
+
 import os
 import time
 from functools import wraps
@@ -10,6 +11,7 @@ import torch
 from PyPDF2 import PdfWriter, PdfReader
 from uuid import uuid4
 from dotenv import load_dotenv
+from pathlib import Path
 
 # sonali: depenedncy for utils currently commented out
 import base64
@@ -103,7 +105,10 @@ def crop_image(block, imagepath, id):
 
     # crop the expanded bounding box
     bbox = img[int(y1) : int(y2), int(x1) : int(x2)]
-    cropped_image_path = os.path.abspath(f"cropped_{id}.png")
+    cropped_image_path = os.path.join(
+        os.path.dirname(imagepath), "sections", f"cropped_{id}.png"
+    )
+    Path(os.path.dirname(cropped_image_path)).mkdir(exist_ok=True, parents=True)
     cv2.imwrite(cropped_image_path, bbox)
 
     return cropped_image_path
@@ -201,19 +206,19 @@ def split_pdf(book_id, local_path):
         return output_file_paths
 
 
-def get_mongo_client():
+def get_mongo_client(connect: bool = None):
     """
     Function to get the mongo client.
     """
-    mongo_client = pymongo.MongoClient(mongo_connection_string)
+    mongo_client = pymongo.MongoClient(mongo_connection_string, connect=connect)
     return mongo_client
 
 
-def get_mongo_collection(collection_name):
+def get_mongo_collection(collection_name, connect: bool = None):
     """
     Function to get the mongo collection.
     """
-    mongo_client = get_mongo_client()
+    mongo_client = get_mongo_client(connect=connect)
     db = mongo_client[mongo_db_name]
     collection = db[collection_name]
     return collection
@@ -238,7 +243,9 @@ def generate_image_str(book_id, image_path, save=True):
     indexes_info = book_images_collection.list_indexes()
     index_exists = any(index_info["name"] == index_name for index_info in indexes_info)
     if not index_exists:
-        book_images_collection.create_index(["bookId", "page_num"], name=index_name, background=True)
+        book_images_collection.create_index(
+            ["bookId", "page_num"], name=index_name, background=True
+        )
     book_image = book_images_collection.find_one(
         {"bookId": book_id, "page_num": page_num}
     )
@@ -312,10 +319,11 @@ def get_unique_pages(original_list):
     result_list = []
     if original_list:
         for item in original_list:
-            if (int(item['page_num']) not in unique_values):
-                unique_values.add(item['page_num'])
+            if int(item["page_num"]) not in unique_values:
+                unique_values.add(item["page_num"])
                 result_list.append(item)
     return result_list
+
 
 if __name__ == "__main__":
     BOOK_ID = "123"

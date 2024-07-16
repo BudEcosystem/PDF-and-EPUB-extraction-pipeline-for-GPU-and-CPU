@@ -12,7 +12,12 @@ import os
 import json
 from datetime import datetime
 from pdf_pipeline.pdf_producer import error_queue
-from utils import get_mongo_collection, get_rabbitmq_connection, get_channel, get_unique_pages
+from utils import (
+    get_mongo_collection,
+    get_rabbitmq_connection,
+    get_channel,
+    get_unique_pages,
+)
 
 connection = get_rabbitmq_connection()
 channel = get_channel(connection)
@@ -67,12 +72,14 @@ def book_complete(ch, method, properties, body):
             doc_result = doc.get("pages", [])
             if doc_result:
                 text_pages_result.extend(doc_result)
-        
+
         other_pages_result = get_unique_pages(other_pages_result)
         latex_pages_result = get_unique_pages(latex_pages_result)
         text_pages_result = get_unique_pages(text_pages_result)
 
-        num_pages_done = len(other_pages_result) + len(latex_pages_result) + len(text_pages_result)
+        num_pages_done = (
+            len(other_pages_result) + len(latex_pages_result) + len(text_pages_result)
+        )
         print("num pages done > ", num_pages_done)
         num_nougat_pages_done = book_det.get("num_nougat_pages_done", 0)
         print("num_nougat_pages_done > ", num_nougat_pages_done)
@@ -96,11 +103,8 @@ def book_complete(ch, method, properties, body):
                     if isinstance(doc_result, list):
                         nougat_pages_result.extend(doc_result)
                     else:
-                        pages_result = [
-                            result for _, result in doc_result.items()
-                        ]
+                        pages_result = [result for _, result in doc_result.items()]
                         nougat_pages_result.extend(pages_result)
-
 
             nougat_pages_result = get_unique_pages(nougat_pages_result)
             all_pages = (
@@ -120,14 +124,17 @@ def book_complete(ch, method, properties, body):
             if document_size >= MAX_BSON_SIZE:
                 # make extracted book splits
                 # Split the 'pages' array into batches
-                page_batches = [sorted_pages[i:i + BOOK_SPLIT_SIZE] for i in range(0, len(sorted_pages), BOOK_SPLIT_SIZE)]
+                page_batches = [
+                    sorted_pages[i : i + BOOK_SPLIT_SIZE]
+                    for i in range(0, len(sorted_pages), BOOK_SPLIT_SIZE)
+                ]
                 splits = len(page_batches)
                 for i, batch in enumerate(page_batches):
                     batch_doc = {
                         "bookId": bookId,
                         "book": book_name,
                         "split_order": i + 1,
-                        "pages": batch
+                        "pages": batch,
                     }
                     books.insert_one(batch_doc)
             else:
@@ -138,11 +145,18 @@ def book_complete(ch, method, properties, body):
             total_time_taken = (end_time - start_time).total_seconds()
             book_details.update_one(
                 {"bookId": bookId},
-                {"$set": {"status": "post_process", "end_time": current_time, "time_taken": total_time_taken, "splits": splits}},
+                {
+                    "$set": {
+                        "status": "post_process",
+                        "end_time": current_time,
+                        "time_taken": total_time_taken,
+                        "splits": splits,
+                    }
+                },
             )
-            book_folder = os.path.dirname(book_path)
-            if os.path.exists(book_folder):
-                shutil.rmtree(book_folder)
+            # book_folder = os.path.dirname(book_path)
+            # if os.path.exists(book_folder):
+            #     shutil.rmtree(book_folder)
             book_images.delete_many({"bookId": bookId})
         else:
             print(f"Book {bookId} not yet completed")

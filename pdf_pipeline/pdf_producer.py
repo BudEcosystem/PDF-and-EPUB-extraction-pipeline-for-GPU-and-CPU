@@ -5,6 +5,7 @@ import json
 from dotenv import load_dotenv
 import os
 import boto3
+from pathlib import Path
 from utils import (
     get_mongo_collection,
     generate_unique_id,
@@ -95,7 +96,8 @@ def send_to_queue(queue_name, data):
 #     book_names = [file_name.split("/")[1] for file_name in pdf_file_names]
 #     return book_names
 
-def get_all_books_names(bucket_name, folder_name):
+
+def get_all_books_names_from_s3(bucket_name, folder_name):
     """
     Get all books names from aws s3 bucket
 
@@ -106,12 +108,12 @@ def get_all_books_names(bucket_name, folder_name):
     Returns:
         list: A list of dictionaries representing the contents (objects) in the specified folder.
     """
-    s3 = boto3.client('s3')
+    s3 = boto3.client("s3")
     all_books = []
 
     # Initial request to list objects
     response = s3.list_objects_v2(Bucket=bucket_name, Prefix=folder_name)
-    
+
     while True:
         # Extract book names from the current page of results
         pdf_file_names = [obj["Key"] for obj in response.get("Contents", [])]
@@ -119,15 +121,25 @@ def get_all_books_names(bucket_name, folder_name):
         all_books.extend(book_names)
 
         # Check if there are more objects to retrieve
-        if not response.get('IsTruncated', False):
+        if not response.get("IsTruncated", False):
             break
 
         # Set ContinuationToken for the next page of results
         response = s3.list_objects_v2(
             Bucket=bucket_name,
             Prefix=folder_name,
-            ContinuationToken=response['NextContinuationToken']
+            ContinuationToken=response["NextContinuationToken"],
         )
+
+    return all_books
+
+
+def get_all_books_names_from_filesystem(folder_name):
+    all_books = []
+
+    for filepath in Path(folder_name).glob("**/*.pdf"):
+        # Extract book names from the current page of results
+        all_books.append(filepath)
 
     return all_books
 
@@ -211,20 +223,21 @@ def error_queue(book_path, bookId, error):
 
 
 def store_book_details():
-    books = get_all_books_names(bucket_name, folder_name + "/")
+    books = get_all_books_names_from_filesystem(folder_name)
     print(len(books))
     for book in books:
-        # doc = book_details.find_one({"book": book})
+        doc = book_details.find_one({"book": os.path.split(book)[-1]})
         # doc2 = sequentially_extracted_books.find_one({"book": book})
-        doc = False
+        # doc = False
         doc2 = False
         if not doc and not doc2:
-            ext = book.split(".")[-1]
+            ext = os.path.splitext(book)[-1][1:]
             book_data = {
                 "bookId": generate_unique_id(),
-                "book": book,
+                "book": os.path.split(book)[-1],
+                "book_path": book.as_posix() if isinstance(book, Path) else book,
                 "status": "not_extracted",
-                "type": ext
+                "type": ext,
             }
             book_details.insert_one(book_data)
 
@@ -244,8 +257,8 @@ if __name__ == "__main__":
             else:
                 error_queue("", book["bookId"], "File extension not .pdf")
                 print("skipping this book as it not a pdf file")
-            if count == 200:
-                break
+            # if count == 10:
+            #     break
 
     except KeyboardInterrupt:
         pass

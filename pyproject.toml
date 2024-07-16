@@ -14,7 +14,7 @@ opencv-python = "^4.9.0.80"
 pymongo = "^4.6.1"
 pypdf2 = "^3.0.1"
 pymupdf = "^1.23.8"
-layoutparser = {extras = ["ocr"], version = "^0.3.4"}
+layoutparser = { extras = ["ocr"], version = "^0.3.4" }
 pillow = "9.5.0"
 pix2tex = "^0.1.2"
 latext = "^0.0.7"

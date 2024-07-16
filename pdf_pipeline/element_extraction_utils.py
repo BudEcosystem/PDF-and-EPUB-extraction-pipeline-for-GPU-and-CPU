@@ -1,8 +1,10 @@
 import os
 import cv2
 from dotenv import load_dotenv
+from pathlib import Path
 import pytesseract
 from PIL import Image
+
 Image.MAX_IMAGE_PIXELS = None
 from pix2tex.cli import LatexOCR
 from latext import latex_to_text
@@ -17,6 +19,7 @@ from pdf_pipeline.pdf_producer import send_to_queue
 load_dotenv()
 
 LATEX_NO_CUDA = os.getenv("LATEX_NO_CUDA") == "true"
+
 
 class LatexOCRConfig:
     def __init__(
@@ -60,7 +63,13 @@ def process_table(table_block, image_path, bookId, page_num):
         y2 = img.shape[0]
     cropped_image = img[int(y1) : int(y2), int(x1) : int(x2)]
     tableId = generate_unique_id()
-    table_image_path = os.path.abspath(f"cropped_{tableId}.png")
+    
+    table_image_path = os.path.join(
+        os.path.dirname(image_path), "sections", f"cropped_{tableId}.png"
+    )
+    Path(os.path.dirname(table_image_path)).mkdir(exist_ok=True, parents=True)
+    
+    # table_image_path = os.path.abspath(f"cropped_{tableId}.png")
     cv2.imwrite(table_image_path, cropped_image)
     output = f"{{{{table:{tableId}}}}}"
     # data = {"img": generate_image_str(bookId, table_image_path, save=False)}
@@ -103,9 +112,10 @@ def process_publaynet_figure(figure_block, image_path):
     figure_image_path = crop_image(figure_block, image_path, figureId)
     output = f"{{{{figure:{figureId}}}}}"
 
-    figure_url = upload_to_aws_s3(figure_image_path, figureId)
-    figure = {"id": figureId, "url": figure_url, "caption": caption}
-    if os.path.exists(figure_image_path):
+    # figure_url = upload_to_aws_s3(figure_image_path, figureId)
+    figure_url = None
+    figure = {"id": figureId, "url": figure_image_path, "caption": caption}
+    if figure_url is not None and os.path.exists(figure_image_path):
         os.remove(figure_image_path)
     return output, figure
 

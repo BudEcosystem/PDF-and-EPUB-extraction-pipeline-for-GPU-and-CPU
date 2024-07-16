@@ -39,7 +39,9 @@ RUN poetry config virtualenvs.create false \
     && poetry install $(test "$YOUR_ENV" == production && echo "--no-dev") --no-interaction --no-ansi
 
 # change command to CUDA version of system
+RUN pip3 install setuptools wheel
 RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+RUN pip3 install "detectron2 @ git+https://github.com/facebookresearch/detectron2.git"
 RUN pip3 install "git+https://${GIT_TOKEN}@github.com/DevBud-ai/docxtract.git"
 RUN pip3 install pillow==9.5.0
 # copy project files

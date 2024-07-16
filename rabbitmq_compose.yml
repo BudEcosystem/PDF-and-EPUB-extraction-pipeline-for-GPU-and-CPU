@@ -5,6 +5,8 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    networks:
+      - my_network
     healthcheck:
       test: rabbitmq-diagnostics -q ping
       interval: 30s
@@ -15,3 +17,5 @@ services:
       RABBITMQ_DEFAULT_USER: "guest"
       RABBITMQ_DEFAULT_PASS: "guest"
       RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbit consumer_timeout 432000000"
+networks:
+  my_network:

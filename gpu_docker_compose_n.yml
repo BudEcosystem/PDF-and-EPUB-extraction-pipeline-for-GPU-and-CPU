@@ -30,7 +30,7 @@ services:
   #   networks:
   #     - my_network
   #   volumes:
-  #     - /home/developer/prakash/pdf_extraction_pipeline:/src
+  #     - .:/src
   #   depends_on:
   #     nougat_api_server:
   #       condition: service_healthy
@@ -44,7 +44,7 @@ services:
     networks:
       - my_network
     volumes:
-      - /home/developer/prakash/pdf_extraction_pipeline:/src
+      - .:/src
     # depends_on:
     #   nougat_api_server:
     #     condition: service_healthy
@@ -60,7 +60,7 @@ services:
     networks:
       - my_network
     volumes:
-      - /home/developer/prakash/pdf_extraction_pipeline:/src
+      - .:/src
     # depends_on:
     #   nougat_api_server:
     #     condition: service_healthy
@@ -82,7 +82,7 @@ services:
     networks:
       - my_network
     volumes:
-      - /home/developer/prakash/pdf_extraction_pipeline:/src
+      - .:/src
     # depends_on:
     #   nougat_api_server:
     #     condition: service_healthy
@@ -104,7 +104,7 @@ services:
     networks:
       - my_network
     volumes:
-      - /home/developer/prakash/pdf_extraction_pipeline:/src
+      - .:/src
     # depends_on:
     #   nougat_api_server:
     #     condition: service_healthy
@@ -120,7 +120,7 @@ services:
     networks:
       - my_network
     volumes:
-      - /home/developer/prakash/pdf_extraction_pipeline:/src
+      - .:/src
     # depends_on:
     #   nougat_api_server:
     #     condition: service_healthy
@@ -142,7 +142,7 @@ services:
     networks:
       - my_network
     volumes:
-      - /home/developer/prakash/pdf_extraction_pipeline:/src
+      - .:/src
     # depends_on:
     #   nougat_api_server:
     #     condition: service_healthy
@@ -158,14 +158,14 @@ services:
     networks:
       - my_network
     volumes:
-      - /home/developer/prakash/pdf_extraction_pipeline:/src
+      - .:/src
     # depends_on:
     #   nougat_api_server:
     #     condition: service_healthy
       # nougat_api_server_2:
       #   condition: service_healthy
     deploy:
-      replicas: 3
+      replicas: 6
       resources:
         reservations:
           devices:
@@ -180,7 +180,7 @@ services:
     networks:
       - my_network
     volumes:
-      - /home/developer/prakash/pdf_extraction_pipeline:/src
+      - .:/src
     # depends_on:
     #   nougat_api_server:
     #     condition: service_healthy
@@ -200,7 +200,7 @@ services:
     networks:
       - my_network
     volumes:
-      - /home/developer/prakash/pdf_extraction_pipeline:/src
+      - .:/src
     # depends_on:
     #   nougat_api_server:
     #     condition: service_healthy
@@ -216,7 +216,7 @@ services:
     networks:
       - my_network
     volumes:
-      - /home/developer/prakash/pdf_extraction_pipeline:/src
+      - .:/src
     # depends_on:
     #   nougat_api_server:
     #     condition: service_healthy
